@@ -1,0 +1,99 @@
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
+from app.models.attendee import Attendee, Match
+from app.schemas.attendee import MatchResponse, MatchListResponse, MatchStatusUpdate, AttendeeResponse
+from app.services.matching import MatchingEngine
+
+router = APIRouter(prefix="/matches", tags=["matches"])
+
+
+@router.get("/{attendee_id}", response_model=MatchListResponse)
+async def get_matches(
+    attendee_id: UUID,
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get AI-generated match recommendations for an attendee."""
+    attendee = await db.get(Attendee, attendee_id)
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Attendee not found")
+
+    result = await db.execute(
+        select(Match)
+        .where(Match.attendee_a_id == attendee_id)
+        .order_by(Match.overall_score.desc())
+        .limit(limit)
+    )
+    matches = result.scalars().all()
+
+    match_responses = []
+    for match in matches:
+        # Fetch the matched attendee's profile
+        matched = await db.get(Attendee, match.attendee_b_id)
+        resp = MatchResponse.model_validate(match)
+        if matched:
+            resp.matched_attendee = AttendeeResponse.model_validate(matched)
+        match_responses.append(resp)
+
+    return MatchListResponse(matches=match_responses, attendee_id=attendee_id)
+
+
+@router.post("/generate/{attendee_id}")
+async def generate_matches_for_attendee(
+    attendee_id: UUID,
+    top_k: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate match recommendations for a single attendee."""
+    engine = MatchingEngine(db)
+    try:
+        matches = await engine.generate_matches_for_attendee(attendee_id, top_k)
+        return {
+            "status": "completed",
+            "attendee_id": str(attendee_id),
+            "matches_generated": len(matches),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/generate-all")
+async def generate_all_matches(
+    top_k: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Trigger match generation for all attendees."""
+    engine = MatchingEngine(db)
+    total = await engine.generate_all_matches(top_k)
+    return {"status": "completed", "total_matches": total}
+
+
+@router.post("/process-all")
+async def process_all_attendees(db: AsyncSession = Depends(get_db)):
+    """Process all attendees: generate AI summaries, intents, and embeddings."""
+    engine = MatchingEngine(db)
+    count = await engine.process_all_attendees()
+    return {"status": "completed", "attendees_processed": count}
+
+
+@router.patch("/{match_id}/status", response_model=MatchResponse)
+async def update_match_status(
+    match_id: UUID,
+    data: MatchStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Accept or decline a match."""
+    match = await db.get(Match, match_id)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    if data.status not in ("accepted", "declined", "met"):
+        raise HTTPException(status_code=400, detail="Status must be accepted, declined, or met")
+
+    match.status = data.status
+    await db.commit()
+    await db.refresh(match)
+    return MatchResponse.model_validate(match)

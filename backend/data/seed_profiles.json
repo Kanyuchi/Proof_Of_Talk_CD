@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Amara Okafor",
+    "email": "amara.okafor@abudhabi-swf.example",
+    "company": "Abu Dhabi Sovereign Wealth Fund",
+    "title": "Director of Digital Assets",
+    "ticket_type": "vip",
+    "interests": ["tokenised real-world assets", "blockchain infrastructure", "regulated custody", "institutional DeFi"],
+    "goals": "Deploy $200M into tokenised real-world assets and blockchain infrastructure over 18 months. Focused on regulated custody solutions and institutional-grade DeFi protocols. Looking for startups with regulatory clarity, audited smart contracts, and institutional partnerships. Also interested in co-investment opportunities with other sovereign and pension funds.",
+    "linkedin_url": null,
+    "twitter_handle": null,
+    "company_website": null
+  },
+  {
+    "name": "Marcus Chen",
+    "email": "marcus@vaultbridge.example",
+    "company": "VaultBridge",
+    "title": "CEO & Co-Founder",
+    "ticket_type": "speaker",
+    "interests": ["institutional custody", "tokenised securities", "settlement infrastructure", "banking partnerships"],
+    "goals": "Series B ($40M raised). Building institutional custody and settlement infrastructure for tokenised securities. Live with 3 European banks and 2 asset managers. Looking for strategic investors (not just financial), partnerships with exchanges and custodians, and introductions to Middle Eastern sovereign wealth funds exploring tokenisation.",
+    "linkedin_url": null,
+    "twitter_handle": null,
+    "company_website": "https://vaultbridge.example"
+  },
+  {
+    "name": "Dr. Elena Vasquez",
+    "email": "elena@meridiancv.example",
+    "company": "Meridian Crypto Ventures",
+    "title": "General Partner",
+    "ticket_type": "vip",
+    "interests": ["TradFi-DeFi convergence", "infrastructure", "Series A-B investing", "institutional traction"],
+    "goals": "$500M AUM. Investment thesis: infrastructure plays at the intersection of TradFi and DeFi. Looking for Series A-B companies with institutional traction, not just retail hype. Seeking deal flow that matches her thesis, co-investors for larger rounds, and portfolio company introductions to strategic partners.",
+    "linkedin_url": null,
+    "twitter_handle": null,
+    "company_website": "https://meridiancv.example"
+  },
+  {
+    "name": "James Whitfield",
+    "email": "james@nexalayer.example",
+    "company": "NexaLayer",
+    "title": "CTO",
+    "ticket_type": "sponsor",
+    "interests": ["Layer-2 scaling", "enterprise blockchain", "compliance modules", "KYC/AML", "cross-chain settlement"],
+    "goals": "Enterprise-grade L2 with built-in compliance modules. Targeting regulated financial institutions that need blockchain throughput without sacrificing KYC/AML. Looking for banks and asset managers willing to pilot the technology. Also seeking infrastructure partnerships for cross-chain settlement.",
+    "linkedin_url": null,
+    "twitter_handle": null,
+    "company_website": "https://nexalayer.example"
+  },
+  {
+    "name": "Sophie Bergmann",
+    "email": "sophie.bergmann@bundesbank.example",
+    "company": "Deutsche Bundesbank",
+    "title": "Head of Digital Assets Innovation",
+    "ticket_type": "delegate",
+    "interests": ["CBDC", "regulatory frameworks", "MiCA", "tokenised securities regulation", "compliance-first technology"],
+    "goals": "Exploring central bank digital currency (CBDC) infrastructure and regulatory frameworks for tokenised securities under MiCA. Looking for technology providers with compliance-first approaches, academic collaborators, and private sector partners for regulatory sandbox participation.",
+    "linkedin_url": null,
+    "twitter_handle": null,
+    "company_website": "https://www.bundesbank.de"
+  }
+]
