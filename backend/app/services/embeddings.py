@@ -112,8 +112,11 @@ Return 2-4 most relevant tags as a JSON array. Nothing else."""
         max_tokens=100,
     )
     import json
+    raw = response.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
     try:
-        return json.loads(response.choices[0].message.content.strip())
+        return json.loads(raw)
     except json.JSONDecodeError:
         return ["knowledge_exchange"]
 
