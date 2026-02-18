@@ -69,6 +69,30 @@ async def enrichment_status(attendee_id: UUID, db: AsyncSession = Depends(get_db
     }
 
 
+@router.post("/batch")
+async def enrich_all(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
+    """Batch enrich all attendees."""
+    result = await db.execute(select(Attendee))
+    attendees = result.scalars().all()
+
+    service = EnrichmentService()
+    results = []
+    try:
+        for attendee in attendees:
+            enriched = await service.enrich_attendee(attendee)
+            attendee.enriched_profile = enriched
+            attendee.enriched_at = datetime.utcnow()
+            attendee.ai_summary = await generate_ai_summary(attendee)
+            attendee.intent_tags = await classify_intents(attendee)
+            attendee.embedding = await embed_attendee(attendee)
+            results.append({"attendee_id": str(attendee.id), "sources": list(enriched.keys())})
+
+        await db.commit()
+        return {"status": "completed", "results": results}
+    finally:
+        await service.close()
+
+
 @router.post("/{attendee_id}")
 async def enrich_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """Trigger data enrichment for a single attendee."""
@@ -93,29 +117,5 @@ async def enrich_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db),
             "attendee_id": str(attendee_id),
             "sources_enriched": [k for k in enriched.keys() if not k.endswith("_at") and not k.endswith("_summary") and not k.endswith("_description") and not k.endswith("_activity")],
         }
-    finally:
-        await service.close()
-
-
-@router.post("/batch")
-async def enrich_all(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
-    """Batch enrich all attendees."""
-    result = await db.execute(select(Attendee))
-    attendees = result.scalars().all()
-
-    service = EnrichmentService()
-    results = []
-    try:
-        for attendee in attendees:
-            enriched = await service.enrich_attendee(attendee)
-            attendee.enriched_profile = enriched
-            attendee.enriched_at = datetime.utcnow()
-            attendee.ai_summary = await generate_ai_summary(attendee)
-            attendee.intent_tags = await classify_intents(attendee)
-            attendee.embedding = await embed_attendee(attendee)
-            results.append({"attendee_id": str(attendee.id), "sources": list(enriched.keys())})
-
-        await db.commit()
-        return {"status": "completed", "results": results}
     finally:
         await service.close()

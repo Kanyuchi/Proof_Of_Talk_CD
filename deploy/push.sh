@@ -7,12 +7,14 @@
 set -euo pipefail
 
 EC2_HOST="${1:?Usage: ./deploy/push.sh <EC2_HOST> [key.pem]}"
-KEY_ARG=""
-if [[ -n "${2:-}" ]]; then
-  KEY_ARG="-i $2"
+KEY_FILE="${2:-}"
+SSH_OPTS=()
+RSYNC_OPTS=(-avz --progress)
+if [[ -n "$KEY_FILE" ]]; then
+  SSH_OPTS+=(-i "$KEY_FILE")
+  RSYNC_OPTS+=(-e "ssh -i $KEY_FILE")
 fi
-SSH="ssh $KEY_ARG ec2-user@$EC2_HOST"
-SCP="rsync -avz --progress $KEY_ARG"
+SSH="ssh ${SSH_OPTS[*]} ec2-user@$EC2_HOST"
 APP_DIR="/home/ec2-user/app"
 
 echo "==> Building frontend..."
@@ -20,7 +22,7 @@ cd "$(dirname "$0")/.."
 (cd frontend && npm run build)
 
 echo "==> Syncing backend to EC2..."
-$SCP \
+rsync "${RSYNC_OPTS[@]}" \
   --exclude '.venv' \
   --exclude '__pycache__' \
   --exclude '*.pyc' \
@@ -28,10 +30,12 @@ $SCP \
   backend/ "ec2-user@$EC2_HOST:$APP_DIR/backend/"
 
 echo "==> Syncing frontend dist to EC2..."
-$SCP frontend/dist/ "ec2-user@$EC2_HOST:$APP_DIR/frontend/dist/"
+rsync "${RSYNC_OPTS[@]}" \
+  frontend/dist/ "ec2-user@$EC2_HOST:$APP_DIR/frontend/dist/"
 
 echo "==> Syncing deploy configs..."
-$SCP deploy/ "ec2-user@$EC2_HOST:$APP_DIR/deploy/"
+rsync "${RSYNC_OPTS[@]}" \
+  deploy/ "ec2-user@$EC2_HOST:$APP_DIR/deploy/"
 
 echo "==> Installing Python deps on EC2..."
 $SSH "cd $APP_DIR/backend && source .venv/bin/activate && pip install -r requirements.txt -q"
