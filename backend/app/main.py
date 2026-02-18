@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
-from app.api.routes import attendees, matches, enrichment, dashboard
+from app.api.routes import attendees, matches, enrichment, dashboard, auth, chat, messages
 
 settings = get_settings()
 
@@ -23,6 +23,9 @@ app.include_router(attendees.router, prefix=settings.API_V1_PREFIX)
 app.include_router(matches.router, prefix=settings.API_V1_PREFIX)
 app.include_router(enrichment.router, prefix=settings.API_V1_PREFIX)
 app.include_router(dashboard.router, prefix=settings.API_V1_PREFIX)
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
+app.include_router(chat.router, prefix=settings.API_V1_PREFIX)
+app.include_router(messages.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")

@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.attendee import Attendee, Match
 from app.schemas.attendee import DashboardStats
+from app.core.deps import require_admin
+from app.models.user import User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -100,3 +102,106 @@ async def match_quality(db: AsyncSession = Depends(get_db)):
             else 0.0
         ),
     }
+
+
+@router.get("/matches-by-type")
+async def matches_by_type(
+    match_type: str = Query(...),
+    limit: int = Query(20, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Drill-down: return matches of a given type with attendee names."""
+    from app.schemas.attendee import MatchResponse
+
+    result = await db.execute(
+        select(Match)
+        .where(Match.match_type == match_type)
+        .order_by(Match.overall_score.desc())
+        .limit(limit)
+    )
+    raw = result.scalars().all()
+
+    matches_out = []
+    for m in raw:
+        matched = await db.get(Attendee, m.matched_attendee_id)
+        d = MatchResponse.model_validate(m).model_dump()
+        if matched:
+            d["matched_attendee"] = {"name": matched.name, "id": str(matched.id)}
+        matches_out.append(d)
+
+    return {"matches": matches_out, "total": len(matches_out)}
+
+
+@router.get("/attendees-by-sector")
+async def attendees_by_sector(
+    sector: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Drill-down: return attendees whose interests include a given sector."""
+    result = await db.execute(select(Attendee))
+    all_attendees = result.scalars().all()
+
+    matching = [a for a in all_attendees if a.interests and sector in a.interests]
+
+    return {
+        "attendees": [
+            {
+                "id": str(a.id),
+                "name": a.name,
+                "title": a.title,
+                "company": a.company,
+            }
+            for a in matching
+        ],
+        "total": len(matching),
+    }
+
+
+@router.post("/trigger-processing")
+async def trigger_processing(
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Admin: re-generate AI summaries + embeddings for all attendees."""
+    from app.services.enrichment import enrich_attendee
+
+    result = await db.execute(select(Attendee))
+    attendees = result.scalars().all()
+
+    async def process_all():
+        from app.core.database import async_session
+        async with async_session() as session:
+            for a in attendees:
+                try:
+                    await enrich_attendee(str(a.id), session)
+                except Exception:
+                    pass
+
+    background_tasks.add_task(process_all)
+    return {"status": "started", "attendees_processed": len(attendees)}
+
+
+@router.post("/trigger-matching")
+async def trigger_matching(
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Admin: re-run the full matching pipeline."""
+    from app.services.matching import run_matching_pipeline
+
+    result = await db.execute(select(Attendee))
+    attendees = result.scalars().all()
+    count = len(attendees)
+
+    async def run_pipeline():
+        from app.core.database import async_session
+        async with async_session() as session:
+            try:
+                await run_matching_pipeline(session)
+            except Exception:
+                pass
+
+    background_tasks.add_task(run_pipeline)
+    return {"status": "started", "total_matches": count * (count - 1)}

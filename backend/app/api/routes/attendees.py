@@ -9,6 +9,36 @@ from app.schemas.attendee import AttendeeCreate, AttendeeResponse, AttendeeListR
 router = APIRouter(prefix="/attendees", tags=["attendees"])
 
 
+@router.get("/search", response_model=AttendeeListResponse)
+async def search_attendees(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    """Full-text search across name, company, title, goals, and ai_summary."""
+    from sqlalchemy import or_, cast, String
+    term = f"%{q.lower()}%"
+    query = (
+        select(Attendee)
+        .where(
+            or_(
+                func.lower(Attendee.name).like(term),
+                func.lower(Attendee.company).like(term),
+                func.lower(Attendee.title).like(term),
+                func.lower(Attendee.goals).like(term),
+                func.lower(Attendee.ai_summary).like(term),
+            )
+        )
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    attendees = result.scalars().all()
+    return AttendeeListResponse(
+        attendees=[AttendeeResponse.model_validate(a) for a in attendees],
+        total=len(attendees),
+    )
+
+
 @router.get("/", response_model=AttendeeListResponse)
 async def list_attendees(
     skip: int = Query(0, ge=0),

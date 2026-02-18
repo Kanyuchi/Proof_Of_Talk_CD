@@ -52,3 +52,66 @@ export interface MatchQuality {
   score_distribution: Record<string, number>;
   acceptance_rate: number;
 }
+
+// ── Auth ────────────────────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  is_admin: boolean;
+  attendee_id: string | null;
+}
+
+export interface Token {
+  access_token: string;
+  token_type: string;
+}
+
+// ── Chat ────────────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+// ── Messages ────────────────────────────────────────────────────────────
+
+export interface MessageData {
+  id: string;
+  conversation_id: string;
+  sender_attendee_id: string;
+  sender_name: string;
+  content: string;
+  created_at: string;
+  read_at: string | null;
+  is_mine: boolean;
+}
+
+export interface ConversationSummary {
+  match_id: string;
+  match_status: string;
+  conversation_id: string | null;
+  other_attendee_id: string | null;
+  other_attendee_name: string;
+  other_attendee_company: string;
+  other_attendee_title: string;
+  other_attendee_ticket: string;
+  last_message: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+}
+
+export interface ConversationDetail {
+  conversation_id: string;
+  match_id: string;
+  match_status: string;
+  other_attendee: {
+    id: string;
+    name: string;
+    company: string;
+    title: string;
+    ticket_type: string;
+  } | null;
+  messages: MessageData[];
+}

@@ -1,16 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Search,
-  Crown,
-  Mic,
-  Megaphone,
-  User,
-  ChevronRight,
-  Brain,
+  Search, Crown, Mic, Megaphone, User, ChevronRight, Brain,
 } from "lucide-react";
-import type { Attendee } from "../types";
-import { listAttendees } from "../api/client";
+import { useAttendees } from "../hooks/useAttendees";
+import EmptyState from "../components/EmptyState";
 
 const ticketIcons: Record<string, React.ReactNode> = {
   vip: <Crown className="w-3.5 h-3.5 text-amber-400" />,
@@ -26,127 +20,29 @@ const ticketColors: Record<string, string> = {
   delegate: "bg-blue-400/10 text-blue-400 border-blue-400/20",
 };
 
-// Demo data for when API isn't connected
-const demoAttendees: Attendee[] = [
-  {
-    id: "1",
-    name: "Amara Okafor",
-    email: "amara@example.com",
-    company: "Abu Dhabi Sovereign Wealth Fund",
-    title: "Director of Digital Assets",
-    ticket_type: "vip",
-    interests: ["tokenised real-world assets", "blockchain infrastructure", "regulated custody", "institutional DeFi"],
-    goals: "Deploy $200M into tokenised real-world assets and blockchain infrastructure over 18 months.",
-    linkedin_url: null,
-    twitter_handle: null,
-    company_website: null,
-    ai_summary: "Senior sovereign wealth fund allocator with a $200M mandate for tokenised RWA and blockchain infrastructure, focused on regulated custody and institutional-grade DeFi.",
-    intent_tags: ["deploying_capital", "seeking_partnerships", "co_investment", "deal_making"],
-    deal_readiness_score: 0.5,
-    enriched_profile: {},
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Marcus Chen",
-    email: "marcus@example.com",
-    company: "VaultBridge",
-    title: "CEO & Co-Founder",
-    ticket_type: "speaker",
-    interests: ["institutional custody", "tokenised securities", "settlement infrastructure", "banking partnerships"],
-    goals: "Series B ($40M raised). Looking for strategic investors and Middle Eastern sovereign wealth fund introductions.",
-    linkedin_url: null,
-    twitter_handle: null,
-    company_website: null,
-    ai_summary: "CEO of VaultBridge, a Series B custody and settlement platform live with 3 European banks. Seeking strategic capital and sovereign fund partnerships.",
-    intent_tags: ["raising_capital", "seeking_partnerships", "deal_making"],
-    deal_readiness_score: 0.5,
-    enriched_profile: {},
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "3",
-    name: "Dr. Elena Vasquez",
-    email: "elena@example.com",
-    company: "Meridian Crypto Ventures",
-    title: "General Partner",
-    ticket_type: "vip",
-    interests: ["TradFi-DeFi convergence", "infrastructure", "Series A-B investing", "institutional traction"],
-    goals: "$500M AUM. Thesis: infrastructure at the TradFi-DeFi intersection. Seeking deal flow and co-investors.",
-    linkedin_url: null,
-    twitter_handle: null,
-    company_website: null,
-    ai_summary: "GP at Meridian Crypto Ventures ($500M AUM), investing in TradFi-DeFi infrastructure. Actively seeking Series A-B companies with institutional traction.",
-    intent_tags: ["deploying_capital", "seeking_partnerships", "deal_making", "co_investment"],
-    deal_readiness_score: 0.5,
-    enriched_profile: {},
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "4",
-    name: "James Whitfield",
-    email: "james@example.com",
-    company: "NexaLayer",
-    title: "CTO",
-    ticket_type: "sponsor",
-    interests: ["Layer-2 scaling", "enterprise blockchain", "compliance modules", "KYC/AML", "cross-chain settlement"],
-    goals: "Enterprise-grade L2 with compliance modules. Seeking bank pilots and infrastructure partnerships.",
-    linkedin_url: null,
-    twitter_handle: null,
-    company_website: null,
-    ai_summary: "CTO of NexaLayer, building enterprise L2 with compliance modules. Targeting regulated financial institutions for pilot programs.",
-    intent_tags: ["seeking_partnerships", "seeking_customers", "regulatory_engagement", "technology_evaluation"],
-    deal_readiness_score: 0.25,
-    enriched_profile: {},
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "5",
-    name: "Sophie Bergmann",
-    email: "sophie@example.com",
-    company: "Deutsche Bundesbank",
-    title: "Head of Digital Assets Innovation",
-    ticket_type: "delegate",
-    interests: ["CBDC", "regulatory frameworks", "MiCA", "tokenised securities regulation", "compliance-first technology"],
-    goals: "Exploring CBDC infrastructure and regulatory frameworks for tokenised securities under MiCA.",
-    linkedin_url: null,
-    twitter_handle: null,
-    company_website: null,
-    ai_summary: "Leads digital assets innovation at Deutsche Bundesbank. Focused on CBDC infrastructure and MiCA regulatory frameworks. Seeking compliance-first technology partners.",
-    intent_tags: ["seeking_partnerships", "regulatory_engagement", "technology_evaluation", "knowledge_exchange"],
-    deal_readiness_score: 0.0,
-    enriched_profile: {},
-    created_at: new Date().toISOString(),
-  },
-];
+const TICKET_TYPES = ["vip", "speaker", "sponsor", "delegate"] as const;
 
 export default function Attendees() {
-  const [attendees, setAttendees] = useState<Attendee[]>([]);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useAttendees();
+  const attendees = data?.attendees ?? [];
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const { attendees: data } = await listAttendees({ limit: 100 });
-        setAttendees(data.length > 0 ? data : demoAttendees);
-      } catch {
-        setAttendees(demoAttendees);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
+  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<string[]>([]);
+
+  const toggleFilter = (type: string) =>
+    setFilters((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
 
   const filtered = attendees.filter((a) => {
+    const q = search.toLowerCase();
     const matchesSearch =
       !search ||
-      a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.company.toLowerCase().includes(search.toLowerCase()) ||
-      a.title.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = !filter || a.ticket_type === filter;
+      a.name.toLowerCase().includes(q) ||
+      a.company.toLowerCase().includes(q) ||
+      a.title.toLowerCase().includes(q) ||
+      (a.ai_summary?.toLowerCase().includes(q) ?? false);
+    const matchesFilter = filters.length === 0 || filters.includes(a.ticket_type);
     return matchesSearch && matchesFilter;
   });
 
@@ -162,24 +58,24 @@ export default function Attendees() {
       </div>
 
       {/* Search and filter */}
-      <div className="flex gap-3">
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
           <input
             type="text"
-            placeholder="Search by name, company, or title..."
+            placeholder="Search by name, company, title, or summary…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400/50"
           />
         </div>
-        <div className="flex gap-1.5">
-          {["vip", "speaker", "sponsor", "delegate"].map((type) => (
+        <div className="flex gap-1.5 flex-wrap">
+          {TICKET_TYPES.map((type) => (
             <button
               key={type}
-              onClick={() => setFilter(filter === type ? null : type)}
+              onClick={() => toggleFilter(type)}
               className={`px-3 py-2 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 capitalize ${
-                filter === type
+                filters.includes(type)
                   ? ticketColors[type]
                   : "border-white/10 text-white/40 hover:text-white/60"
               }`}
@@ -188,12 +84,30 @@ export default function Attendees() {
               {type}
             </button>
           ))}
+          {filters.length > 0 && (
+            <button
+              onClick={() => setFilters([])}
+              className="px-3 py-2 rounded-lg text-xs text-white/30 border border-white/5 hover:text-white/50 transition-all"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
       {/* Attendee list */}
-      {loading ? (
-        <div className="text-center py-20 text-white/30">Loading...</div>
+      {isLoading ? (
+        <div className="text-center py-20 text-white/30">Loading…</div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="No attendees found"
+          description="Try a different search term or clear your filters."
+          action={
+            (search || filters.length > 0)
+              ? { label: "Clear all filters", onClick: () => { setSearch(""); setFilters([]); } }
+              : undefined
+          }
+        />
       ) : (
         <div className="grid gap-3">
           {filtered.map((attendee) => (
@@ -210,9 +124,7 @@ export default function Attendees() {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white">
-                    {attendee.name}
-                  </span>
+                  <span className="font-semibold text-white">{attendee.name}</span>
                   <span
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase ${
                       ticketColors[attendee.ticket_type]
@@ -235,11 +147,8 @@ export default function Attendees() {
 
               {/* Intent tags */}
               <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
-                {attendee.intent_tags.slice(0, 3).map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-2 py-0.5 rounded-full bg-white/5 text-white/40 text-[10px]"
-                  >
+                {(attendee.intent_tags ?? []).slice(0, 3).map((tag) => (
+                  <span key={tag} className="px-2 py-0.5 rounded-full bg-white/5 text-white/40 text-[10px]">
                     {tag.replace(/_/g, " ")}
                   </span>
                 ))}
