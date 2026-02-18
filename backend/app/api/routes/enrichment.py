@@ -7,12 +7,14 @@ from app.core.database import get_db
 from app.models.attendee import Attendee
 from app.services.enrichment import EnrichmentService
 from app.services.embeddings import generate_ai_summary, embed_attendee, classify_intents
+from app.core.deps import require_auth, require_admin
+from app.models.user import User
 
 router = APIRouter(prefix="/enrichment", tags=["enrichment"])
 
 
 @router.get("/{attendee_id}/status")
-async def enrichment_status(attendee_id: UUID, db: AsyncSession = Depends(get_db)):
+async def enrichment_status(attendee_id: UUID, db: AsyncSession = Depends(get_db), _user: User = Depends(require_auth)):
     """Return per-source enrichment status for an attendee."""
     attendee = await db.get(Attendee, attendee_id)
     if not attendee:
@@ -68,7 +70,7 @@ async def enrichment_status(attendee_id: UUID, db: AsyncSession = Depends(get_db
 
 
 @router.post("/{attendee_id}")
-async def enrich_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db)):
+async def enrich_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """Trigger data enrichment for a single attendee."""
     attendee = await db.get(Attendee, attendee_id)
     if not attendee:
@@ -96,7 +98,7 @@ async def enrich_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db))
 
 
 @router.post("/batch")
-async def enrich_all(db: AsyncSession = Depends(get_db)):
+async def enrich_all(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """Batch enrich all attendees."""
     result = await db.execute(select(Attendee))
     attendees = result.scalars().all()

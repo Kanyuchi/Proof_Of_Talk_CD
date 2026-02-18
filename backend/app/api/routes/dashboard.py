@@ -1,17 +1,19 @@
+import structlog
+logger = structlog.get_logger(__name__)
 from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.attendee import Attendee, Match
 from app.schemas.attendee import DashboardStats
-from app.core.deps import require_admin
+from app.core.deps import require_auth, require_admin
 from app.models.user import User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
 @router.get("/stats", response_model=DashboardStats)
-async def get_stats(db: AsyncSession = Depends(get_db)):
+async def get_stats(db: AsyncSession = Depends(get_db), _user: User = Depends(require_auth)):
     """Organiser dashboard: event-wide stats."""
     total_attendees = (await db.execute(select(func.count(Attendee.id)))).scalar() or 0
     matches_generated = (await db.execute(select(func.count(Match.id)))).scalar() or 0
@@ -72,7 +74,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/match-quality")
-async def match_quality(db: AsyncSession = Depends(get_db)):
+async def match_quality(db: AsyncSession = Depends(get_db), _user: User = Depends(require_auth)):
     """Match quality distribution and analytics."""
     result = await db.execute(
         select(Match.overall_score, Match.match_type, Match.status)
@@ -109,6 +111,7 @@ async def matches_by_type(
     match_type: str = Query(...),
     limit: int = Query(20, le=100),
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
 ):
     """Drill-down: return matches of a given type with attendee names."""
     from app.schemas.attendee import MatchResponse
@@ -136,6 +139,7 @@ async def matches_by_type(
 async def attendees_by_sector(
     sector: str = Query(...),
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
 ):
     """Drill-down: return attendees whose interests include a given sector."""
     result = await db.execute(select(Attendee))
@@ -175,8 +179,8 @@ async def trigger_processing(
             for a in attendees:
                 try:
                     await enrich_attendee(str(a.id), session)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.error("bg_enrich_failed", attendee_id=str(a.id), error=str(exc))
 
     background_tasks.add_task(process_all)
     return {"status": "started", "attendees_processed": len(attendees)}
@@ -200,8 +204,8 @@ async def trigger_matching(
         async with async_session() as session:
             try:
                 await run_matching_pipeline(session)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.error("bg_matching_failed", error=str(exc))
 
     background_tasks.add_task(run_pipeline)
     return {"status": "started", "total_matches": count * (count - 1)}

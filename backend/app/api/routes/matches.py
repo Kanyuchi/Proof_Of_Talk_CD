@@ -6,6 +6,8 @@ from app.core.database import get_db
 from app.models.attendee import Attendee, Match
 from app.schemas.attendee import MatchResponse, MatchListResponse, MatchStatusUpdate, AttendeeResponse
 from app.services.matching import MatchingEngine
+from app.core.deps import require_auth, require_admin
+from app.models.user import User
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
@@ -15,6 +17,7 @@ async def get_matches(
     attendee_id: UUID,
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
 ):
     """Get AI-generated match recommendations for an attendee."""
     attendee = await db.get(Attendee, attendee_id)
@@ -46,6 +49,7 @@ async def generate_matches_for_attendee(
     attendee_id: UUID,
     top_k: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Generate match recommendations for a single attendee."""
     engine = MatchingEngine(db)
@@ -64,6 +68,7 @@ async def generate_matches_for_attendee(
 async def generate_all_matches(
     top_k: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Trigger match generation for all attendees."""
     engine = MatchingEngine(db)
@@ -72,7 +77,7 @@ async def generate_all_matches(
 
 
 @router.post("/process-all")
-async def process_all_attendees(db: AsyncSession = Depends(get_db)):
+async def process_all_attendees(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """Process all attendees: generate AI summaries, intents, and embeddings."""
     engine = MatchingEngine(db)
     count = await engine.process_all_attendees()
@@ -84,6 +89,7 @@ async def update_match_status(
     match_id: UUID,
     data: MatchStatusUpdate,
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
 ):
     """Accept or decline a match."""
     match = await db.get(Match, match_id)

@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
+from app.core.deps import require_auth, require_admin
+from app.models.user import User
 from app.models.attendee import Attendee, TicketType
 from app.schemas.attendee import AttendeeCreate, AttendeeResponse, AttendeeListResponse
 
@@ -14,6 +16,7 @@ async def search_attendees(
     q: str = Query(..., min_length=1),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
 ):
     """Full-text search across name, company, title, goals, and ai_summary."""
     from sqlalchemy import or_, cast, String
@@ -45,6 +48,7 @@ async def list_attendees(
     limit: int = Query(50, ge=1, le=200),
     ticket_type: str | None = None,
     db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
 ):
     """List all attendees with pagination and optional filtering."""
     query = select(Attendee)
@@ -67,7 +71,7 @@ async def list_attendees(
 
 
 @router.get("/{attendee_id}", response_model=AttendeeResponse)
-async def get_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db)):
+async def get_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db), _user: User = Depends(require_auth)):
     """Get attendee profile with enriched data."""
     attendee = await db.get(Attendee, attendee_id)
     if not attendee:
@@ -76,7 +80,7 @@ async def get_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/", response_model=AttendeeResponse, status_code=201)
-async def create_attendee(data: AttendeeCreate, db: AsyncSession = Depends(get_db)):
+async def create_attendee(data: AttendeeCreate, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """Register a new attendee."""
     # Check for duplicate email
     existing = await db.execute(select(Attendee).where(Attendee.email == data.email))
@@ -103,7 +107,8 @@ async def create_attendee(data: AttendeeCreate, db: AsyncSession = Depends(get_d
 
 @router.put("/{attendee_id}", response_model=AttendeeResponse)
 async def update_attendee(
-    attendee_id: UUID, data: AttendeeCreate, db: AsyncSession = Depends(get_db)
+    attendee_id: UUID, data: AttendeeCreate, db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
 ):
     """Update an attendee's profile."""
     attendee = await db.get(Attendee, attendee_id)
@@ -126,7 +131,7 @@ async def update_attendee(
 
 
 @router.delete("/{attendee_id}", status_code=204)
-async def delete_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db)):
+async def delete_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """Delete an attendee."""
     attendee = await db.get(Attendee, attendee_id)
     if not attendee:

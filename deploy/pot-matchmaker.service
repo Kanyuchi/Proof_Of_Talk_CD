@@ -1,0 +1,20 @@
+[Unit]
+Description=POT Matchmaker FastAPI backend
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/app/backend
+Environment="PATH=/home/ec2-user/app/backend/.venv/bin"
+EnvironmentFile=/home/ec2-user/app/backend/.env
+ExecStart=/home/ec2-user/app/backend/.venv/bin/gunicorn -c gunicorn.conf.py app.main:app
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

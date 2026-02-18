@@ -1,11 +1,12 @@
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db, async_session
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.core.deps import require_auth
+from app.core.limiter import limiter
 from app.models.user import User
 from app.models.attendee import Attendee
 from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse
@@ -24,7 +25,9 @@ async def _process_attendee_bg(attendee_id: uuid.UUID) -> None:
 
 
 @router.post("/register", response_model=Token, status_code=201)
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     data: RegisterRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
@@ -70,7 +73,8 @@ async def register(
 
 
 @router.post("/login", response_model=Token)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     """Authenticate with email + password, returns JWT token."""
     user = (await db.execute(select(User).where(User.email == data.email))).scalars().first()
     if not user or not verify_password(data.password, user.hashed_password):
