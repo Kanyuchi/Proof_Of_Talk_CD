@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # Enrichment API keys (optional, for Level 3 data enrichment)
     PROXYCURL_API_KEY: str = ""  # LinkedIn enrichment
     TWITTER_BEARER_TOKEN: str = ""
+    CRUNCHBASE_API_KEY: str = ""  # Crunchbase Basic API (optional)
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

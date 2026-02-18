@@ -83,3 +83,42 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def get_me(user: User = Depends(require_auth)):
     """Get the currently authenticated user."""
     return user
+
+
+@router.put("/profile")
+async def update_profile(
+    data: dict,
+    user: User = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update the current user's attendee profile."""
+    if not user.attendee_id:
+        raise HTTPException(status_code=404, detail="No attendee profile linked")
+
+    attendee = await db.get(Attendee, user.attendee_id)
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Attendee profile not found")
+
+    allowed = {
+        "name", "company", "title", "goals", "interests",
+        "linkedin_url", "twitter_handle", "company_website",
+    }
+    for field, value in data.items():
+        if field in allowed:
+            setattr(attendee, field, value)
+
+    # Update display name on User too if name changed
+    if "name" in data:
+        user.full_name = data["name"]
+
+    # Clear embedding so it regenerates on next enrichment run
+    attendee.embedding = None
+
+    await db.commit()
+    await db.refresh(attendee)
+
+    from app.schemas.attendee import AttendeeResponse
+    return {
+        "user": UserResponse.model_validate(user),
+        "attendee": AttendeeResponse.model_validate(attendee),
+    }

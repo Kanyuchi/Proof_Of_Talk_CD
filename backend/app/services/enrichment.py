@@ -1,5 +1,7 @@
 import httpx
 import structlog
+import re
+from datetime import datetime
 from bs4 import BeautifulSoup
 from tenacity import retry, stop_after_attempt, wait_exponential
 from app.core.config import get_settings
@@ -27,18 +29,27 @@ class EnrichmentService:
             if linkedin_data:
                 enriched["linkedin"] = linkedin_data
                 enriched["linkedin_summary"] = self._summarize_linkedin(linkedin_data)
+                enriched["linkedin_enriched_at"] = datetime.utcnow().isoformat()
 
         if attendee.twitter_handle and settings.TWITTER_BEARER_TOKEN:
             twitter_data = await self._enrich_twitter(attendee.twitter_handle)
             if twitter_data:
                 enriched["twitter"] = twitter_data
                 enriched["recent_activity"] = self._summarize_twitter(twitter_data)
+                enriched["twitter_enriched_at"] = datetime.utcnow().isoformat()
 
         if attendee.company_website:
             website_data = await self._scrape_company_website(attendee.company_website)
             if website_data:
                 enriched["website"] = website_data
                 enriched["company_description"] = website_data.get("description", "")
+                enriched["website_enriched_at"] = datetime.utcnow().isoformat()
+
+        if attendee.company:
+            crunchbase_data = await self._enrich_crunchbase(attendee.company, attendee.company_website)
+            if crunchbase_data:
+                enriched["crunchbase"] = crunchbase_data
+                enriched["crunchbase_enriched_at"] = datetime.utcnow().isoformat()
 
         return enriched
 
@@ -172,6 +183,69 @@ class EnrichmentService:
         if data.get("recent_tweets"):
             parts.append(f"Recent topics: {' | '.join(data['recent_tweets'][:3])}")
         return ". ".join(parts)
+
+    async def _enrich_crunchbase(self, company_name: str, website: str | None = None) -> dict | None:
+        """Fetch funding and company data from Crunchbase Basic API or by scraping."""
+        # Try Crunchbase Basic API first (if key is available)
+        if settings.CRUNCHBASE_API_KEY:
+            try:
+                slug = re.sub(r"[^a-z0-9]+", "-", company_name.lower()).strip("-")
+                resp = await self.http_client.get(
+                    f"https://api.crunchbase.com/api/v4/entities/organizations/{slug}",
+                    params={
+                        "user_key": settings.CRUNCHBASE_API_KEY,
+                        "field_ids": "short_description,funding_total,last_funding_type,"
+                                     "last_funding_at,num_funding_rounds,investor_identifiers,"
+                                     "categories,rank_org",
+                    },
+                )
+                if resp.status_code == 200:
+                    props = resp.json().get("properties", {})
+                    return {
+                        "description": props.get("short_description"),
+                        "total_funding": props.get("funding_total", {}).get("value_usd"),
+                        "last_funding_type": props.get("last_funding_type"),
+                        "last_funding_date": props.get("last_funding_at"),
+                        "funding_rounds": props.get("num_funding_rounds"),
+                        "investors": [
+                            i.get("value") for i in (props.get("investor_identifiers") or [])[:5]
+                        ],
+                        "categories": [
+                            c.get("value") for c in (props.get("categories") or [])[:5]
+                        ],
+                        "source": "crunchbase_api",
+                    }
+            except Exception as e:
+                logger.warning("crunchbase_api_error", error=str(e), company=company_name)
+
+        # Fallback: scrape public Crunchbase page
+        try:
+            slug = re.sub(r"[^a-z0-9]+", "-", company_name.lower()).strip("-")
+            resp = await self.http_client.get(
+                f"https://www.crunchbase.com/organization/{slug}",
+                headers={"User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1)"},
+                follow_redirects=True,
+            )
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, "html.parser")
+                # Extract meta description which usually contains funding/description info
+                meta = soup.find("meta", attrs={"name": "description"})
+                og_desc = soup.find("meta", attrs={"property": "og:description"})
+                description = (
+                    (meta and meta.get("content"))
+                    or (og_desc and og_desc.get("content"))
+                    or ""
+                )
+                if description and len(description) > 30:
+                    return {
+                        "description": description[:500],
+                        "source": "crunchbase_scrape",
+                        "profile_url": f"https://www.crunchbase.com/organization/{slug}",
+                    }
+        except Exception as e:
+            logger.warning("crunchbase_scrape_error", error=str(e), company=company_name)
+
+        return None
 
     async def close(self):
         await self.http_client.aclose()

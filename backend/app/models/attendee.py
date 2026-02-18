@@ -43,6 +43,11 @@ class Attendee(Base):
     intent_tags: Mapped[list] = mapped_column(ARRAY(String), default=list)  # AI-classified intents
     deal_readiness_score: Mapped[float] = mapped_column(Float, nullable=True)  # 0-1 score
 
+    # Data intelligence extras
+    crunchbase_data: Mapped[dict] = mapped_column(JSONB, default=dict)  # Crunchbase/PitchBook data
+    pot_history: Mapped[dict] = mapped_column(JSONB, default=dict)   # Previous POT event attendance
+    enriched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # Last enrichment run
+
 
 class Match(Base):
     __tablename__ = "matches"
