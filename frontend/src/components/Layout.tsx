@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Users, Sparkles, BarChart3, MessageSquare, LogIn, LogOut, UserPlus } from "lucide-react";
+import { Users, Sparkles, BarChart3, MessageSquare, LogIn, LogOut, UserPlus, UserCog } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useUnreadCount } from "../hooks/useMessages";
 import ChatWidget from "./chat/ChatWidget";
@@ -79,10 +79,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 shrink-0">
             {isAuthenticated ? (
               <>
-                <div className="hidden sm:flex flex-col text-right">
+                <Link to="/profile" className="hidden sm:flex flex-col text-right hover:opacity-80 transition-opacity">
                   <span className="text-xs font-medium text-white/80">{user?.full_name}</span>
                   <span className="text-[10px] text-white/30">{user?.is_admin ? "Admin" : "Attendee"}</span>
-                </div>
+                </Link>
+                <Link
+                  to="/profile"
+                  className={`p-1.5 rounded-lg border border-white/10 text-white/50 hover:text-amber-400 hover:border-amber-400/30 transition-all ${
+                    location.pathname === "/profile" ? "text-amber-400 border-amber-400/30 bg-amber-400/10" : ""
+                  }`}
+                  title="Edit profile"
+                >
+                  <UserCog className="w-3.5 h-3.5" />
+                </Link>
                 <button
                   onClick={logout}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-white/50 text-xs hover:text-white/80 hover:border-white/20 transition-all"

@@ -163,6 +163,20 @@ export async function getMe(): Promise<User> {
   return data;
 }
 
+export async function updateProfile(body: {
+  name?: string;
+  company?: string;
+  title?: string;
+  goals?: string;
+  interests?: string[];
+  linkedin_url?: string;
+  twitter_handle?: string;
+  company_website?: string;
+}): Promise<{ user: User; attendee: Attendee }> {
+  const { data } = await api.put("/auth/profile", body);
+  return data;
+}
+
 // ── Chat ─────────────────────────────────────────────────────────────
 
 export async function chatWithConcierge(body: {
