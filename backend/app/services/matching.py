@@ -69,10 +69,16 @@ class MatchingEngine:
             LIMIT :top_k
         """)
 
+        # Format embedding as pgvector-compatible string: [0.1,0.2,...]
+        emb = attendee.embedding
+        if hasattr(emb, 'tolist'):
+            emb = emb.tolist()
+        emb_str = "[" + ",".join(str(v) for v in emb) + "]"
+
         result = await self.db.execute(
             query,
             {
-                "embedding": str(attendee.embedding),
+                "embedding": emb_str,
                 "attendee_id": str(attendee.id),
                 "top_k": top_k,
             },
@@ -157,7 +163,11 @@ Return ONLY the JSON array. No markdown, no commentary."""
         )
 
         try:
-            ranked = json.loads(response.choices[0].message.content.strip())
+            raw = response.choices[0].message.content.strip()
+            # Strip markdown code fences if GPT wraps response
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            ranked = json.loads(raw)
         except json.JSONDecodeError:
             # Fallback: return candidates in similarity order
             ranked = [
