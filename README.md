@@ -4,7 +4,7 @@
 > Built for [Proof of Talk 2026](http://potconf.com) — 2,500 decision-makers at the Louvre Palace, Paris (June 2–3, 2026).
 
 **Live prototype:** http://54.89.55.202
-**Author:** Fadzie Kanyuchi
+**Author:** Kanyuchi
 **License:** [CC BY 4.0](./LICENSE) — Attribution required for forks and derivatives
 
 ---
@@ -243,7 +243,7 @@ The script:
 
 ## Author
 
-**Fadzie Kanyuchi**
+**Kanyuchi**
 - GitHub: [@Kanyuchi](https://github.com/Kanyuchi)
 - Project: XVentures Labs Internal Entrepreneur Case Study — Level 3
 
@@ -253,6 +253,6 @@ The script:
 
 This project is licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)**.
 
-You are free to share and adapt this work **provided you give appropriate credit** to the original author (Fadzie Kanyuchi), include a link to the license, and indicate if changes were made.
+You are free to share and adapt this work **provided you give appropriate credit** to the original author (Kanyuchi), include a link to the license, and indicate if changes were made.
 
 **You may not use this work without attribution.** See [LICENSE](./LICENSE) for full terms.
