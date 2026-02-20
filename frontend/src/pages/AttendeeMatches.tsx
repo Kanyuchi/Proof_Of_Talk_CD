@@ -6,7 +6,7 @@ import {
   Calendar, Clock, Download,
 } from "lucide-react";
 import { useAttendee } from "../hooks/useAttendee";
-import { useMatches, useUpdateMatchStatus, useScheduleMeeting } from "../hooks/useMatches";
+import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedback } from "../hooks/useMatches";
 import { useAuth } from "../hooks/useAuth";
 import { enrichAttendee } from "../api/client";
 import { useState } from "react";
@@ -137,6 +137,7 @@ export default function AttendeeMatches() {
   const { data: matchData, isLoading: loadingMatches } = useMatches(id);
   const updateStatus = useUpdateMatchStatus(id);
   const scheduleMeeting = useScheduleMeeting(id);
+  const feedback = useMeetingFeedback(id);
   const [enriching, setEnriching] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [schedulingMatchId, setSchedulingMatchId] = useState<string | null>(null);
@@ -146,8 +147,26 @@ export default function AttendeeMatches() {
   const matches = matchData?.matches ?? [];
   const isLoading = loadingAttendee || loadingMatches;
 
-  const handleStatus = (matchId: string, status: "accepted" | "declined") => {
-    updateStatus.mutate({ matchId, status });
+  const handleStatus = (
+    matchId: string,
+    status: "accepted" | "declined" | "met",
+    decline_reason?: string
+  ) => {
+    updateStatus.mutate({ matchId, status, decline_reason });
+  };
+
+  const handleDecline = (matchId: string) => {
+    const reason = window.prompt("Optional: why are you declining this match?");
+    handleStatus(matchId, "declined", reason?.trim() || undefined);
+  };
+
+  const handleMarkMet = (matchId: string) => {
+    handleStatus(matchId, "met");
+    feedback.mutate({
+      matchId,
+      meeting_outcome: "met",
+      met_at: new Date().toISOString(),
+    });
   };
 
   const handleCopyIcebreaker = (text: string, matchId: string) => {
@@ -644,6 +663,43 @@ export default function AttendeeMatches() {
                           </div>
                         )}
 
+                        {/* Meeting outcome + satisfaction */}
+                        {match.status === "met" || match.meeting_outcome ? (
+                          <div className="p-3 rounded-xl bg-blue-400/5 border border-blue-400/20">
+                            <div className="text-xs text-blue-300 font-medium">
+                              Meeting completed{match.meeting_outcome ? `: ${match.meeting_outcome}` : ""}
+                            </div>
+                            <div className="mt-2 flex items-center gap-2">
+                              <span className="text-[11px] text-white/40">Rate this match</span>
+                              {[1, 2, 3, 4, 5].map((v) => (
+                                <button
+                                  key={v}
+                                  onClick={() =>
+                                    feedback.mutate({ matchId: match.id, satisfaction_score: v })
+                                  }
+                                  className={`w-7 h-7 rounded-md border text-xs ${
+                                    (match.satisfaction_score ?? 0) >= v
+                                      ? "bg-amber-400/20 border-amber-400/40 text-amber-400"
+                                      : "bg-white/5 border-white/10 text-white/50"
+                                  }`}
+                                >
+                                  {v}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          match.meeting_time && (
+                            <button
+                              onClick={() => handleMarkMet(match.id)}
+                              className="w-full flex items-center justify-center gap-2 py-2 bg-blue-400/10 text-blue-300 border border-blue-400/30 rounded-lg text-sm font-medium hover:bg-blue-400/20 transition-all"
+                            >
+                              <Check className="w-4 h-4" />
+                              Mark meeting as done
+                            </button>
+                          )
+                        )}
+
                         {/* AI-suggested icebreaker */}
                         {icebreaker && (
                           <div className="p-3 rounded-xl bg-white/[0.02] border border-white/10">
@@ -680,7 +736,7 @@ export default function AttendeeMatches() {
                           You accepted — waiting for {person?.name.split(" ")[0] ?? "them"} to respond
                         </div>
                         <button
-                          onClick={() => handleStatus(match.id, "declined")}
+                          onClick={() => handleDecline(match.id)}
                           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/30 border border-white/10 rounded-lg text-xs hover:text-white/50 transition-all"
                         >
                           <X className="w-3 h-3" />
@@ -709,7 +765,7 @@ export default function AttendeeMatches() {
                           {otherAccepted ? "Accept & Confirm Meeting" : "Accept Meeting"}
                         </button>
                         <button
-                          onClick={() => handleStatus(match.id, "declined")}
+                          onClick={() => handleDecline(match.id)}
                           className="flex items-center gap-2 px-4 py-2 bg-white/5 text-white/40 border border-white/10 rounded-lg text-sm font-medium hover:text-white/60 transition-all"
                         >
                           <X className="w-4 h-4" />

@@ -19,6 +19,18 @@ from app.models.user import User
 router = APIRouter(prefix="/matches", tags=["matches"])
 
 
+def _compute_overall_status(status_a: str, status_b: str) -> str:
+    """Compute overall match state from per-party statuses."""
+    if "declined" in (status_a, status_b):
+        return "declined"
+    if status_a == "met" and status_b == "met":
+        return "met"
+    # accepted+met still counts as accepted until both mark met
+    if status_a in {"accepted", "met"} and status_b in {"accepted", "met"}:
+        return "accepted"
+    return "pending"
+
+
 @router.get("/{attendee_id}", response_model=MatchListResponse)
 async def get_matches(
     attendee_id: UUID,
@@ -129,18 +141,8 @@ async def update_match_status(
         await db.refresh(match)
         return MatchResponse.model_validate(match)
 
-    # Recompute overall status from both sides:
-    # - Either party declining → declined
-    # - Both accepting → accepted (mutual)
-    # - Otherwise → pending
-    if "declined" in (match.status_a, match.status_b):
-        match.status = "declined"
-    elif match.status_a == "accepted" and match.status_b == "accepted":
-        match.status = "accepted"
-    elif match.status_a == "met" and match.status_b == "met":
-        match.status = "met"
-    else:
-        match.status = "pending"
+    # Recompute overall status from both sides
+    match.status = _compute_overall_status(match.status_a, match.status_b)
 
     if data.status == "declined":
         match.decline_reason = data.decline_reason
@@ -197,8 +199,8 @@ async def update_meeting_feedback(
     if data.met_at is not None:
         match.met_at = data.met_at
     elif data.meeting_outcome and not match.met_at:
-        from datetime import datetime
-        match.met_at = datetime.utcnow()
+        from datetime import datetime, timezone
+        match.met_at = datetime.now(timezone.utc)
     if data.hidden_by_user is not None:
         match.hidden_by_user = data.hidden_by_user
 

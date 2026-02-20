@@ -149,6 +149,50 @@ async def matches_by_type(
     return {"matches": matches_out, "total": len(matches_out)}
 
 
+@router.get("/feedback-dataset")
+async def feedback_dataset(
+    limit: int = Query(500, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Export match outcomes for analytics / training pipelines."""
+    result = await db.execute(
+        select(Match)
+        .where(
+            (Match.decline_reason.isnot(None))
+            | (Match.meeting_outcome.isnot(None))
+            | (Match.satisfaction_score.isnot(None))
+        )
+        .order_by(Match.created_at.desc())
+        .limit(limit)
+    )
+    rows = result.scalars().all()
+    dataset = []
+    for m in rows:
+        attendee_a = await db.get(Attendee, m.attendee_a_id)
+        attendee_b = await db.get(Attendee, m.attendee_b_id)
+        dataset.append(
+            {
+                "match_id": str(m.id),
+                "attendee_a_id": str(m.attendee_a_id),
+                "attendee_a_name": attendee_a.name if attendee_a else None,
+                "attendee_b_id": str(m.attendee_b_id),
+                "attendee_b_name": attendee_b.name if attendee_b else None,
+                "match_type": m.match_type,
+                "overall_score": float(m.overall_score),
+                "status": m.status,
+                "decline_reason": m.decline_reason,
+                "meeting_time": m.meeting_time.isoformat() if m.meeting_time else None,
+                "met_at": m.met_at.isoformat() if m.met_at else None,
+                "meeting_outcome": m.meeting_outcome,
+                "satisfaction_score": m.satisfaction_score,
+                "explanation_confidence": m.explanation_confidence,
+                "created_at": m.created_at.isoformat(),
+            }
+        )
+    return {"rows": dataset, "total": len(dataset)}
+
+
 @router.get("/attendees-by-sector")
 async def attendees_by_sector(
     sector: str = Query(...),
