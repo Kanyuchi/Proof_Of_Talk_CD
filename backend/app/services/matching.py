@@ -240,7 +240,7 @@ Return a JSON array ranked from best to worst match. Each entry:
 Return ONLY the JSON array. No markdown, no commentary."""
 
         response = await client.chat.completions.create(
-            model=settings.OPENAI_CHAT_MODEL,
+            model=settings.OPENAI_RERANK_MODEL or settings.OPENAI_CHAT_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.2,
             max_tokens=2000,
@@ -262,11 +262,70 @@ Return ONLY the JSON array. No markdown, no commentary."""
                     "match_type": "complementary",
                     "explanation": "Match based on profile similarity.",
                     "shared_context": {},
+                    "explanation_confidence": sim_score,
                 }
                 for i, (_, sim_score) in enumerate(candidates)
             ]
 
+        # Deterministic rerank for diversity/novelty and duplicate-topic suppression
+        if settings.AI_RERANK_ENABLED:
+            ranked = self._deterministic_rerank(ranked)
+
+        if settings.AI_CONFIDENCE_ENABLED:
+            for entry in ranked:
+                entry["explanation_confidence"] = self._estimate_explanation_confidence(entry)
+
         return ranked
+
+    @staticmethod
+    def _extract_primary_topic(entry: dict) -> str:
+        context = entry.get("shared_context") or {}
+        sectors = context.get("sectors") or []
+        synergies = context.get("synergies") or []
+        if sectors:
+            return str(sectors[0]).strip().lower()
+        if synergies:
+            return str(synergies[0]).strip().lower()
+        return "unknown"
+
+    def _deterministic_rerank(self, ranked: list[dict]) -> list[dict]:
+        """Apply deterministic boosts/penalties after LLM ranking."""
+        adjusted = []
+        seen_topics = set()
+        for entry in ranked:
+            score = float(entry.get("overall_score", 0.0))
+            match_type = str(entry.get("match_type", "complementary"))
+            topic = self._extract_primary_topic(entry)
+
+            # Small novelty boost for non-obvious cross-sector pairings.
+            if match_type == "non_obvious":
+                score += 0.03
+
+            # Penalize repeated primary topics to reduce duplicate recommendations.
+            if topic in seen_topics:
+                score -= 0.05
+            else:
+                seen_topics.add(topic)
+
+            entry["overall_score"] = max(0.0, min(1.0, score))
+            adjusted.append(entry)
+
+        adjusted.sort(key=lambda e: float(e.get("overall_score", 0.0)), reverse=True)
+        return adjusted
+
+    @staticmethod
+    def _estimate_explanation_confidence(entry: dict) -> float:
+        """Heuristic confidence score for explanation quality (0-1)."""
+        overall = float(entry.get("overall_score", 0.0))
+        comp = float(entry.get("complementary_score", 0.0))
+        explanation = str(entry.get("explanation", "")).strip()
+        context = entry.get("shared_context") or {}
+        action_items = context.get("action_items") or []
+
+        length_bonus = 0.08 if len(explanation) >= 120 else 0.03
+        action_bonus = min(0.08, 0.03 * len(action_items))
+        raw = (0.55 * overall) + (0.25 * comp) + length_bonus + action_bonus
+        return max(0.0, min(1.0, raw))
 
     # ── Full Pipeline ───────────────────────────────────────────────────
 
@@ -346,6 +405,7 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 match_type=entry.get("match_type", "complementary"),
                 explanation=entry.get("explanation", ""),
                 shared_context=entry.get("shared_context", {}),
+                explanation_confidence=entry.get("explanation_confidence"),
             )
             self.db.add(match)
             matches.append(match)
