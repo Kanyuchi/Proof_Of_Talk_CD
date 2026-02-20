@@ -311,3 +311,9 @@ Return ONLY the JSON array. No markdown, no commentary."""
             total += len(matches)
 
         return total
+
+
+async def run_matching_pipeline(db: AsyncSession, top_k: int = 10) -> int:
+    """Run the full matching pipeline and return generated match count."""
+    engine = MatchingEngine(db)
+    return await engine.generate_all_matches(top_k=top_k)

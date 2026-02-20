@@ -114,8 +114,6 @@ async def matches_by_type(
     _user: User = Depends(require_auth),
 ):
     """Drill-down: return matches of a given type with attendee names."""
-    from app.schemas.attendee import MatchResponse
-
     result = await db.execute(
         select(Match)
         .where(Match.match_type == match_type)
@@ -126,11 +124,27 @@ async def matches_by_type(
 
     matches_out = []
     for m in raw:
-        matched = await db.get(Attendee, m.matched_attendee_id)
-        d = MatchResponse.model_validate(m).model_dump()
-        if matched:
-            d["matched_attendee"] = {"name": matched.name, "id": str(matched.id)}
-        matches_out.append(d)
+        attendee_a = await db.get(Attendee, m.attendee_a_id)
+        attendee_b = await db.get(Attendee, m.attendee_b_id)
+        pair_label = "Unknown pair"
+        if attendee_a and attendee_b:
+            pair_label = f"{attendee_a.name} ↔ {attendee_b.name}"
+
+        matches_out.append(
+            {
+                "id": str(m.id),
+                "overall_score": float(m.overall_score),
+                "explanation": m.explanation,
+                "match_type": m.match_type,
+                "status": m.status,
+                "attendee_a_id": str(m.attendee_a_id),
+                "attendee_b_id": str(m.attendee_b_id),
+                "matched_attendee": {
+                    "id": str(m.id),
+                    "name": pair_label,
+                },
+            }
+        )
 
     return {"matches": matches_out, "total": len(matches_out)}
 
@@ -197,15 +211,20 @@ async def trigger_matching(
 
     result = await db.execute(select(Attendee))
     attendees = result.scalars().all()
-    count = len(attendees)
+    top_k = max(1, min(len(attendees) - 1, 10)) if attendees else 1
 
     async def run_pipeline():
         from app.core.database import async_session
         async with async_session() as session:
             try:
-                await run_matching_pipeline(session)
+                await run_matching_pipeline(session, top_k=top_k)
             except Exception as exc:
                 logger.error("bg_matching_failed", error=str(exc))
 
     background_tasks.add_task(run_pipeline)
-    return {"status": "started", "total_matches": count * (count - 1)}
+    return {
+        "status": "started",
+        "attendees_processed": len(attendees),
+        "top_k": top_k,
+        "total_matches": len(attendees) * top_k,
+    }
