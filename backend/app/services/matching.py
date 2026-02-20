@@ -1,5 +1,7 @@
 import json
+import asyncio
 import uuid
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, text, delete as sql_delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
@@ -20,6 +22,7 @@ class MatchingEngine:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+        self._candidate_cache: dict[str, dict] = {}
 
     # ── Stage 1: Embed ──────────────────────────────────────────────────
 
@@ -135,6 +138,19 @@ class MatchingEngine:
         if attendee.embedding is None:
             attendee = await self.process_attendee(attendee)
 
+        cache_key = str(attendee.id)
+        cached = self._candidate_cache.get(cache_key)
+        if cached and cached.get("expires_at", datetime.min.replace(tzinfo=timezone.utc)) > datetime.now(timezone.utc):
+            hydrated: list[tuple[Attendee, float]] = []
+            for item in cached.get("items", []):
+                candidate = await self.db.get(Attendee, item["id"])
+                if candidate and self._is_candidate_eligible(attendee, candidate):
+                    hydrated.append((candidate, float(item["similarity"])))
+                    if len(hydrated) >= top_k:
+                        break
+            if hydrated:
+                return hydrated
+
         # pgvector cosine distance: <=> operator (lower = more similar)
         # Exclude admin-linked attendees so organisers never appear as recommendations
         query = text("""
@@ -174,6 +190,12 @@ class MatchingEngine:
                 candidates.append((candidate, float(row.similarity)))
                 if len(candidates) >= top_k:
                     break
+
+        # Cache raw candidates for future calls in this pipeline window
+        self._candidate_cache[cache_key] = {
+            "items": [{"id": c.id, "similarity": s} for c, s in candidates],
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=6),
+        }
 
         return candidates
 
@@ -437,15 +459,30 @@ Return ONLY the JSON array. No markdown, no commentary."""
         # Ensure all attendees have embeddings / AI summaries
         await self.process_all_attendees()
 
+        # Candidate precompute cache to reduce repeated retrieval load in this run
+        await self.precompute_candidate_cache(attendees, top_k=max(10, top_k))
+
         total = 0
-        for attendee in attendees:
-            # clear_existing=False because we wiped above and use dedup check
-            matches = await self.generate_matches_for_attendee(
-                attendee.id, top_k, clear_existing=False
-            )
-            total += len(matches)
+        batch_size = max(1, settings.MATCH_BATCH_SIZE)
+        for i in range(0, len(attendees), batch_size):
+            batch = attendees[i : i + batch_size]
+            for attendee in batch:
+                # clear_existing=False because we wiped above and use dedup check
+                matches = await self.generate_matches_for_attendee(
+                    attendee.id, top_k, clear_existing=False
+                )
+                total += len(matches)
+                # Explicit yield to keep event loop responsive under load.
+                await asyncio.sleep(0)
 
         return total
+
+    async def precompute_candidate_cache(self, attendees: list[Attendee], top_k: int = 10) -> None:
+        """Precompute candidate retrieval cache for the current pipeline run."""
+        for attendee in attendees:
+            if attendee.embedding is None:
+                continue
+            await self.retrieve_candidates(attendee, top_k=top_k)
 
 
 async def run_matching_pipeline(db: AsyncSession, top_k: int = 10) -> int:
