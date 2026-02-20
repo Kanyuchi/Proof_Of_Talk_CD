@@ -53,6 +53,10 @@ class MatchResponse(BaseModel):
     explanation: str
     shared_context: dict
     status: str
+    status_a: str
+    status_b: str
+    meeting_time: datetime | None = None
+    meeting_location: str | None = None
     created_at: datetime
 
     # Populated in the endpoint
@@ -68,6 +72,11 @@ class MatchListResponse(BaseModel):
 
 class MatchStatusUpdate(BaseModel):
     status: str  # accepted, declined
+
+
+class ScheduleMeetingRequest(BaseModel):
+    meeting_time: datetime
+    meeting_location: str | None = None
 
 
 class DashboardStats(BaseModel):

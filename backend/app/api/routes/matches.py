@@ -4,7 +4,7 @@ from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.attendee import Attendee, Match
-from app.schemas.attendee import MatchResponse, MatchListResponse, MatchStatusUpdate, AttendeeResponse
+from app.schemas.attendee import MatchResponse, MatchListResponse, MatchStatusUpdate, ScheduleMeetingRequest, AttendeeResponse
 from app.services.matching import MatchingEngine
 from app.core.deps import require_auth, require_admin
 from app.models.user import User
@@ -99,9 +99,9 @@ async def update_match_status(
     match_id: UUID,
     data: MatchStatusUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_auth),
+    user: User = Depends(require_auth),
 ):
-    """Accept or decline a match."""
+    """Accept or decline a match — records per-party status and computes mutual state."""
     match = await db.get(Match, match_id)
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
@@ -109,7 +109,55 @@ async def update_match_status(
     if data.status not in ("accepted", "declined", "met"):
         raise HTTPException(status_code=400, detail="Status must be accepted, declined, or met")
 
-    match.status = data.status
+    # Determine which side this user is on, based on their linked attendee_id
+    if user.attendee_id and str(user.attendee_id) == str(match.attendee_a_id):
+        match.status_a = data.status
+    elif user.attendee_id and str(user.attendee_id) == str(match.attendee_b_id):
+        match.status_b = data.status
+    else:
+        # Admin or unlinked user — update the legacy status field directly
+        match.status = data.status
+        await db.commit()
+        await db.refresh(match)
+        return MatchResponse.model_validate(match)
+
+    # Recompute overall status from both sides:
+    # - Either party declining → declined
+    # - Both accepting → accepted (mutual)
+    # - Otherwise → pending
+    if "declined" in (match.status_a, match.status_b):
+        match.status = "declined"
+    elif match.status_a == "accepted" and match.status_b == "accepted":
+        match.status = "accepted"
+    else:
+        match.status = "pending"
+
+    await db.commit()
+    await db.refresh(match)
+    return MatchResponse.model_validate(match)
+
+
+@router.patch("/{match_id}/schedule", response_model=MatchResponse)
+async def schedule_meeting(
+    match_id: UUID,
+    data: ScheduleMeetingRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
+):
+    """Propose a meeting time for a mutually accepted match."""
+    match = await db.get(Match, match_id)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    if match.status != "accepted":
+        raise HTTPException(
+            status_code=400,
+            detail="Meeting time can only be set on mutually accepted matches",
+        )
+
+    match.meeting_time = data.meeting_time
+    match.meeting_location = data.meeting_location or "Louvre Palace, Paris — TBD at venue"
+
     await db.commit()
     await db.refresh(match)
     return MatchResponse.model_validate(match)

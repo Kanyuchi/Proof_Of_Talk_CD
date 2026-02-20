@@ -68,5 +68,12 @@ class Match(Base):
     explanation: Mapped[str] = mapped_column(Text)  # Why these two should meet
     shared_context: Mapped[dict] = mapped_column(JSONB, default=dict)  # Shared interests, sectors, etc.
 
-    # Status
+    # Status — overall (computed) + per-party
     status: Mapped[str] = mapped_column(String(50), default="pending")  # pending, accepted, declined, met
+    # Two-sided consent: each party's independent response
+    status_a: Mapped[str] = mapped_column(String(50), default="pending")  # attendee_a's response
+    status_b: Mapped[str] = mapped_column(String(50), default="pending")  # attendee_b's response
+
+    # Scheduling
+    meeting_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    meeting_location: Mapped[str | None] = mapped_column(String(255), nullable=True)

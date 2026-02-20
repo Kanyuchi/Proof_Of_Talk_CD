@@ -32,6 +32,10 @@ export interface Match {
     action_items?: string[];
   };
   status: "pending" | "accepted" | "declined" | "met";
+  status_a: string;
+  status_b: string;
+  meeting_time: string | null;
+  meeting_location: string | null;
   created_at: string;
   matched_attendee?: Attendee;
 }

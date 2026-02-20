@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
 from app.core.config import get_settings
 from app.models.attendee import Attendee, Match
+from app.models.user import User
 from app.services.embeddings import embed_attendee, generate_ai_summary, classify_intents
 
 settings = get_settings()
@@ -63,11 +64,16 @@ class MatchingEngine:
             attendee = await self.process_attendee(attendee)
 
         # pgvector cosine distance: <=> operator (lower = more similar)
+        # Exclude admin-linked attendees so organisers never appear as recommendations
         query = text("""
             SELECT id, 1 - (embedding <=> :embedding) as similarity
             FROM attendees
             WHERE id != :attendee_id
               AND embedding IS NOT NULL
+              AND id NOT IN (
+                SELECT attendee_id FROM users
+                WHERE is_admin = true AND attendee_id IS NOT NULL
+              )
             ORDER BY embedding <=> :embedding
             LIMIT :top_k
         """)
@@ -283,7 +289,14 @@ Return ONLY the JSON array. No markdown, no commentary."""
         await self.db.execute(sql_delete(Match))
         await self.db.commit()
 
-        result = await self.db.execute(select(Attendee))
+        # Exclude admin-linked attendees from the matching pool entirely
+        admin_ids_subq = select(User.attendee_id).where(
+            User.is_admin.is_(True),
+            User.attendee_id.isnot(None),
+        )
+        result = await self.db.execute(
+            select(Attendee).where(~Attendee.id.in_(admin_ids_subq))
+        )
         attendees = result.scalars().all()
 
         # Ensure all attendees have embeddings / AI summaries

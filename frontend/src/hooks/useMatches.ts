@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getMatches, updateMatchStatus } from "../api/client";
+import { getMatches, updateMatchStatus, scheduleMeeting } from "../api/client";
 import { demoMatches } from "../data/demo";
 
 export function useMatches(attendeeId: string | undefined) {
@@ -37,6 +37,24 @@ export function useUpdateMatchStatus(attendeeId: string | undefined) {
           matches: old.matches.map((m) => (m.id === matchId ? { ...m, status } : m)),
         };
       });
+    },
+  });
+}
+
+export function useScheduleMeeting(attendeeId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      matchId,
+      meeting_time,
+      meeting_location,
+    }: {
+      matchId: string;
+      meeting_time: string;
+      meeting_location?: string;
+    }) => scheduleMeeting(matchId, meeting_time, meeting_location),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["matches", attendeeId] });
     },
   });
 }

@@ -84,6 +84,18 @@ export async function updateMatchStatus(
   return data;
 }
 
+export async function scheduleMeeting(
+  matchId: string,
+  meeting_time: string,
+  meeting_location?: string
+): Promise<Match> {
+  const { data } = await api.patch(`/matches/${matchId}/schedule`, {
+    meeting_time,
+    meeting_location,
+  });
+  return data;
+}
+
 // ── Enrichment ───────────────────────────────────────────────────────
 
 export async function enrichAttendee(
