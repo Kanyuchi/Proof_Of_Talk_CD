@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getMatches, updateMatchStatus, scheduleMeeting } from "../api/client";
+import { getMatches, updateMatchStatus, scheduleMeeting, updateMeetingFeedback } from "../api/client";
 import { demoMatches } from "../data/demo";
 
 export function useMatches(attendeeId: string | undefined) {
@@ -22,8 +22,15 @@ export function useMatches(attendeeId: string | undefined) {
 export function useUpdateMatchStatus(attendeeId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ matchId, status }: { matchId: string; status: "accepted" | "declined" }) =>
-      updateMatchStatus(matchId, status),
+    mutationFn: ({
+      matchId,
+      status,
+      decline_reason,
+    }: {
+      matchId: string;
+      status: "accepted" | "declined" | "met";
+      decline_reason?: string;
+    }) => updateMatchStatus(matchId, status, decline_reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["matches", attendeeId] });
     },
@@ -53,6 +60,34 @@ export function useScheduleMeeting(attendeeId: string | undefined) {
       meeting_time: string;
       meeting_location?: string;
     }) => scheduleMeeting(matchId, meeting_time, meeting_location),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["matches", attendeeId] });
+    },
+  });
+}
+
+export function useMeetingFeedback(attendeeId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      matchId,
+      meeting_outcome,
+      satisfaction_score,
+      met_at,
+      hidden_by_user,
+    }: {
+      matchId: string;
+      meeting_outcome?: string;
+      satisfaction_score?: number;
+      met_at?: string;
+      hidden_by_user?: boolean;
+    }) =>
+      updateMeetingFeedback(matchId, {
+        meeting_outcome,
+        satisfaction_score,
+        met_at,
+        hidden_by_user,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["matches", attendeeId] });
     },

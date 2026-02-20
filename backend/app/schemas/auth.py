@@ -19,6 +19,10 @@ class RegisterRequest(BaseModel):
     ticket_type: str = "delegate"
     interests: list[str] = []
     goals: str | None = None
+    seeking: list[str] = []
+    not_looking_for: list[str] = []
+    preferred_geographies: list[str] = []
+    deal_stage: str | None = None
     linkedin_url: str | None = None
     twitter_handle: str | None = None
     company_website: str | None = None

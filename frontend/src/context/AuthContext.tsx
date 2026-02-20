@@ -11,6 +11,10 @@ interface RegisterData {
   ticket_type: string;
   interests: string[];
   goals: string;
+  seeking?: string[];
+  not_looking_for?: string[];
+  preferred_geographies?: string[];
+  deal_stage?: string;
   linkedin_url?: string;
   twitter_handle?: string;
   company_website?: string;

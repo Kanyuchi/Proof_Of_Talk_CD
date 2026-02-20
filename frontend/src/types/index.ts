@@ -7,6 +7,10 @@ export interface Attendee {
   ticket_type: "delegate" | "sponsor" | "speaker" | "vip";
   interests: string[];
   goals: string | null;
+  seeking: string[];
+  not_looking_for: string[];
+  preferred_geographies: string[];
+  deal_stage: string | null;
   linkedin_url: string | null;
   twitter_handle: string | null;
   company_website: string | null;
@@ -36,6 +40,12 @@ export interface Match {
   status_b: string;
   meeting_time: string | null;
   meeting_location: string | null;
+  met_at: string | null;
+  meeting_outcome: string | null;
+  satisfaction_score: number | null;
+  decline_reason: string | null;
+  hidden_by_user: boolean;
+  explanation_confidence: number | null;
   created_at: string;
   matched_attendee?: Attendee;
 }
@@ -47,6 +57,10 @@ export interface DashboardStats {
   matches_declined: number;
   enrichment_coverage: number;
   avg_match_score: number;
+  mutual_accept_rate: number;
+  scheduled_rate: number;
+  show_rate: number;
+  post_meeting_satisfaction: number;
   top_sectors: { sector: string; count: number }[];
   match_type_distribution: Record<string, number>;
 }

@@ -78,9 +78,10 @@ export async function processAllAttendees(): Promise<{ status: string; attendees
 
 export async function updateMatchStatus(
   matchId: string,
-  status: "accepted" | "declined"
+  status: "accepted" | "declined" | "met",
+  decline_reason?: string
 ): Promise<Match> {
-  const { data } = await api.patch(`/matches/${matchId}/status`, { status });
+  const { data } = await api.patch(`/matches/${matchId}/status`, { status, decline_reason });
   return data;
 }
 
@@ -93,6 +94,19 @@ export async function scheduleMeeting(
     meeting_time,
     meeting_location,
   });
+  return data;
+}
+
+export async function updateMeetingFeedback(
+  matchId: string,
+  body: {
+    meeting_outcome?: string;
+    satisfaction_score?: number;
+    met_at?: string;
+    hidden_by_user?: boolean;
+  }
+): Promise<Match> {
+  const { data } = await api.patch(`/matches/${matchId}/feedback`, body);
   return data;
 }
 
@@ -162,6 +176,10 @@ export async function registerUser(body: {
   ticket_type: string;
   interests: string[];
   goals: string;
+  seeking?: string[];
+  not_looking_for?: string[];
+  preferred_geographies?: string[];
+  deal_stage?: string;
   linkedin_url?: string;
   twitter_handle?: string;
   company_website?: string;
@@ -181,6 +199,10 @@ export async function updateProfile(body: {
   title?: string;
   goals?: string;
   interests?: string[];
+  seeking?: string[];
+  not_looking_for?: string[];
+  preferred_geographies?: string[];
+  deal_stage?: string;
   linkedin_url?: string;
   twitter_handle?: string;
   company_website?: string;

@@ -4,7 +4,14 @@ from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.attendee import Attendee, Match
-from app.schemas.attendee import MatchResponse, MatchListResponse, MatchStatusUpdate, ScheduleMeetingRequest, AttendeeResponse
+from app.schemas.attendee import (
+    MatchResponse,
+    MatchListResponse,
+    MatchStatusUpdate,
+    ScheduleMeetingRequest,
+    MatchFeedbackUpdate,
+    AttendeeResponse,
+)
 from app.services.matching import MatchingEngine
 from app.core.deps import require_auth, require_admin
 from app.models.user import User
@@ -129,8 +136,13 @@ async def update_match_status(
         match.status = "declined"
     elif match.status_a == "accepted" and match.status_b == "accepted":
         match.status = "accepted"
+    elif match.status_a == "met" and match.status_b == "met":
+        match.status = "met"
     else:
         match.status = "pending"
+
+    if data.status == "declined":
+        match.decline_reason = data.decline_reason
 
     await db.commit()
     await db.refresh(match)
@@ -157,6 +169,37 @@ async def schedule_meeting(
 
     match.meeting_time = data.meeting_time
     match.meeting_location = data.meeting_location or "Louvre Palace, Paris — TBD at venue"
+
+    await db.commit()
+    await db.refresh(match)
+    return MatchResponse.model_validate(match)
+
+
+@router.patch("/{match_id}/feedback", response_model=MatchResponse)
+async def update_meeting_feedback(
+    match_id: UUID,
+    data: MatchFeedbackUpdate,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
+):
+    """Save post-meeting outcome and satisfaction feedback."""
+    match = await db.get(Match, match_id)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    if data.meeting_outcome is not None:
+        match.meeting_outcome = data.meeting_outcome
+    if data.satisfaction_score is not None:
+        # Keep satisfaction in a 1-5 range for dashboard averages
+        score = max(1.0, min(5.0, float(data.satisfaction_score)))
+        match.satisfaction_score = score
+    if data.met_at is not None:
+        match.met_at = data.met_at
+    elif data.meeting_outcome and not match.met_at:
+        from datetime import datetime
+        match.met_at = datetime.utcnow()
+    if data.hidden_by_user is not None:
+        match.hidden_by_user = data.hidden_by_user
 
     await db.commit()
     await db.refresh(match)

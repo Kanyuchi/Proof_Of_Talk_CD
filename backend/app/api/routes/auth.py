@@ -48,6 +48,10 @@ async def register(
         ticket_type=data.ticket_type,
         interests=data.interests,
         goals=data.goals,
+        seeking=data.seeking,
+        not_looking_for=data.not_looking_for,
+        preferred_geographies=data.preferred_geographies,
+        deal_stage=data.deal_stage,
         linkedin_url=data.linkedin_url,
         twitter_handle=data.twitter_handle,
         company_website=data.company_website,
@@ -105,6 +109,7 @@ async def update_profile(
 
     allowed = {
         "name", "company", "title", "goals", "interests",
+        "seeking", "not_looking_for", "preferred_geographies", "deal_stage",
         "linkedin_url", "twitter_handle", "company_website",
     }
     for field, value in data.items():

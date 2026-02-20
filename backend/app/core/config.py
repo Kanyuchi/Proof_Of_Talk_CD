@@ -15,6 +15,17 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     OPENAI_CHAT_MODEL: str = "gpt-4o"
+    OPENAI_AGENT_MODEL: str = "gpt-4o-mini"
+    OPENAI_REASONING_MODEL: str = "gpt-4o"
+    OPENAI_RERANK_MODEL: str = "gpt-4o"
+    AI_AGENT_ENABLED: bool = False
+    AI_RERANK_ENABLED: bool = False
+    AI_CONFIDENCE_ENABLED: bool = True
+    AI_NUDGE_ENABLED: bool = False
+
+    # Matching runtime controls
+    MATCH_BATCH_SIZE: int = 100
+    MATCH_MAX_CONCURRENCY: int = 4
 
     # AWS
     AWS_REGION: str = "eu-west-1"

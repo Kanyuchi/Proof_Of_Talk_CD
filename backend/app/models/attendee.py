@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Text, DateTime, Enum as SAEnum, Float
+from sqlalchemy import String, Text, DateTime, Enum as SAEnum, Float, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from pgvector.sqlalchemy import Vector
@@ -30,6 +30,10 @@ class Attendee(Base):
     ticket_type: Mapped[TicketType] = mapped_column(SAEnum(TicketType), default=TicketType.DELEGATE)
     interests: Mapped[list] = mapped_column(ARRAY(String), default=list)
     goals: Mapped[str] = mapped_column(Text, nullable=True)  # "What do you want from this event?"
+    seeking: Mapped[list] = mapped_column(ARRAY(String), default=list)  # target counterpart types
+    not_looking_for: Mapped[list] = mapped_column(ARRAY(String), default=list)  # excluded counterpart types
+    preferred_geographies: Mapped[list] = mapped_column(ARRAY(String), default=list)
+    deal_stage: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Enriched data (populated by enrichment pipeline)
     linkedin_url: Mapped[str] = mapped_column(String(500), nullable=True)
@@ -77,3 +81,11 @@ class Match(Base):
     # Scheduling
     meeting_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     meeting_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    met_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    meeting_outcome: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    satisfaction_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Feedback and controls
+    decline_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hidden_by_user: Mapped[bool] = mapped_column(Boolean, default=False)
+    explanation_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
