@@ -56,6 +56,78 @@ class MatchingEngine:
 
     # ── Stage 2: Retrieve (pgvector similarity) ─────────────────────────
 
+    @staticmethod
+    def _norm_set(values: list[str] | None) -> set[str]:
+        return {
+            str(v).strip().lower()
+            for v in (values or [])
+            if str(v).strip()
+        }
+
+    @staticmethod
+    def _deal_stage_compatible(stage_a: str | None, stage_b: str | None) -> bool:
+        if not stage_a or not stage_b:
+            return True
+        a = stage_a.strip().lower()
+        b = stage_b.strip().lower()
+        if a == b:
+            return True
+        if a in {"any", "all", "global"} or b in {"any", "all", "global"}:
+            return True
+        if "series" in a and "series" in b:
+            return True
+        if "growth" in {a, b} and ("series" in a or "series" in b):
+            return True
+        # Keep policy-focused attendees constrained unless explicit overlap exists
+        if "policy" in {a, b}:
+            return False
+        return False
+
+    def _is_candidate_eligible(self, attendee: Attendee, candidate: Attendee) -> bool:
+        # Respect each side's explicit exclusions.
+        attendee_exclusions = self._norm_set(getattr(attendee, "not_looking_for", []))
+        candidate_exclusions = self._norm_set(getattr(candidate, "not_looking_for", []))
+        candidate_ticket = str(candidate.ticket_type.value if hasattr(candidate.ticket_type, "value") else candidate.ticket_type).lower()
+        attendee_ticket = str(attendee.ticket_type.value if hasattr(attendee.ticket_type, "value") else attendee.ticket_type).lower()
+        if candidate_ticket in attendee_exclusions:
+            return False
+        if attendee_ticket in candidate_exclusions:
+            return False
+
+        # If both sides specified preferred geographies, they must intersect.
+        attendee_geos = self._norm_set(getattr(attendee, "preferred_geographies", []))
+        candidate_geos = self._norm_set(getattr(candidate, "preferred_geographies", []))
+        if attendee_geos and candidate_geos and attendee_geos.isdisjoint(candidate_geos):
+            return False
+
+        # Deal-stage compatibility as a hard filter.
+        if not self._deal_stage_compatible(
+            getattr(attendee, "deal_stage", None),
+            getattr(candidate, "deal_stage", None),
+        ):
+            return False
+
+        # "Seeking" constraints: at least one target signal should match when provided.
+        attendee_seeking = self._norm_set(getattr(attendee, "seeking", []))
+        candidate_signals = self._norm_set(getattr(candidate, "intent_tags", []))
+        candidate_signals.add(candidate_ticket)
+        candidate_stage = getattr(candidate, "deal_stage", None)
+        if candidate_stage:
+            candidate_signals.add(candidate_stage.strip().lower())
+        if attendee_seeking and attendee_seeking.isdisjoint(candidate_signals):
+            return False
+
+        candidate_seeking = self._norm_set(getattr(candidate, "seeking", []))
+        attendee_signals = self._norm_set(getattr(attendee, "intent_tags", []))
+        attendee_signals.add(attendee_ticket)
+        attendee_stage = getattr(attendee, "deal_stage", None)
+        if attendee_stage:
+            attendee_signals.add(attendee_stage.strip().lower())
+        if candidate_seeking and candidate_seeking.isdisjoint(attendee_signals):
+            return False
+
+        return True
+
     async def retrieve_candidates(
         self, attendee: Attendee, top_k: int = 10
     ) -> list[tuple[Attendee, float]]:
@@ -84,12 +156,13 @@ class MatchingEngine:
             emb = emb.tolist()
         emb_str = "[" + ",".join(str(v) for v in emb) + "]"
 
+        retrieval_limit = max(top_k * 5, top_k)
         result = await self.db.execute(
             query,
             {
                 "embedding": emb_str,
                 "attendee_id": str(attendee.id),
-                "top_k": top_k,
+                "top_k": retrieval_limit,
             },
         )
         rows = result.fetchall()
@@ -97,8 +170,10 @@ class MatchingEngine:
         candidates = []
         for row in rows:
             candidate = await self.db.get(Attendee, row.id)
-            if candidate:
+            if candidate and self._is_candidate_eligible(attendee, candidate):
                 candidates.append((candidate, float(row.similarity)))
+                if len(candidates) >= top_k:
+                    break
 
         return candidates
 

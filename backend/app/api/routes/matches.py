@@ -38,6 +38,7 @@ async def get_matches(
                 Match.attendee_a_id == attendee_id,
                 Match.attendee_b_id == attendee_id,
             )
+            & (Match.hidden_by_user.is_(False))
         )
         .order_by(Match.overall_score.desc())
         .limit(limit)
