@@ -1,6 +1,6 @@
 import json
 import uuid
-from sqlalchemy import select, text
+from sqlalchemy import select, text, delete as sql_delete, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
 from app.core.config import get_settings
@@ -9,6 +9,9 @@ from app.services.embeddings import embed_attendee, generate_ai_summary, classif
 
 settings = get_settings()
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+# Only persist matches above this quality threshold — avoids padding with weak connections
+MIN_MATCH_SCORE = 0.60
 
 
 class MatchingEngine:
@@ -122,9 +125,9 @@ class MatchingEngine:
         prompt = f"""You are the AI matchmaking engine for Proof of Talk 2026, an exclusive Web3 conference at the Louvre Palace with 2,500 decision-makers controlling $18 trillion in assets.
 
 Your task: Re-rank and explain match recommendations for the attendee below. Go beyond surface-level keyword matching. Find:
-1. **Complementary matches** — where one party has what the other needs (investor meets startup, regulator meets builder)
-2. **Non-obvious connections** — different sectors but solving similar underlying problems
-3. **Deal-ready pairs** — both parties in a position to transact, not just talk
+1. **Complementary matches** — one party has exactly what the other needs within the same or adjacent sector (investor meets startup in their thesis; regulator meets builder in their jurisdiction; capital deployer meets capital raiser)
+2. **Non-obvious connections** — participants from CLEARLY DIFFERENT sectors who share an underlying common problem they'd uniquely benefit from solving together. Do NOT classify as non_obvious if both parties work in related or overlapping sectors — that is complementary.
+3. **Deal-ready pairs** — both parties have explicit, active deal signals (deploying_capital + raising_capital; seeking_customers + has_product). Must be transactable at this event, not just networking.
 
 TARGET ATTENDEE:
 Name: {attendee.name}
@@ -142,14 +145,14 @@ CANDIDATES:
 Return a JSON array ranked from best to worst match. Each entry:
 {{
   "candidate_index": <1-based index>,
-  "overall_score": <0.0-1.0>,
+  "overall_score": <0.0-1.0 — be conservative: only score above 0.75 if the connection is genuinely strong and specific. A score below 0.60 means the match adds little value.>,
   "complementary_score": <0.0-1.0>,
   "match_type": "complementary" | "non_obvious" | "deal_ready",
-  "explanation": "<2-3 sentences explaining WHY these two should meet. Be specific about the mutual value. Reference concrete details like funding amounts, products, mandates.>",
+  "explanation": "<2-3 sentences explaining WHY these two should meet. Be specific about the mutual value. Reference concrete details like funding amounts, products, mandates, and the conference context.>",
   "shared_context": {{
     "sectors": ["list of shared/overlapping sectors"],
-    "synergies": ["specific synergy points"],
-    "action_items": ["suggested conversation topics or deals to discuss"]
+    "synergies": ["specific synergy points — be concrete, not generic"],
+    "action_items": ["2-3 specific conversation topics or deal scenarios to explore at POT 2026"]
   }}
 }}
 
@@ -187,9 +190,15 @@ Return ONLY the JSON array. No markdown, no commentary."""
     # ── Full Pipeline ───────────────────────────────────────────────────
 
     async def generate_matches_for_attendee(
-        self, attendee_id: uuid.UUID, top_k: int = 10
+        self, attendee_id: uuid.UUID, top_k: int = 10, clear_existing: bool = True
     ) -> list[Match]:
-        """Run full 3-stage pipeline for a single attendee."""
+        """Run full 3-stage pipeline for a single attendee.
+
+        Args:
+            clear_existing: When True (single-attendee call), removes all existing
+                matches involving this attendee before regenerating. When False
+                (batch call), relies on the caller to have cleared matches upfront.
+        """
         attendee = await self.db.get(Attendee, attendee_id)
         if not attendee:
             raise ValueError(f"Attendee {attendee_id} not found")
@@ -197,6 +206,18 @@ Return ONLY the JSON array. No markdown, no commentary."""
         # Stage 1: Ensure attendee is processed
         if attendee.embedding is None:
             attendee = await self.process_attendee(attendee)
+
+        # Clear stale matches for this attendee (both directions) when called individually
+        if clear_existing:
+            await self.db.execute(
+                sql_delete(Match).where(
+                    or_(
+                        Match.attendee_a_id == attendee_id,
+                        Match.attendee_b_id == attendee_id,
+                    )
+                )
+            )
+            await self.db.commit()
 
         # Stage 2: Retrieve candidates
         candidates = await self.retrieve_candidates(attendee, top_k=top_k)
@@ -206,7 +227,7 @@ Return ONLY the JSON array. No markdown, no commentary."""
         # Stage 3: Rank & explain
         ranked = await self.rank_and_explain(attendee, candidates)
 
-        # Persist matches
+        # Persist matches — with deduplication and score threshold
         matches = []
         for entry in ranked:
             idx = entry["candidate_index"] - 1
@@ -214,12 +235,33 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 continue
             candidate, sim_score = candidates[idx]
 
+            # Apply minimum quality threshold — avoid padding with weak matches
+            overall_score = entry.get("overall_score", sim_score)
+            if overall_score < MIN_MATCH_SCORE:
+                continue
+
+            # Deduplication: skip if this pair already exists in either direction
+            existing = (
+                await self.db.execute(
+                    select(Match).where(
+                        or_(
+                            (Match.attendee_a_id == attendee.id)
+                            & (Match.attendee_b_id == candidate.id),
+                            (Match.attendee_a_id == candidate.id)
+                            & (Match.attendee_b_id == attendee.id),
+                        )
+                    )
+                )
+            ).scalars().first()
+            if existing:
+                continue
+
             match = Match(
                 attendee_a_id=attendee.id,
                 attendee_b_id=candidate.id,
                 similarity_score=sim_score,
                 complementary_score=entry.get("complementary_score", sim_score),
-                overall_score=entry.get("overall_score", sim_score),
+                overall_score=overall_score,
                 match_type=entry.get("match_type", "complementary"),
                 explanation=entry.get("explanation", ""),
                 shared_context=entry.get("shared_context", {}),
@@ -231,16 +273,28 @@ Return ONLY the JSON array. No markdown, no commentary."""
         return matches
 
     async def generate_all_matches(self, top_k: int = 10) -> int:
-        """Generate matches for all attendees."""
+        """Generate matches for all attendees.
+
+        Wipes existing matches first so reruns produce a clean, deduplicated result.
+        Each pair (A, B) produces exactly one Match record — whichever attendee is
+        processed first becomes attendee_a.
+        """
+        # Start clean — prevents duplicates on reruns
+        await self.db.execute(sql_delete(Match))
+        await self.db.commit()
+
         result = await self.db.execute(select(Attendee))
         attendees = result.scalars().all()
 
-        # First ensure all attendees are processed
+        # Ensure all attendees have embeddings / AI summaries
         await self.process_all_attendees()
 
         total = 0
         for attendee in attendees:
-            matches = await self.generate_matches_for_attendee(attendee.id, top_k)
+            # clear_existing=False because we wiped above and use dedup check
+            matches = await self.generate_matches_for_attendee(
+                attendee.id, top_k, clear_existing=False
+            )
             total += len(matches)
 
         return total

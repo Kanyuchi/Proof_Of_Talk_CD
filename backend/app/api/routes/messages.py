@@ -53,6 +53,7 @@ async def list_conversations(
     accepted = (await db.execute(
         select(Match).where(
             ((Match.attendee_a_id == attendee.id) | (Match.attendee_b_id == attendee.id))
+            & (Match.status == "accepted")
         )
     )).scalars().all()
 

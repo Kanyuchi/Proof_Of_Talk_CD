@@ -2,7 +2,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Handshake, Lightbulb, DollarSign, Check, X, Brain,
   Target, MessageSquare, Sparkles, Crown, Mic, Megaphone, User,
-  Linkedin, Twitter, Globe, RefreshCw,
+  Linkedin, Twitter, Globe, RefreshCw, AlertTriangle, Copy, CheckCheck,
 } from "lucide-react";
 import { useAttendee } from "../hooks/useAttendee";
 import { useMatches, useUpdateMatchStatus } from "../hooks/useMatches";
@@ -41,6 +41,20 @@ const ticketIcons: Record<string, React.ReactNode> = {
   delegate: <User className="w-3 h-3" />,
 };
 
+// Build an icebreaker from match data so the user has a ready-made opener
+function buildIcebreaker(matchedName: string, synergies?: string[], topics?: string[]): string {
+  const firstName = matchedName.split(" ")[0];
+  const synergy = synergies?.[0];
+  const topic = topics?.[0];
+  if (synergy && topic) {
+    return `Hi ${firstName}, our profiles were matched by the POT 2026 AI — I noticed we share a focus on ${synergy}. I'd love to discuss ${topic} at the conference. Are you free on June 2 or 3?`;
+  }
+  if (synergy) {
+    return `Hi ${firstName}, I noticed we both have a focus on ${synergy}. Would love to connect at POT 2026 and explore potential synergies!`;
+  }
+  return `Hi ${firstName}, the POT 2026 matchmaker highlighted us as a strong connection. I'd love to meet briefly during the conference — are you available on June 2 or 3?`;
+}
+
 export default function AttendeeMatches() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -49,12 +63,20 @@ export default function AttendeeMatches() {
   const { data: matchData, isLoading: loadingMatches } = useMatches(id);
   const updateStatus = useUpdateMatchStatus(id);
   const [enriching, setEnriching] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const matches = matchData?.matches ?? [];
   const isLoading = loadingAttendee || loadingMatches;
 
   const handleStatus = (matchId: string, status: "accepted" | "declined") => {
     updateStatus.mutate({ matchId, status });
+  };
+
+  const handleCopyIcebreaker = (text: string, matchId: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(matchId);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
   };
 
   const handleMessage = (matchId: string) => {
@@ -82,6 +104,20 @@ export default function AttendeeMatches() {
   const enriched = attendee.enriched_profile as Record<string, unknown>;
   const hasEnrichedData = Object.keys(enriched).length > 0;
 
+  // Profile completeness — more complete = better matches
+  const completenessFields = [
+    !!attendee.goals,
+    !!attendee.linkedin_url,
+    !!attendee.twitter_handle,
+    !!attendee.company_website,
+    (attendee.interests ?? []).length > 0,
+    !!attendee.ai_summary,
+  ];
+  const completeness = Math.round(
+    (completenessFields.filter(Boolean).length / completenessFields.length) * 100
+  );
+  const missingGoals = !attendee.goals;
+
   return (
     <div className="space-y-8">
       {/* Back link */}
@@ -92,6 +128,20 @@ export default function AttendeeMatches() {
         <ArrowLeft className="w-4 h-4" />
         Back to Attendees
       </Link>
+
+      {/* Goals warning — missing goals reduces match accuracy */}
+      {missingGoals && (
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-400/30 bg-amber-400/5">
+          <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-amber-400">Goals not set — match quality may be reduced</p>
+            <p className="text-xs text-white/40 mt-0.5">
+              Adding your conference goals helps the AI find the most relevant connections for you.
+              Edit your profile to complete this field.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Attendee profile card */}
       <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
@@ -141,6 +191,21 @@ export default function AttendeeMatches() {
                 <RefreshCw className={`w-3 h-3 ${enriching ? "animate-spin" : ""}`} />
                 {enriching ? "Enriching…" : "Enrich Profile"}
               </button>
+            </div>
+
+            {/* Profile completeness indicator */}
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    completeness >= 80 ? "bg-emerald-400" : completeness >= 50 ? "bg-amber-400" : "bg-red-400"
+                  }`}
+                  style={{ width: `${completeness}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-white/30 shrink-0">
+                Profile {completeness}% complete
+              </span>
             </div>
 
             {attendee.ai_summary && (
@@ -345,19 +410,57 @@ export default function AttendeeMatches() {
                   </div>
                 )}
                 {match.status === "accepted" && (
-                  <div className="flex items-center gap-3 pt-2">
-                    <div className="flex items-center gap-2 text-sm text-emerald-400">
-                      <Check className="w-4 h-4" />
-                      Meeting accepted
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 text-sm text-emerald-400">
+                        <Check className="w-4 h-4" />
+                        Meeting accepted
+                      </div>
+                      {user && (
+                        <button
+                          onClick={() => handleMessage(match.id)}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded-lg text-sm font-medium hover:bg-amber-400/20 transition-all"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" />
+                          Send Message
+                        </button>
+                      )}
                     </div>
-                    {user && (
-                      <button
-                        onClick={() => handleMessage(match.id)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded-lg text-sm font-medium hover:bg-amber-400/20 transition-all"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        Send Message
-                      </button>
+                    {/* AI-suggested icebreaker */}
+                    {person && (
+                      <div className="p-3 rounded-xl bg-white/[0.02] border border-white/10">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] text-white/30 uppercase font-medium flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" /> Suggested opener
+                          </span>
+                          <button
+                            onClick={() =>
+                              handleCopyIcebreaker(
+                                buildIcebreaker(
+                                  person.name,
+                                  match.shared_context?.synergies,
+                                  match.shared_context?.action_items
+                                ),
+                                match.id
+                              )
+                            }
+                            className="flex items-center gap-1 text-[10px] text-white/30 hover:text-amber-400 transition-colors"
+                          >
+                            {copiedId === match.id ? (
+                              <><CheckCheck className="w-3 h-3 text-emerald-400" /> <span className="text-emerald-400">Copied</span></>
+                            ) : (
+                              <><Copy className="w-3 h-3" /> Copy</>
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-xs text-white/50 italic leading-relaxed">
+                          "{buildIcebreaker(
+                            person.name,
+                            match.shared_context?.synergies,
+                            match.shared_context?.action_items
+                          )}"
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}

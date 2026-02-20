@@ -1,6 +1,6 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.attendee import Attendee, Match
@@ -26,7 +26,12 @@ async def get_matches(
 
     result = await db.execute(
         select(Match)
-        .where(Match.attendee_a_id == attendee_id)
+        .where(
+            or_(
+                Match.attendee_a_id == attendee_id,
+                Match.attendee_b_id == attendee_id,
+            )
+        )
         .order_by(Match.overall_score.desc())
         .limit(limit)
     )
@@ -34,8 +39,13 @@ async def get_matches(
 
     match_responses = []
     for match in matches:
-        # Fetch the matched attendee's profile
-        matched = await db.get(Attendee, match.attendee_b_id)
+        # Always return the OTHER party's profile, regardless of a/b position
+        other_id = (
+            match.attendee_b_id
+            if match.attendee_a_id == attendee_id
+            else match.attendee_a_id
+        )
+        matched = await db.get(Attendee, other_id)
         resp = MatchResponse.model_validate(match)
         if matched:
             resp.matched_attendee = AttendeeResponse.model_validate(matched)
