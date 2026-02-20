@@ -4,12 +4,14 @@ from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
+from app.core.config import get_settings
 from app.models.attendee import Attendee, Match
 from app.schemas.attendee import DashboardStats
 from app.core.deps import require_auth, require_admin
 from app.models.user import User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+settings = get_settings()
 
 
 def _compute_kpi_rates(
@@ -317,3 +319,27 @@ async def trigger_matching(
         "top_k": top_k,
         "total_matches": len(attendees) * top_k,
     }
+
+
+@router.get("/engagement/nudges/dry-run")
+async def nudge_dry_run(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Preview currently due engagement nudges without dispatching them."""
+    if not settings.AI_NUDGE_ENABLED:
+        return {"status": "disabled", "reason": "Set AI_NUDGE_ENABLED=true to enable nudges"}
+    from app.services.engagement import trigger_nudges
+    return await trigger_nudges(db, dry_run=True)
+
+
+@router.post("/engagement/nudges/trigger")
+async def nudge_trigger(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Dispatch due nudges (idempotent by daily dedup key)."""
+    if not settings.AI_NUDGE_ENABLED:
+        return {"status": "disabled", "reason": "Set AI_NUDGE_ENABLED=true to enable nudges"}
+    from app.services.engagement import trigger_nudges
+    return await trigger_nudges(db, dry_run=False)
