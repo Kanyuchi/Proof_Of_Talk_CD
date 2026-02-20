@@ -1,7 +1,7 @@
 import structlog
 logger = structlog.get_logger(__name__)
 from fastapi import APIRouter, Depends, Query, BackgroundTasks
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.attendee import Attendee, Match
@@ -10,6 +10,18 @@ from app.core.deps import require_auth, require_admin
 from app.models.user import User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+
+
+def _compute_kpi_rates(
+    matches_generated: int,
+    mutual_accepted_count: int,
+    scheduled_count: int,
+    show_count: int,
+) -> tuple[float, float, float]:
+    mutual_accept_rate = (mutual_accepted_count / matches_generated) if matches_generated else 0.0
+    scheduled_rate = (scheduled_count / mutual_accepted_count) if mutual_accepted_count else 0.0
+    show_rate = (show_count / scheduled_count) if scheduled_count else 0.0
+    return mutual_accept_rate, scheduled_rate, show_rate
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -27,6 +39,26 @@ async def get_stats(db: AsyncSession = Depends(get_db), _user: User = Depends(re
             select(func.count(Match.id)).where(Match.status == "declined")
         )
     ).scalar() or 0
+    mutual_accepted_count = (
+        await db.execute(
+            select(func.count(Match.id)).where(
+                and_(
+                    Match.status_a.in_(["accepted", "met"]),
+                    Match.status_b.in_(["accepted", "met"]),
+                )
+            )
+        )
+    ).scalar() or 0
+    scheduled_count = (
+        await db.execute(select(func.count(Match.id)).where(Match.meeting_time.isnot(None)))
+    ).scalar() or 0
+    show_count = (
+        await db.execute(
+            select(func.count(Match.id)).where(
+                (Match.met_at.isnot(None)) | (Match.status == "met") | (Match.meeting_outcome == "met")
+            )
+        )
+    ).scalar() or 0
 
     # Enrichment coverage: % of attendees with non-empty enriched_profile
     enriched_count = (
@@ -41,6 +73,9 @@ async def get_stats(db: AsyncSession = Depends(get_db), _user: User = Depends(re
     # Average match score
     avg_score = (
         await db.execute(select(func.avg(Match.overall_score)))
+    ).scalar() or 0.0
+    avg_satisfaction = (
+        await db.execute(select(func.avg(Match.satisfaction_score)).where(Match.satisfaction_score.isnot(None)))
     ).scalar() or 0.0
 
     # Match type distribution
@@ -60,6 +95,12 @@ async def get_stats(db: AsyncSession = Depends(get_db), _user: User = Depends(re
     from collections import Counter
     interest_counts = Counter(all_interests).most_common(10)
     top_sectors = [{"sector": s, "count": c} for s, c in interest_counts]
+    mutual_accept_rate, scheduled_rate, show_rate = _compute_kpi_rates(
+        matches_generated=matches_generated,
+        mutual_accepted_count=mutual_accepted_count,
+        scheduled_count=scheduled_count,
+        show_count=show_count,
+    )
 
     return DashboardStats(
         total_attendees=total_attendees,
@@ -68,6 +109,10 @@ async def get_stats(db: AsyncSession = Depends(get_db), _user: User = Depends(re
         matches_declined=matches_declined,
         enrichment_coverage=enrichment_coverage,
         avg_match_score=float(avg_score),
+        mutual_accept_rate=mutual_accept_rate,
+        scheduled_rate=scheduled_rate,
+        show_rate=show_rate,
+        post_meeting_satisfaction=float(avg_satisfaction or 0.0),
         top_sectors=top_sectors,
         match_type_distribution=match_type_distribution,
     )

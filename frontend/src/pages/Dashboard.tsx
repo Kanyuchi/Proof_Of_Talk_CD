@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Users, Handshake, Check, TrendingUp, BarChart3, Brain,
-  Lightbulb, DollarSign, Activity, Zap, RefreshCw, X,
+  Lightbulb, DollarSign, Activity, Zap, RefreshCw, X, Sparkles,
 } from "lucide-react";
 import type { Attendee, Match } from "../types";
 import {
@@ -163,6 +163,34 @@ export default function Dashboard() {
         <StatCard icon={Handshake} label="Matches Generated" value={stats.matches_generated.toLocaleString()} color="bg-amber-500" />
         <StatCard icon={Check} label="Matches Accepted" value={stats.matches_accepted.toLocaleString()} color="bg-emerald-500" />
         <StatCard icon={TrendingUp} label="Avg Match Score" value={`${(stats.avg_match_score * 100).toFixed(0)}%`} color="bg-purple-500" />
+      </div>
+
+      {/* Outcome funnel KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          icon={Handshake}
+          label="Mutual Accept Rate"
+          value={`${(stats.mutual_accept_rate * 100).toFixed(1)}%`}
+          color="bg-emerald-600"
+        />
+        <StatCard
+          icon={Activity}
+          label="Scheduled Rate"
+          value={`${(stats.scheduled_rate * 100).toFixed(1)}%`}
+          color="bg-blue-600"
+        />
+        <StatCard
+          icon={Check}
+          label="Show Rate"
+          value={`${(stats.show_rate * 100).toFixed(1)}%`}
+          color="bg-indigo-600"
+        />
+        <StatCard
+          icon={Sparkles}
+          label="Post-Meeting CSAT"
+          value={stats.post_meeting_satisfaction > 0 ? `${stats.post_meeting_satisfaction.toFixed(2)} / 5` : "N/A"}
+          color="bg-amber-600"
+        />
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
