@@ -14,7 +14,7 @@ if [[ -n "$KEY_FILE" ]]; then
   SSH_OPTS+=(-i "$KEY_FILE")
   RSYNC_OPTS+=(-e "ssh -i $KEY_FILE")
 fi
-SSH="ssh ${SSH_OPTS[*]} ec2-user@$EC2_HOST"
+SSH=(ssh ${SSH_OPTS+"${SSH_OPTS[@]}"} "ec2-user@$EC2_HOST")
 APP_DIR="/home/ec2-user/app"
 
 echo "==> Building frontend..."
@@ -38,18 +38,18 @@ rsync "${RSYNC_OPTS[@]}" \
   deploy/ "ec2-user@$EC2_HOST:$APP_DIR/deploy/"
 
 echo "==> Installing Python deps on EC2..."
-$SSH "cd $APP_DIR/backend && source .venv/bin/activate && pip install -r requirements.txt -q"
+"${SSH[@]}" "cd $APP_DIR/backend && source .venv/bin/activate && pip install -r requirements.txt -q"
 
 echo "==> Running database migrations..."
-$SSH "cd $APP_DIR/backend && source .venv/bin/activate && alembic upgrade head"
+"${SSH[@]}" "cd $APP_DIR/backend && source .venv/bin/activate && alembic upgrade head"
 
 echo "==> Restarting backend service..."
-$SSH "sudo systemctl restart pot-matchmaker"
+"${SSH[@]}" "sudo systemctl restart pot-matchmaker"
 
 echo "==> Reloading nginx..."
-$SSH "sudo nginx -t && sudo systemctl reload nginx"
+"${SSH[@]}" "sudo nginx -t && sudo systemctl reload nginx"
 
 echo ""
 echo "✓ Deployment complete — http://$EC2_HOST"
 echo ""
-$SSH "sudo systemctl status pot-matchmaker --no-pager | tail -5"
+"${SSH[@]}" "sudo systemctl status pot-matchmaker --no-pager | tail -5"
