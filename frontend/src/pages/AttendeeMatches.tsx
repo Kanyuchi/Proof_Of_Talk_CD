@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Handshake, Lightbulb, DollarSign, Check, X, Brain,
-  Target, MessageSquare, Sparkles, Crown, Mic, Megaphone, User,
+  ArrowLeft, Check, X, Brain,
+  Target, MessageSquare, Sparkles,
   Linkedin, Twitter, Globe, RefreshCw, AlertTriangle, Copy, CheckCheck,
   Calendar, Clock, Download,
 } from "lucide-react";
@@ -10,124 +10,10 @@ import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedbac
 import { useAuth } from "../hooks/useAuth";
 import { enrichAttendee } from "../api/client";
 import { useState } from "react";
-
-// Conference time slots — June 2 & 3, 2026
-const CONFERENCE_SLOTS = [
-  { day: "June 2", label: "Mon 2 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },
-  { day: "June 2", label: "Mon 2 Jun — Afternoon", slots: ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
-  { day: "June 2", label: "Mon 2 Jun — Evening", slots: ["18:00", "18:30", "19:00"] },
-  { day: "June 3", label: "Tue 3 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },
-  { day: "June 3", label: "Tue 3 Jun — Afternoon", slots: ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
-];
-
-function slotToISO(day: string, time: string): string {
-  const dateStr = day === "June 2" ? "2026-06-02" : "2026-06-03";
-  return `${dateStr}T${time}:00`;
-}
-
-function formatMeetingTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString("en-GB", {
-    weekday: "short", day: "numeric", month: "long",
-    hour: "2-digit", minute: "2-digit",
-  });
-}
-
-function downloadICS(
-  meetingTime: string,
-  _attendeeName: string,
-  matchedName: string,
-  matchedCompany: string,
-  location: string,
-  explanation: string,
-) {
-  const start = new Date(meetingTime);
-  const end = new Date(start.getTime() + 30 * 60 * 1000); // 30-min block
-  const fmt = (d: Date) =>
-    d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-  const ics = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//POT Matchmaker//POT 2026//EN",
-    "BEGIN:VEVENT",
-    `UID:${Date.now()}@pot2026.com`,
-    `DTSTAMP:${fmt(new Date())}`,
-    `DTSTART:${fmt(start)}`,
-    `DTEND:${fmt(end)}`,
-    `SUMMARY:POT 2026 Meeting — ${matchedName} (${matchedCompany})`,
-    `DESCRIPTION:${explanation.replace(/\n/g, "\\n")}`,
-    `LOCATION:${location}`,
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ].join("\r\n");
-
-  const blob = new Blob([ics], { type: "text/calendar" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `POT2026_${matchedName.replace(/\s+/g, "_")}.ics`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-const matchTypeConfig = {
-  complementary: {
-    icon: Handshake,
-    label: "Complementary",
-    color: "text-blue-400",
-    bg: "bg-blue-400/10 border-blue-400/20",
-    description: "One party has what the other needs",
-  },
-  non_obvious: {
-    icon: Lightbulb,
-    label: "Non-Obvious",
-    color: "text-purple-400",
-    bg: "bg-purple-400/10 border-purple-400/20",
-    description: "Different sectors, similar underlying problems",
-  },
-  deal_ready: {
-    icon: DollarSign,
-    label: "Deal Ready",
-    color: "text-emerald-400",
-    bg: "bg-emerald-400/10 border-emerald-400/20",
-    description: "Both parties positioned to transact",
-  },
-};
-
-const ticketIcons: Record<string, React.ReactNode> = {
-  vip: <Crown className="w-3 h-3" />,
-  speaker: <Mic className="w-3 h-3" />,
-  sponsor: <Megaphone className="w-3 h-3" />,
-  delegate: <User className="w-3 h-3" />,
-};
-
-// Build a natural icebreaker opener from match data.
-// Prioritises action_items (specific discussion topics) over raw synergy strings,
-// and falls back to the person's title/company when those aren't available.
-function buildIcebreaker(
-  matchedName: string,
-  matchedTitle?: string,
-  matchedCompany?: string,
-  topics?: string[],
-): string {
-  const firstName = matchedName.split(" ")[0];
-  // Use the first action item if it's concise enough to read naturally
-  const topic = topics?.find((t) => t.length < 140);
-  const cleanTopic = topic
-    ? topic.replace(/^discuss\s+/i, "").replace(/^explore\s+/i, "")
-    : null;
-
-  if (cleanTopic && matchedCompany) {
-    return `Hi ${firstName}, the POT 2026 AI matched us as a strong connection. Given your work at ${matchedCompany}, I'd love to explore ${cleanTopic} at the conference. Are you free on June 2 or 3?`;
-  }
-  if (cleanTopic) {
-    return `Hi ${firstName}, I'd love to explore ${cleanTopic} with you at POT 2026. Are you free on June 2 or 3?`;
-  }
-  if (matchedTitle && matchedCompany) {
-    return `Hi ${firstName}, I noticed you're ${matchedTitle} at ${matchedCompany}. The POT 2026 AI flagged us as a strong match — I'd love to connect briefly at the conference. Are you free on June 2 or 3?`;
-  }
-  return `Hi ${firstName}, the POT 2026 matchmaker highlighted us as a strong connection. I'd love to meet briefly during the conference — are you available on June 2 or 3?`;
-}
+import {
+  CONFERENCE_SLOTS, slotToISO, formatMeetingTime, downloadICS,
+  matchTypeConfig, ticketIcons, buildIcebreaker,
+} from "../utils/matchHelpers";
 
 export default function AttendeeMatches() {
   const { id } = useParams<{ id: string }>();
@@ -214,19 +100,21 @@ export default function AttendeeMatches() {
   }
 
   const enriched = attendee.enriched_profile as Record<string, unknown>;
-  const hasEnrichedData = Object.keys(enriched).length > 0;
+  // Show enriched section only when at least one display field has content
+  const hasEnrichedData = !!(enriched.linkedin_summary || enriched.twitter_summary || enriched.website_summary);
 
-  // Profile completeness — more complete = better matches
+  // Profile completeness — labelled fields for tooltip
   const completenessFields = [
-    !!attendee.goals,
-    !!attendee.linkedin_url,
-    !!attendee.twitter_handle,
-    !!attendee.company_website,
-    (attendee.interests ?? []).length > 0,
-    !!attendee.ai_summary,
+    { label: "Goals",       ok: !!attendee.goals },
+    { label: "Interests",   ok: (attendee.interests?.length ?? 0) > 0 },
+    { label: "LinkedIn",    ok: !!attendee.linkedin_url },
+    { label: "Twitter",     ok: !!attendee.twitter_handle },
+    { label: "Website",     ok: !!attendee.company_website },
+    { label: "AI Summary",  ok: !!attendee.ai_summary },
+    { label: "Intent Tags", ok: (attendee.intent_tags?.length ?? 0) > 0 },
   ];
   const completeness = Math.round(
-    (completenessFields.filter(Boolean).length / completenessFields.length) * 100
+    (completenessFields.filter((f) => f.ok).length / completenessFields.length) * 100
   );
   const missingGoals = !attendee.goals;
 
@@ -305,19 +193,34 @@ export default function AttendeeMatches() {
               </button>
             </div>
 
-            {/* Profile completeness indicator */}
-            <div className="mt-3 flex items-center gap-3">
-              <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    completeness >= 80 ? "bg-emerald-400" : completeness >= 50 ? "bg-amber-400" : "bg-red-400"
-                  }`}
-                  style={{ width: `${completeness}%` }}
-                />
+            {/* Profile completeness indicator with hover tooltip */}
+            <div className="mt-3 group relative">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      completeness >= 80 ? "bg-emerald-400" : completeness >= 50 ? "bg-amber-400" : "bg-red-400"
+                    }`}
+                    style={{ width: `${completeness}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-white/30 shrink-0">
+                  Profile {completeness}% complete
+                </span>
               </div>
-              <span className="text-[10px] text-white/30 shrink-0">
-                Profile {completeness}% complete
-              </span>
+              {/* Tooltip */}
+              <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10
+                bg-[#1a1a2e] border border-white/10 rounded-lg p-3 text-xs min-w-48 shadow-xl">
+                {completenessFields.map((f) => (
+                  <div
+                    key={f.label}
+                    className={`flex items-center gap-2 py-0.5 ${f.ok ? "text-emerald-400" : "text-white/30"}`}
+                  >
+                    <span>{f.ok ? "✓" : "✗"}</span>
+                    {f.label}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {attendee.ai_summary && (
@@ -353,7 +256,7 @@ export default function AttendeeMatches() {
               </div>
             )}
 
-            {/* Enriched data */}
+            {/* Enriched data — only shown when at least one field has content */}
             {hasEnrichedData && (
               <div className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
                 <div className="text-[10px] text-white/30 uppercase font-medium">Enriched Data</div>
@@ -398,7 +301,7 @@ export default function AttendeeMatches() {
           return (
             <div
               key={match.id}
-              className={`rounded-2xl border overflow-hidden transition-all ${
+              className={`rounded-2xl border border-l-4 ${config.leftBorder} overflow-hidden transition-all ${
                 match.status === "accepted"
                   ? "border-emerald-400/30 bg-emerald-400/[0.03]"
                   : match.status === "declined"
@@ -728,7 +631,6 @@ export default function AttendeeMatches() {
                   }
 
                   if (iAccepted && !isMutual) {
-                    // I accepted, waiting for the other party
                     return (
                       <div className="flex items-center gap-2 pt-2">
                         <div className="flex items-center gap-2 text-sm text-amber-400/70">

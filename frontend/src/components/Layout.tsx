@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Users, Sparkles, BarChart3, MessageSquare, LogIn, LogOut, UserPlus, UserCog } from "lucide-react";
+import { Users, Sparkles, BarChart3, MessageSquare, LogIn, LogOut, UserPlus, UserCog, Heart } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { useUnreadCount } from "../hooks/useMessages";
 import ChatWidget from "./chat/ChatWidget";
@@ -57,6 +57,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
               );
             })}
+
+            {/* My Matches (only when logged in) */}
+            {isAuthenticated && (
+              <Link
+                to="/matches"
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  location.pathname === "/matches"
+                    ? "bg-white/10 text-amber-400"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <Heart className="w-4 h-4" />
+                <span className="hidden sm:inline">My Matches</span>
+              </Link>
+            )}
 
             {/* Messages (only when logged in) */}
             {isAuthenticated && (

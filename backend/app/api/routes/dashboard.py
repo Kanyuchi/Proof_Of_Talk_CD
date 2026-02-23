@@ -30,39 +30,57 @@ def _compute_kpi_rates(
 async def get_stats(db: AsyncSession = Depends(get_db), _user: User = Depends(require_auth)):
     """Organiser dashboard: event-wide stats."""
     total_attendees = (await db.execute(select(func.count(Attendee.id)))).scalar() or 0
-    matches_generated = (await db.execute(select(func.count(Match.id)))).scalar() or 0
+
+    # Exclude matches involving admin-linked attendees so demo/test accounts don't skew stats
+    admin_attendee_subq = (
+        select(User.attendee_id)
+        .where(and_(User.is_admin.is_(True), User.attendee_id.isnot(None)))
+        .scalar_subquery()
+    )
+    non_admin_filter = and_(
+        ~Match.attendee_a_id.in_(admin_attendee_subq),
+        ~Match.attendee_b_id.in_(admin_attendee_subq),
+    )
+    mutual_filter = and_(
+        non_admin_filter,
+        Match.status_a.in_(["accepted", "met"]),
+        Match.status_b.in_(["accepted", "met"]),
+    )
+
+    matches_generated = (
+        await db.execute(select(func.count(Match.id)).where(non_admin_filter))
+    ).scalar() or 0
+    # matches_accepted = mutual accepts (both sides said yes), consistent with mutual_accepted_count
     matches_accepted = (
-        await db.execute(
-            select(func.count(Match.id)).where(Match.status == "accepted")
-        )
+        await db.execute(select(func.count(Match.id)).where(mutual_filter))
     ).scalar() or 0
     matches_declined = (
         await db.execute(
-            select(func.count(Match.id)).where(Match.status == "declined")
-        )
-    ).scalar() or 0
-    mutual_accepted_count = (
-        await db.execute(
             select(func.count(Match.id)).where(
-                and_(
-                    Match.status_a.in_(["accepted", "met"]),
-                    Match.status_b.in_(["accepted", "met"]),
-                )
+                and_(non_admin_filter, Match.status == "declined")
             )
         )
     ).scalar() or 0
+    mutual_accepted_count = matches_accepted  # same query — reuse
     scheduled_count = (
-        await db.execute(select(func.count(Match.id)).where(Match.meeting_time.isnot(None)))
+        await db.execute(
+            select(func.count(Match.id)).where(
+                and_(non_admin_filter, Match.meeting_time.isnot(None))
+            )
+        )
     ).scalar() or 0
     show_count = (
         await db.execute(
             select(func.count(Match.id)).where(
-                (Match.met_at.isnot(None)) | (Match.status == "met") | (Match.meeting_outcome == "met")
+                and_(
+                    non_admin_filter,
+                    (Match.met_at.isnot(None)) | (Match.status == "met") | (Match.meeting_outcome == "met"),
+                )
             )
         )
     ).scalar() or 0
 
-    # Enrichment coverage: % of attendees with non-empty enriched_profile
+    # Enrichment coverage: % of attendees with AI summary
     enriched_count = (
         await db.execute(
             select(func.count(Attendee.id)).where(
@@ -72,17 +90,18 @@ async def get_stats(db: AsyncSession = Depends(get_db), _user: User = Depends(re
     ).scalar() or 0
     enrichment_coverage = enriched_count / total_attendees if total_attendees > 0 else 0.0
 
-    # Average match score
+    # Average match score (non-admin matches only)
     avg_score = (
-        await db.execute(select(func.avg(Match.overall_score)))
+        await db.execute(select(func.avg(Match.overall_score)).where(non_admin_filter))
     ).scalar() or 0.0
     avg_satisfaction = (
         await db.execute(select(func.avg(Match.satisfaction_score)).where(Match.satisfaction_score.isnot(None)))
     ).scalar() or 0.0
 
-    # Match type distribution
+    # Match type distribution (non-admin matches only)
     type_result = await db.execute(
         select(Match.match_type, func.count(Match.id))
+        .where(non_admin_filter)
         .group_by(Match.match_type)
     )
     match_type_distribution = {row[0]: row[1] for row in type_result.fetchall()}

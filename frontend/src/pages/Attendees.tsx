@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Search, Crown, Mic, Megaphone, User, ChevronRight, Brain,
 } from "lucide-react";
 import { useAttendees } from "../hooks/useAttendees";
+import { useMatches } from "../hooks/useMatches";
+import { useAuth } from "../hooks/useAuth";
 import EmptyState from "../components/EmptyState";
 
 const ticketIcons: Record<string, React.ReactNode> = {
@@ -22,9 +24,29 @@ const ticketColors: Record<string, string> = {
 
 const TICKET_TYPES = ["vip", "speaker", "sponsor", "delegate"] as const;
 
+const matchScoreColor: Record<string, string> = {
+  deal_ready:    "bg-emerald-400/15 text-emerald-400 border-emerald-400/25",
+  complementary: "bg-blue-400/15 text-blue-400 border-blue-400/25",
+  non_obvious:   "bg-purple-400/15 text-purple-400 border-purple-400/25",
+};
+
 export default function Attendees() {
   const { data, isLoading } = useAttendees();
   const attendees = data?.attendees ?? [];
+  const { user } = useAuth();
+  const { data: matchData } = useMatches(user?.attendee_id ?? undefined);
+
+  // Map each matched attendee's id → { score, type } for badge display
+  const matchMap = useMemo(
+    () =>
+      new Map(
+        (matchData?.matches ?? []).map((m) => [
+          m.matched_attendee?.id,
+          { score: m.overall_score, type: m.match_type },
+        ]),
+      ),
+    [matchData],
+  );
 
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<string[]>([]);
@@ -144,6 +166,18 @@ export default function Attendees() {
                   </div>
                 )}
               </div>
+
+              {/* Match score badge (shown when logged in and this person is a match) */}
+              {(() => {
+                const myMatch = matchMap.get(attendee.id);
+                if (!myMatch) return null;
+                const colorClass = matchScoreColor[myMatch.type] ?? "bg-white/10 text-white/50 border-white/10";
+                return (
+                  <div className={`hidden md:block text-xs font-mono font-semibold px-2 py-0.5 rounded-full border ${colorClass}`}>
+                    {(myMatch.score * 100).toFixed(0)}% match
+                  </div>
+                );
+              })()}
 
               {/* Intent tags */}
               <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
