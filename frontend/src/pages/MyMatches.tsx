@@ -1,8 +1,9 @@
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import {
   Check, X, Brain, Target, MessageSquare, Sparkles,
   Copy, CheckCheck, Calendar, Clock, Download, Heart, ChevronDown, ChevronUp,
 } from "lucide-react";
+import AttendeeAvatar from "../components/AttendeeAvatar";
 import { useAuth } from "../hooks/useAuth";
 import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedback } from "../hooks/useMatches";
 import { useState } from "react";
@@ -13,7 +14,6 @@ import {
 
 export default function MyMatches() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const navigate = useNavigate();
   const attendeeId = user?.attendee_id ?? undefined;
 
   const { data: matchData, isLoading: loadingMatches } = useMatches(attendeeId);
@@ -181,9 +181,7 @@ export default function MyMatches() {
                     {/* Matched person */}
                     {person && (
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-white/5 to-white/10 flex items-center justify-center text-white/60 font-semibold">
-                          {person.name[0]}
-                        </div>
+                        <AttendeeAvatar attendee={person} size="md" />
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-semibold">{person.name}</span>

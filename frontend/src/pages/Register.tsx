@@ -1,20 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Sparkles, ChevronRight, ChevronLeft, Check, X, Eye, EyeOff } from "lucide-react";
+import { ChevronRight, ChevronLeft, Check, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-
-const TICKET_TYPES = [
-  { value: "delegate", label: "Delegate", desc: "Conference attendee" },
-  { value: "vip", label: "VIP", desc: "Sovereign fund, family office" },
-  { value: "speaker", label: "Speaker", desc: "Keynote or panel speaker" },
-  { value: "sponsor", label: "Sponsor", desc: "Corporate sponsor" },
-] as const;
-
-const SUGGESTED_INTERESTS = [
-  "DeFi", "CBDC", "tokenisation", "institutional custody", "blockchain infrastructure",
-  "regulatory compliance", "TradFi-DeFi", "Layer-2", "KYC/AML", "cross-chain",
-  "NFTs", "DAOs", "Web3", "zero-knowledge proofs", "tokenised RWA",
-];
 
 export default function Register() {
   const { register } = useAuth();
@@ -24,7 +11,6 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
 
-  // Form state
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -32,38 +18,19 @@ export default function Register() {
     name: "",
     company: "",
     title: "",
-    ticket_type: "delegate",
-    interests: [] as string[],
-    interestInput: "",
-    goals: "",
-    linkedin_url: "",
-    twitter_handle: "",
     company_website: "",
+    goals: "",
+    seeking: "",
   });
 
-  const set = (key: string, value: unknown) =>
+  const set = (key: string, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
 
-  // Auto-prepend https:// to URL fields so native validation never fires
   const normalizeUrl = (val: string): string => {
     if (!val.trim()) return val;
     if (/^https?:\/\//i.test(val)) return val;
     return `https://${val}`;
   };
-
-  const setUrl = (key: string, val: string) => set(key, val);
-  const blurUrl = (key: string, val: string) => set(key, normalizeUrl(val));
-
-  const addInterest = (val: string) => {
-    const trimmed = val.trim().toLowerCase();
-    if (trimmed && !form.interests.includes(trimmed)) {
-      set("interests", [...form.interests, trimmed]);
-    }
-    set("interestInput", "");
-  };
-
-  const removeInterest = (tag: string) =>
-    set("interests", form.interests.filter((i) => i !== tag));
 
   const validateStep = () => {
     setError(null);
@@ -91,7 +58,7 @@ export default function Register() {
     if (validateStep()) setStep((s) => s + 1);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
@@ -102,14 +69,13 @@ export default function Register() {
         name: form.name,
         company: form.company,
         title: form.title,
-        ticket_type: form.ticket_type,
-        interests: form.interests,
+        ticket_type: "delegate",
+        interests: [],
         goals: form.goals,
-        linkedin_url: form.linkedin_url || undefined,
-        twitter_handle: form.twitter_handle || undefined,
-        company_website: form.company_website || undefined,
+        seeking: form.seeking ? [form.seeking] : [],
+        company_website: normalizeUrl(form.company_website) || undefined,
       });
-      navigate("/attendees");
+      navigate("/matches");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       setError(msg || "Registration failed. Please try again.");
@@ -119,18 +85,26 @@ export default function Register() {
   };
 
   const inputCls =
-    "w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#E76315]/50";
+    "w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#E76315]/50 transition-colors";
+
+  const stepLabels = ["Account", "Profile", "Intent"];
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-8">
-      <div className="w-full max-w-lg">
+      <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#E76315] to-[#D35400] mb-4">
-            <Sparkles className="w-7 h-7 text-black" />
+          {/* POT logo mark */}
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div
+              className="w-7 h-9 bg-[#E76315]"
+              style={{ clipPath: "polygon(0 0, 100% 8%, 100% 92%, 0 100%)" }}
+            />
+            <span className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)" }}>
+              Proof of Talk 2026
+            </span>
           </div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-heading)" }}>Join Proof of Talk 2026</h1>
-          <p className="text-white/40 text-sm mt-1">
+          <p className="text-white/40 text-sm">
             Tell us what you need. We'll tell you who to meet.
           </p>
         </div>
@@ -139,18 +113,23 @@ export default function Register() {
         <div className="flex items-center justify-center gap-2 mb-6">
           {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center gap-2">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  s < step
-                    ? "bg-[#E76315] text-black"
-                    : s === step
-                    ? "bg-[#E76315]/20 text-[#E76315] border border-[#E76315]/40"
-                    : "bg-white/5 text-white/30 border border-white/10"
-                }`}
-              >
-                {s < step ? <Check className="w-3.5 h-3.5" /> : s}
+              <div className="flex flex-col items-center gap-1">
+                <div
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    s < step
+                      ? "bg-[#E76315] text-white"
+                      : s === step
+                      ? "bg-[#E76315]/20 text-[#E76315] border border-[#E76315]/40"
+                      : "bg-white/5 text-white/30 border border-white/10"
+                  }`}
+                >
+                  {s < step ? <Check className="w-3.5 h-3.5" /> : s}
+                </div>
+                <span className={`text-[10px] ${s === step ? "text-[#E76315]" : "text-white/30"}`}>
+                  {stepLabels[s - 1]}
+                </span>
               </div>
-              {s < 3 && <div className="w-8 h-px bg-white/10" />}
+              {s < 3 && <div className="w-8 h-px bg-white/10 mb-4" />}
             </div>
           ))}
         </div>
@@ -165,25 +144,56 @@ export default function Register() {
           {/* Step 1: Account */}
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Create your account</h2>
+              <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)" }}>
+                Create your account
+              </h2>
               <div>
                 <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Email *</label>
-                <input type="email" required value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="you@company.com" className={inputCls} />
+                <input
+                  type="email"
+                  required
+                  value={form.email}
+                  onChange={(e) => set("email", e.target.value)}
+                  placeholder="you@company.com"
+                  className={inputCls}
+                />
               </div>
               <div>
                 <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Password *</label>
                 <div className="relative">
-                  <input type={showPw ? "text" : "password"} required value={form.password} onChange={(e) => set("password", e.target.value)} placeholder="Min. 8 characters" className={`${inputCls} pr-10`} />
-                  <button type="button" onClick={() => setShowPw((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+                  <input
+                    type={showPw ? "text" : "password"}
+                    required
+                    value={form.password}
+                    onChange={(e) => set("password", e.target.value)}
+                    placeholder="Min. 8 characters"
+                    className={`${inputCls} pr-10`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+                  >
                     {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
               <div>
                 <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Confirm Password *</label>
-                <input type="password" required value={form.confirmPassword} onChange={(e) => set("confirmPassword", e.target.value)} placeholder="••••••••" className={inputCls} />
+                <input
+                  type="password"
+                  required
+                  value={form.confirmPassword}
+                  onChange={(e) => set("confirmPassword", e.target.value)}
+                  placeholder="••••••••"
+                  className={inputCls}
+                />
               </div>
-              <button onClick={handleNext} className="w-full flex items-center justify-center gap-2 py-3 bg-[#E76315] text-black font-semibold rounded-xl hover:bg-[#FF833A] transition-all">
+              <button
+                onClick={handleNext}
+                className="w-full flex items-center justify-center gap-2 py-3 min-h-[44px] text-white font-semibold rounded-xl transition-all"
+                style={{ background: "var(--pot-orange)" }}
+              >
                 Continue <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -192,118 +202,121 @@ export default function Register() {
           {/* Step 2: Profile */}
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Your profile</h2>
+              <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)" }}>
+                Your profile
+              </h2>
+              <div>
+                <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={form.name}
+                  onChange={(e) => set("name", e.target.value)}
+                  placeholder="Jane Smith"
+                  className={inputCls}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Full Name *</label>
-                  <input type="text" required value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Jane Smith" className={inputCls} />
-                </div>
                 <div>
                   <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Company *</label>
-                  <input type="text" required value={form.company} onChange={(e) => set("company", e.target.value)} placeholder="Acme Capital" className={inputCls} />
+                  <input
+                    type="text"
+                    required
+                    value={form.company}
+                    onChange={(e) => set("company", e.target.value)}
+                    placeholder="Acme Capital"
+                    className={inputCls}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Title *</label>
-                  <input type="text" required value={form.title} onChange={(e) => set("title", e.target.value)} placeholder="Managing Partner" className={inputCls} />
+                  <input
+                    type="text"
+                    required
+                    value={form.title}
+                    onChange={(e) => set("title", e.target.value)}
+                    placeholder="Managing Partner"
+                    className={inputCls}
+                  />
                 </div>
               </div>
               <div>
-                <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Ticket Type *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {TICKET_TYPES.map(({ value, label, desc }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => set("ticket_type", value)}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        form.ticket_type === value
-                          ? "bg-[#E76315]/10 border-[#E76315]/40 text-[#E76315]"
-                          : "bg-white/[0.02] border-white/10 text-white/60 hover:border-white/20"
-                      }`}
-                    >
-                      <div className="text-sm font-medium">{label}</div>
-                      <div className="text-xs opacity-60">{desc}</div>
-                    </button>
-                  ))}
-                </div>
+                <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Company Website</label>
+                <input
+                  type="text"
+                  value={form.company_website}
+                  onChange={(e) => set("company_website", e.target.value)}
+                  onBlur={(e) => set("company_website", normalizeUrl(e.target.value))}
+                  placeholder="company.com"
+                  className={inputCls}
+                />
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setStep(1)} className="flex items-center gap-1 px-4 py-3 rounded-xl border border-white/10 text-white/60 hover:text-white transition-all text-sm">
+                <button
+                  onClick={() => setStep(1)}
+                  className="flex items-center gap-1 px-4 py-3 min-h-[44px] rounded-xl border border-white/10 text-white/60 hover:text-white transition-all text-sm"
+                >
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
-                <button onClick={handleNext} className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#E76315] text-black font-semibold rounded-xl hover:bg-[#FF833A] transition-all">
+                <button
+                  onClick={handleNext}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 min-h-[44px] text-white font-semibold rounded-xl transition-all"
+                  style={{ background: "var(--pot-orange)" }}
+                >
                   Continue <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 3: Interests + Goals */}
+          {/* Step 3: Intent */}
           {step === 3 && (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <h2 className="text-lg font-semibold">Your interests & goals</h2>
+              <h2 className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)" }}>
+                Two quick questions
+              </h2>
               <div>
-                <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Interests</label>
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {form.interests.map((tag) => (
-                    <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#E76315]/10 text-[#E76315] text-xs border border-[#E76315]/20">
-                      {tag}
-                      <button type="button" onClick={() => removeInterest(tag)}>
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  value={form.interestInput}
-                  onChange={(e) => set("interestInput", e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === ",") {
-                      e.preventDefault();
-                      addInterest(form.interestInput);
-                    }
-                  }}
-                  placeholder="Type interest and press Enter…"
-                  className={inputCls}
+                <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">
+                  What are you looking to achieve at POT 2026?
+                </label>
+                <textarea
+                  value={form.goals}
+                  onChange={(e) => set("goals", e.target.value)}
+                  placeholder="e.g. Deploy €50M into Series B tokenisation infrastructure over 12 months…"
+                  rows={3}
+                  className={`${inputCls} resize-none`}
                 />
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {SUGGESTED_INTERESTS.filter((s) => !form.interests.includes(s.toLowerCase())).slice(0, 8).map((s) => (
-                    <button key={s} type="button" onClick={() => addInterest(s)} className="px-2 py-0.5 rounded-full bg-white/5 text-white/40 text-xs hover:text-white/70 hover:bg-white/10 transition-all">
-                      + {s}
-                    </button>
-                  ))}
-                </div>
               </div>
               <div>
-                <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Goals at the Conference</label>
-                <textarea value={form.goals} onChange={(e) => set("goals", e.target.value)} placeholder="What do you want to achieve? (investors, partners, pilots…)" rows={3} className={`${inputCls} resize-none`} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">LinkedIn URL</label>
-                  <input type="text" value={form.linkedin_url} onChange={(e) => setUrl("linkedin_url", e.target.value)} onBlur={(e) => blurUrl("linkedin_url", e.target.value)} placeholder="linkedin.com/in/you" className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Twitter / X</label>
-                  <input type="text" value={form.twitter_handle} onChange={(e) => set("twitter_handle", e.target.value)} placeholder="@handle" className={inputCls} />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Company Website</label>
-                  <input type="text" value={form.company_website} onChange={(e) => setUrl("company_website", e.target.value)} onBlur={(e) => blurUrl("company_website", e.target.value)} placeholder="company.com" className={inputCls} />
-                </div>
+                <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">
+                  Who is your ideal connection at this event?
+                </label>
+                <textarea
+                  value={form.seeking}
+                  onChange={(e) => set("seeking", e.target.value)}
+                  placeholder="e.g. Founders with institutional-grade custody infrastructure and a live product…"
+                  rows={3}
+                  className={`${inputCls} resize-none`}
+                />
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setStep(2)} className="flex items-center gap-1 px-4 py-3 rounded-xl border border-white/10 text-white/60 hover:text-white transition-all text-sm">
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="flex items-center gap-1 px-4 py-3 min-h-[44px] rounded-xl border border-white/10 text-white/60 hover:text-white transition-all text-sm"
+                >
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
-                <button type="submit" disabled={loading} className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#E76315] text-black font-semibold rounded-xl hover:bg-[#FF833A] transition-all disabled:opacity-50">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 min-h-[44px] text-white font-semibold rounded-xl transition-all disabled:opacity-50"
+                  style={{ background: "var(--pot-orange)" }}
+                >
                   {loading ? (
-                    <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4" />
-                  )}
-                  {loading ? "Creating your profile…" : "Complete Registration"}
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : null}
+                  {loading ? "Creating your profile…" : "Get my introductions"}
                 </button>
               </div>
             </form>

@@ -5,7 +5,7 @@ import { useConversations, useConversation, useSendMessage } from "../hooks/useM
 import { useAuth } from "../hooks/useAuth";
 
 const ticketColors: Record<string, string> = {
-  vip: "text-amber-400",
+  vip: "text-[#E76315]",
   speaker: "text-purple-400",
   sponsor: "text-emerald-400",
   delegate: "text-blue-400",
@@ -105,7 +105,7 @@ export default function Messages() {
                         {ticketIcons[conv.other_attendee_ticket]}
                       </span>
                       {conv.unread_count > 0 && (
-                        <span className="ml-auto shrink-0 w-5 h-5 rounded-full bg-amber-400 text-black text-[10px] font-bold flex items-center justify-center">
+                        <span className="ml-auto shrink-0 w-5 h-5 rounded-full bg-[#E76315] text-black text-[10px] font-bold flex items-center justify-center">
                           {conv.unread_count}
                         </span>
                       )}
@@ -162,7 +162,7 @@ export default function Messages() {
                 >
                   <div
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                      msg.is_mine ? "bg-amber-400/20 text-amber-400" : "bg-white/10 text-white/50"
+                      msg.is_mine ? "bg-[#E76315]/20 text-[#E76315]" : "bg-white/10 text-white/50"
                     }`}
                   >
                     {msg.sender_name[0]}
@@ -171,7 +171,7 @@ export default function Messages() {
                     <div
                       className={`px-4 py-2.5 rounded-2xl text-sm ${
                         msg.is_mine
-                          ? "bg-amber-400/15 text-white rounded-br-sm"
+                          ? "bg-[#E76315]/15 text-white rounded-br-sm"
                           : "bg-white/5 text-white/80 rounded-bl-sm"
                       }`}
                     >
@@ -187,7 +187,7 @@ export default function Messages() {
 
             {/* Input */}
             <div className="p-4 border-t border-white/10">
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 focus-within:border-amber-400/30 transition-all">
+              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 focus-within:border-[#E76315]/30 transition-all">
                 <input
                   type="text"
                   value={messageInput}
@@ -199,7 +199,7 @@ export default function Messages() {
                 <button
                   onClick={handleSend}
                   disabled={!messageInput.trim() || sendMutation.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-400 text-black hover:bg-amber-300 transition-all disabled:opacity-40 shrink-0"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#E76315] text-black hover:bg-[#FF833A] transition-all disabled:opacity-40 shrink-0"
                 >
                   <Send className="w-3.5 h-3.5" />
                 </button>
