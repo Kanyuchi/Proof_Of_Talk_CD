@@ -1,25 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
-import { Users, Sparkles, BarChart3, MessageSquare, LogIn, LogOut, UserPlus, UserCog, Heart } from "lucide-react";
+import { Users, Sparkles, BarChart3, LogIn, LogOut, UserPlus, UserCog, Heart } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { useUnreadCount } from "../hooks/useMessages";
 import ChatWidget from "./chat/ChatWidget";
-
-const navItems = [
-  { to: "/", label: "Home", icon: Sparkles },
-  { to: "/attendees", label: "Attendees", icon: Users },
-  { to: "/dashboard", label: "Dashboard", icon: BarChart3 },
-];
-
-function UnreadBadge() {
-  const { data } = useUnreadCount();
-  const count = data?.unread_count ?? 0;
-  if (count === 0) return null;
-  return (
-    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-400 text-black text-[9px] font-bold flex items-center justify-center">
-      {count > 9 ? "9+" : count}
-    </span>
-  );
-}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -70,22 +52,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               >
                 <Heart className="w-4 h-4" />
                 <span className="hidden sm:inline">My Matches</span>
-              </Link>
-            )}
-
-            {/* Messages (only when logged in) */}
-            {isAuthenticated && (
-              <Link
-                to="/messages"
-                className={`relative px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                  location.pathname.startsWith("/messages")
-                    ? "bg-white/10 text-amber-400"
-                    : "text-white/60 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                <MessageSquare className="w-4 h-4" />
-                <UnreadBadge />
-                <span className="hidden sm:inline">Messages</span>
               </Link>
             )}
           </nav>

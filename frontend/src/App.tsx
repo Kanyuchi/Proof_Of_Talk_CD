@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./context/AuthContext";
 import Layout from "./components/Layout";
@@ -8,10 +8,10 @@ import AttendeeMatches from "./pages/AttendeeMatches";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Messages from "./pages/Messages";
 import Profile from "./pages/Profile";
 import MyMatches from "./pages/MyMatches";
 import NotFound from "./pages/NotFound";
+import Onboarding from "./pages/Onboarding";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,8 +36,9 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/matches" element={<MyMatches />} />
-              <Route path="/messages" element={<Messages />} />
+              <Route path="/messages" element={<Navigate to="/matches" replace />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/onboarding" element={<Onboarding />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

@@ -26,6 +26,8 @@ export default function MyMatches() {
   const [selectedDay, setSelectedDay] = useState<string>("June 2");
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [decliningMatchId, setDecliningMatchId] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
 
   const matches = matchData?.matches ?? [];
 
@@ -47,8 +49,14 @@ export default function MyMatches() {
   };
 
   const handleDecline = (matchId: string) => {
-    const reason = window.prompt("Optional: why are you declining this match?");
-    handleStatus(matchId, "declined", reason?.trim() || undefined);
+    setDecliningMatchId(matchId);
+    setDeclineReason("");
+  };
+
+  const confirmDecline = (matchId: string) => {
+    handleStatus(matchId, "declined", declineReason.trim() || undefined);
+    setDecliningMatchId(null);
+    setDeclineReason("");
   };
 
   const handleMarkMet = (matchId: string) => {
@@ -128,7 +136,7 @@ export default function MyMatches() {
         <>
           <div className="flex items-center gap-2 text-sm text-white/40">
             <Sparkles className="w-4 h-4 text-amber-400" />
-            {matches.length} AI-recommended connections
+            We found {matches.length} people you should meet at the Louvre
           </div>
 
           <div className="space-y-4">
@@ -161,9 +169,9 @@ export default function MyMatches() {
                       <span className="text-xs text-white/30 hidden sm:block">{config.description}</span>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs text-white/30">Match Score</div>
+                      <div className="text-xs text-white/30">Compatibility</div>
                       <div className="text-lg font-bold text-amber-400">
-                        {(match.overall_score * 100).toFixed(0)}%
+                        {match.overall_score >= 0.85 ? "Strong match" : match.overall_score >= 0.7 ? "Good match" : "Potential match"}
                       </div>
                     </div>
                   </div>
@@ -200,7 +208,7 @@ export default function MyMatches() {
                     <div className="p-4 rounded-xl bg-amber-400/5 border border-amber-400/10">
                       <div className="flex items-center gap-2 text-xs text-amber-400 font-medium mb-2">
                         <Brain className="w-3.5 h-3.5" />
-                        WHY YOU SHOULD MEET
+                        Why this meeting matters
                       </div>
                       <p className="text-sm text-white/70 leading-relaxed">
                         {longExplanation && !isExpanded
@@ -263,6 +271,34 @@ export default function MyMatches() {
                       </div>
                     )}
 
+                    {/* Inline decline panel */}
+                    {decliningMatchId === match.id && (
+                      <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 space-y-3">
+                        <p className="text-sm text-white/60">Let us know why — it helps improve future matches (optional)</p>
+                        <textarea
+                          value={declineReason}
+                          onChange={(e) => setDeclineReason(e.target.value)}
+                          placeholder="Not the right fit right now…"
+                          rows={2}
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-red-400/40 resize-none"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => confirmDecline(match.id)}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-all"
+                          >
+                            <X className="w-3.5 h-3.5" /> Maybe later
+                          </button>
+                          <button
+                            onClick={() => setDecliningMatchId(null)}
+                            className="px-4 py-2 text-white/40 text-sm hover:text-white/60 transition-all"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Actions */}
                     {(() => {
                       const myStatus = myStatusFor(match);
@@ -298,14 +334,7 @@ export default function MyMatches() {
                                 <Check className="w-4 h-4" />
                                 Mutual match — both accepted!
                               </div>
-                              <button
-                                onClick={() => navigate(`/messages?match=${match.id}`)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded-lg text-sm font-medium hover:bg-amber-400/20 transition-all"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                                Send Message
-                              </button>
-                            </div>
+                              </div>
 
                             {match.meeting_time ? (
                               <div className="p-3 rounded-xl bg-emerald-400/5 border border-emerald-400/20 flex items-center justify-between gap-3 flex-wrap">
@@ -346,7 +375,7 @@ export default function MyMatches() {
                                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/[0.02] text-sm text-white/50 hover:text-amber-400 hover:bg-amber-400/5 transition-all text-left"
                                 >
                                   <Clock className="w-4 h-4" />
-                                  {isScheduling ? "Cancel scheduling" : "Schedule a meeting at POT 2026"}
+                                  {isScheduling ? "Cancel" : "Save a preferred time for Paris"}
                                 </button>
 
                                 {isScheduling && (
@@ -401,7 +430,7 @@ export default function MyMatches() {
                                         className="w-full flex items-center justify-center gap-2 py-2 bg-amber-400/10 text-amber-400 border border-amber-400/30 rounded-lg text-sm font-medium hover:bg-amber-400/20 transition-all disabled:opacity-50"
                                       >
                                         <Calendar className="w-4 h-4" />
-                                        {scheduleMeeting.isPending ? "Saving…" : `Confirm ${selectedDay}, ${selectedTime}`}
+                                        {scheduleMeeting.isPending ? "Saving…" : `Save ${selectedDay}, ${selectedTime}`}
                                       </button>
                                     )}
                                   </div>
@@ -497,16 +526,22 @@ export default function MyMatches() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleStatus(match.id, "accepted")}
-                              className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-all"
+                              disabled={updateStatus.isPending}
+                              className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-all disabled:opacity-50"
                             >
-                              <Check className="w-4 h-4" />
-                              {otherAccepted ? "Accept & Confirm Meeting" : "Accept Meeting"}
+                              {updateStatus.isPending ? (
+                                <div className="w-4 h-4 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                              ) : (
+                                <Check className="w-4 h-4" />
+                              )}
+                              {otherAccepted ? "I'd like to meet — confirm" : "I'd like to meet"}
                             </button>
                             <button
                               onClick={() => handleDecline(match.id)}
-                              className="flex items-center gap-2 px-4 py-2 bg-white/5 text-white/40 border border-white/10 rounded-lg text-sm font-medium hover:text-white/60 transition-all"
+                              disabled={updateStatus.isPending}
+                              className="flex items-center gap-2 px-4 py-2 bg-white/5 text-white/40 border border-white/10 rounded-lg text-sm font-medium hover:text-white/60 transition-all disabled:opacity-50"
                             >
-                              <X className="w-4 h-4" /> Not Now
+                              <X className="w-4 h-4" /> Maybe later
                             </button>
                           </div>
                         </div>

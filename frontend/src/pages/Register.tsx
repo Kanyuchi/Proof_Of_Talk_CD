@@ -44,6 +44,16 @@ export default function Register() {
   const set = (key: string, value: unknown) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  // Auto-prepend https:// to URL fields so native validation never fires
+  const normalizeUrl = (val: string): string => {
+    if (!val.trim()) return val;
+    if (/^https?:\/\//i.test(val)) return val;
+    return `https://${val}`;
+  };
+
+  const setUrl = (key: string, val: string) => set(key, val);
+  const blurUrl = (key: string, val: string) => set(key, normalizeUrl(val));
+
   const addInterest = (val: string) => {
     const trimmed = val.trim().toLowerCase();
     if (trimmed && !form.interests.includes(trimmed)) {
@@ -272,7 +282,7 @@ export default function Register() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">LinkedIn URL</label>
-                  <input type="url" value={form.linkedin_url} onChange={(e) => set("linkedin_url", e.target.value)} placeholder="linkedin.com/in/you" className={inputCls} />
+                  <input type="text" value={form.linkedin_url} onChange={(e) => setUrl("linkedin_url", e.target.value)} onBlur={(e) => blurUrl("linkedin_url", e.target.value)} placeholder="linkedin.com/in/you" className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Twitter / X</label>
@@ -280,7 +290,7 @@ export default function Register() {
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Company Website</label>
-                  <input type="url" value={form.company_website} onChange={(e) => set("company_website", e.target.value)} placeholder="https://company.com" className={inputCls} />
+                  <input type="text" value={form.company_website} onChange={(e) => setUrl("company_website", e.target.value)} onBlur={(e) => blurUrl("company_website", e.target.value)} placeholder="company.com" className={inputCls} />
                 </div>
               </div>
               <div className="flex gap-2">
