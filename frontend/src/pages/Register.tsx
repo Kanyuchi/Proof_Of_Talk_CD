@@ -44,6 +44,10 @@ export default function Register() {
         setError("Password must be at least 8 characters");
         return false;
       }
+      if (!/[A-Z]/.test(form.password) || !/[a-z]/.test(form.password) || !/\d/.test(form.password)) {
+        setError("Password must contain uppercase, lowercase, and a number (e.g. Paris2026)");
+        return false;
+      }
     }
     if (step === 2) {
       if (!form.name || !form.company || !form.title) {
@@ -166,7 +170,7 @@ export default function Register() {
                     required
                     value={form.password}
                     onChange={(e) => set("password", e.target.value)}
-                    placeholder="Min. 8 characters"
+                    placeholder="Min. 8 chars, uppercase + number"
                     className={`${inputCls} pr-10`}
                   />
                   <button
