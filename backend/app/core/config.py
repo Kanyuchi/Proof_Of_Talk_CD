@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     TWITTER_BEARER_TOKEN: str = ""
     CRUNCHBASE_API_KEY: str = ""  # Crunchbase Basic API (optional)
 
+    # LinkedIn Voyager (Chrome DevTools session cookie — no third-party API needed)
+    LINKEDIN_LI_AT_COOKIE: str = ""   # li_at cookie value from Chrome DevTools
+    LINKEDIN_CSRF_TOKEN: str = ""     # ajax:XXXXXXX part of JSESSIONID cookie
+
     # CORS – comma-separated list of allowed origins
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:5174,http://localhost:3000"
 

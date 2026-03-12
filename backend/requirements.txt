@@ -31,6 +31,9 @@ python-multipart==0.0.20
 # AWS
 boto3==1.35.86
 
+# Supabase
+supabase>=2.0.0
+
 # Utils
 structlog==24.4.0
 tenacity==9.0.0

@@ -1,0 +1,35 @@
+# Netlify configuration for POT Matchmaker
+# Frontend is deployed here; backend API runs on EC2.
+# The [[redirects]] proxy rules forward /api/* calls to the EC2 backend
+# so the frontend's relative baseURL ("/api/v1") works correctly.
+
+[build]
+  base    = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# ── API proxy — forward all /api/* and /health to the EC2 backend ──────────
+# Update the `to` URLs when you switch backends (green EC2, Render, Railway, etc.)
+# Current backend: green EC2 at 3.239.218.239
+# To change: update the IP below and redeploy on Netlify
+
+[[redirects]]
+  from   = "/api/*"
+  to     = "http://3.239.218.239/api/:splat"
+  status = 200
+  force  = true
+
+[[redirects]]
+  from   = "/health"
+  to     = "http://3.239.218.239/health"
+  status = 200
+  force  = true
+
+# ── SPA fallback — all other routes serve index.html (React Router) ────────
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200

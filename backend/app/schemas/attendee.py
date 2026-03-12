@@ -94,6 +94,27 @@ class ScheduleMeetingRequest(BaseModel):
     meeting_location: str | None = None
 
 
+class OnboardingSubmit(BaseModel):
+    """Schema for attendee self-onboarding (post-purchase form)."""
+    ticket_code: str                          # extasy_ticket_code — used as the auth token
+    title: str | None = None
+    company: str | None = None
+    goals: str | None = None
+    interests: list[str] = []
+    seeking: list[str] = []
+    deal_stage: str | None = None
+    linkedin_url: str | None = None
+    twitter_handle: str | None = None
+    company_website: str | None = None
+
+
+class OnboardingResponse(BaseModel):
+    status: str
+    attendee_id: str
+    name: str
+    message: str
+
+
 class MatchFeedbackUpdate(BaseModel):
     meeting_outcome: str | None = None
     satisfaction_score: float | None = None

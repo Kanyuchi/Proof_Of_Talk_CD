@@ -23,10 +23,24 @@ class EnrichmentService:
         """Run all enrichment sources and merge results."""
         enriched = attendee.enriched_profile or {}
 
-        # Run enrichment sources (gracefully handle failures)
-        if attendee.linkedin_url and settings.PROXYCURL_API_KEY:
-            linkedin_data = await self._enrich_linkedin(attendee.linkedin_url)
+        # --- LinkedIn enrichment ---
+        # Step 1: resolve URL if not already stored
+        linkedin_url = attendee.linkedin_url
+        if not linkedin_url and settings.LINKEDIN_LI_AT_COOKIE:
+            linkedin_url = await self._find_linkedin_url_by_email(attendee.email, attendee.name or "")
+        if not linkedin_url and settings.LINKEDIN_LI_AT_COOKIE and attendee.name and attendee.company:
+            linkedin_url = await self._find_linkedin_url_by_name(attendee.name, attendee.company)
+
+        # Step 2: fetch profile data
+        if linkedin_url:
+            linkedin_data = None
+            if settings.PROXYCURL_API_KEY:
+                linkedin_data = await self._enrich_linkedin(linkedin_url)
+            elif settings.LINKEDIN_LI_AT_COOKIE:
+                linkedin_data = await self._enrich_linkedin_voyager(linkedin_url)
             if linkedin_data:
+                if not attendee.linkedin_url:
+                    attendee.linkedin_url = linkedin_url
                 enriched["linkedin"] = linkedin_data
                 enriched["linkedin_summary"] = self._summarize_linkedin(linkedin_data)
                 enriched["linkedin_enriched_at"] = datetime.utcnow().isoformat()
@@ -52,6 +66,166 @@ class EnrichmentService:
                 enriched["crunchbase_enriched_at"] = datetime.utcnow().isoformat()
 
         return enriched
+
+    def _voyager_headers(self) -> dict:
+        """Build headers required for LinkedIn Voyager dash API calls."""
+        return {
+            "Cookie": f"li_at={settings.LINKEDIN_LI_AT_COOKIE}; JSESSIONID=\"{settings.LINKEDIN_CSRF_TOKEN}\"",
+            "csrf-token": settings.LINKEDIN_CSRF_TOKEN,
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/vnd.linkedin.normalized+json+2.1",
+            "x-restli-protocol-version": "2.0.0",
+            "x-li-lang": "en_US",
+        }
+
+    async def _find_linkedin_url_by_email(self, email: str, attendee_name: str = "") -> str | None:
+        """
+        Derive a LinkedIn vanity URL from an email address.
+        Only accepts candidates where the identifier contains both the attendee's
+        first and last name — prevents short/ambiguous matches like 'dariia-p'.
+        """
+        try:
+            # Require a recognisable first+last name in the identifier
+            name_parts = attendee_name.lower().split() if attendee_name else []
+            if len(name_parts) < 2:
+                return None  # Can't validate without full name
+            first, last = name_parts[0], name_parts[-1]
+
+            local = email.split("@")[0].lower()
+            clean = re.sub(r"[._+]", "-", local)
+            stripped = re.sub(r"\d+$", "", clean).rstrip("-")
+            candidates = [c for c in [clean, stripped] if c]
+
+            for candidate in candidates:
+                # Reject if candidate doesn't contain both first and last name
+                if first not in candidate or last not in candidate:
+                    continue
+                if await self._verify_linkedin_identifier(candidate):
+                    logger.info("linkedin_url_found_by_email", email=email, identifier=candidate)
+                    return f"https://www.linkedin.com/in/{candidate}"
+        except Exception as e:
+            logger.error("linkedin_email_lookup_error", error=str(e), email=email)
+        return None
+
+    async def _find_linkedin_url_by_name(self, name: str, company: str) -> str | None:
+        """
+        Derive a LinkedIn vanity URL from a full name (first-last pattern only).
+        Only tries candidates that contain both first and last name — rejects
+        short patterns like 'f-lastname' that are too ambiguous.
+        """
+        try:
+            parts = name.lower().split()
+            if len(parts) < 2:
+                return None
+            first, last = parts[0], parts[-1]
+            # Only try the full first-last combo; single-initial patterns are too ambiguous
+            candidates = [f"{first}-{last}"]
+            for candidate in candidates:
+                if await self._verify_linkedin_identifier(candidate):
+                    logger.info("linkedin_url_found_by_name", name=name, identifier=candidate)
+                    return f"https://www.linkedin.com/in/{candidate}"
+        except Exception as e:
+            logger.error("linkedin_name_search_error", error=str(e), name=name, company=company)
+        return None
+
+    async def _verify_linkedin_identifier(self, identifier: str) -> bool:
+        """Return True if the given public identifier resolves to a real LinkedIn profile."""
+        try:
+            resp = await self.http_client.get(
+                "https://www.linkedin.com/voyager/api/identity/dash/profiles",
+                params={
+                    "q": "memberIdentity",
+                    "memberIdentity": identifier,
+                    "decorationId": "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-86",
+                },
+                headers=self._voyager_headers(),
+                follow_redirects=True,
+            )
+            # 200 = found, 403 = found but private, 404 = not found
+            return resp.status_code in (200, 403)
+        except Exception:
+            return False
+
+    async def _enrich_linkedin_voyager(self, linkedin_url: str) -> dict | None:
+        """
+        Fetch LinkedIn profile data via the Voyager dash/profiles endpoint.
+        Response structure: {"data": {...}, "included": [...typed objects...]}
+        Profile, Position, Education items are in the flat `included` array.
+        """
+        try:
+            match = re.search(r"/in/([^/?#]+)", linkedin_url)
+            if not match:
+                logger.warning("linkedin_voyager_bad_url", url=linkedin_url)
+                return None
+            profile_id = match.group(1)
+
+            resp = await self.http_client.get(
+                "https://www.linkedin.com/voyager/api/identity/dash/profiles",
+                params={
+                    "q": "memberIdentity",
+                    "memberIdentity": profile_id,
+                    "decorationId": "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-86",
+                },
+                headers=self._voyager_headers(),
+                follow_redirects=True,
+            )
+            if resp.status_code not in (200, 403):
+                logger.warning("linkedin_voyager_fetch_failed", status=resp.status_code, profile=profile_id)
+                return None
+            if resp.status_code == 403:
+                # Profile exists but is private — return minimal stub so URL gets saved
+                logger.info("linkedin_profile_private", profile=profile_id)
+                return {"headline": None, "summary": None, "experiences": [], "skills": [],
+                        "education": [], "source": "voyager_private"}
+
+            data = resp.json()
+            included = data.get("included", [])
+
+            # Pull typed objects out of the flat included array
+            profile_obj = next(
+                (i for i in included if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Profile"),
+                {}
+            )
+            positions = [
+                i for i in included
+                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Position"
+            ]
+            skills = [
+                i for i in included
+                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Skill"
+            ]
+            educations = [
+                i for i in included
+                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Education"
+            ]
+
+            experiences = [
+                {
+                    "title": pos.get("title"),
+                    "company": pos.get("companyName"),
+                    "description": pos.get("description"),
+                }
+                for pos in positions[:5]
+            ]
+
+            return {
+                "headline": profile_obj.get("headline"),
+                "summary": profile_obj.get("summary"),
+                "experiences": experiences,
+                "skills": [s.get("name") for s in skills[:15] if s.get("name")],
+                "education": [
+                    {
+                        "school": edu.get("schoolName"),
+                        "degree": edu.get("degreeName"),
+                        "field": edu.get("fieldOfStudy"),
+                    }
+                    for edu in educations[:3]
+                ],
+                "source": "voyager",
+            }
+        except Exception as e:
+            logger.error("linkedin_voyager_error", error=str(e), url=linkedin_url)
+            return None
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=5))
     async def _enrich_linkedin(self, linkedin_url: str) -> dict | None:

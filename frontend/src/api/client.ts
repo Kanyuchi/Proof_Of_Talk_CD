@@ -49,6 +49,22 @@ export async function searchAttendees(q: string): Promise<{ attendees: Attendee[
   return data;
 }
 
+export async function submitOnboarding(body: {
+  ticket_code: string;
+  title?: string;
+  company?: string;
+  goals?: string;
+  interests?: string[];
+  seeking?: string[];
+  deal_stage?: string;
+  linkedin_url?: string;
+  twitter_handle?: string;
+  company_website?: string;
+}): Promise<{ status: string; attendee_id: string; name: string; message: string }> {
+  const { data } = await api.post("/attendees/onboarding", body);
+  return data;
+}
+
 // ── Matches ──────────────────────────────────────────────────────────
 
 export async function getMatches(

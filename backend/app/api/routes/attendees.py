@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.core.deps import require_auth, require_admin
 from app.models.user import User
 from app.models.attendee import Attendee, TicketType
-from app.schemas.attendee import AttendeeCreate, AttendeeResponse, AttendeeListResponse
+from app.schemas.attendee import AttendeeCreate, AttendeeResponse, AttendeeListResponse, OnboardingSubmit, OnboardingResponse
 
 router = APIRouter(prefix="/attendees", tags=["attendees"])
 
@@ -142,3 +142,65 @@ async def delete_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db),
         raise HTTPException(status_code=404, detail="Attendee not found")
     await db.delete(attendee)
     await db.commit()
+
+
+@router.post("/onboarding", response_model=OnboardingResponse, status_code=200)
+async def attendee_onboarding(data: OnboardingSubmit, db: AsyncSession = Depends(get_db)):
+    """
+    Public endpoint for post-purchase attendee onboarding.
+
+    Attendees authenticate with their Extasy ticket code (printed on their
+    confirmation email). This endpoint collects the intent fields that
+    Extasy does not provide, enriching the profile for higher-quality matching.
+    """
+    # Look up attendee by ticket code (case-insensitive)
+    result = await db.execute(
+        select(Attendee).where(
+            func.lower(Attendee.extasy_ticket_code) == data.ticket_code.strip().lower()
+        )
+    )
+    attendee = result.scalar_one_or_none()
+    if not attendee:
+        raise HTTPException(
+            status_code=404,
+            detail="Ticket code not found. Check your confirmation email or contact support@proofoftalk.io",
+        )
+
+    # Update intent fields (only override if provided)
+    if data.title is not None:
+        attendee.title = data.title.strip()
+    if data.company is not None:
+        attendee.company = data.company.strip()
+    if data.goals is not None:
+        attendee.goals = data.goals.strip()
+    if data.interests:
+        attendee.interests = data.interests
+    if data.seeking:
+        attendee.seeking = data.seeking
+    if data.deal_stage is not None:
+        attendee.deal_stage = data.deal_stage
+    if data.linkedin_url is not None:
+        attendee.linkedin_url = data.linkedin_url.strip() or None
+    if data.twitter_handle is not None:
+        handle = data.twitter_handle.strip().lstrip("@")
+        attendee.twitter_handle = handle or None
+    if data.company_website is not None:
+        attendee.company_website = data.company_website.strip() or None
+
+    # Clear stale AI fields so they get regenerated on next enrichment run
+    attendee.ai_summary = None
+    attendee.embedding = None
+    attendee.intent_tags = []
+
+    await db.commit()
+    await db.refresh(attendee)
+
+    return OnboardingResponse(
+        status="success",
+        attendee_id=str(attendee.id),
+        name=attendee.name,
+        message=(
+            "Your profile has been updated. Our AI will generate your personalised match "
+            "recommendations before the event. You'll receive them by email."
+        ),
+    )
