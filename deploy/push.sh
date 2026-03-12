@@ -38,7 +38,7 @@ rsync "${RSYNC_OPTS[@]}" \
   deploy/ "ec2-user@$EC2_HOST:$APP_DIR/deploy/"
 
 echo "==> Installing Python deps on EC2..."
-"${SSH[@]}" "cd $APP_DIR/backend && source .venv/bin/activate && pip install -r requirements.txt -q"
+"${SSH[@]}" "cd $APP_DIR/backend && ([ -d .venv ] || python3.12 -m venv .venv) && source .venv/bin/activate && pip install -r requirements.txt -q"
 
 echo "==> Running database migrations..."
 "${SSH[@]}" "cd $APP_DIR/backend && source .venv/bin/activate && alembic upgrade head"
