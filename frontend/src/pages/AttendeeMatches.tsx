@@ -182,15 +182,17 @@ export default function AttendeeMatches() {
                   <Globe className="w-4 h-4" />
                 </a>
               )}
-              {/* Enrich button */}
-              <button
-                onClick={handleEnrich}
-                disabled={enriching}
-                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-white/40 text-xs hover:border-[#E76315]/30 hover:text-[#E76315] transition-all disabled:opacity-40"
-              >
-                <RefreshCw className={`w-3 h-3 ${enriching ? "animate-spin" : ""}`} />
-                {enriching ? "Enriching…" : "Enrich Profile"}
-              </button>
+              {/* Enrich button — admin only */}
+              {user?.is_admin && (
+                <button
+                  onClick={handleEnrich}
+                  disabled={enriching}
+                  className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-white/40 text-xs hover:border-[#E76315]/30 hover:text-[#E76315] transition-all disabled:opacity-40"
+                >
+                  <RefreshCw className={`w-3 h-3 ${enriching ? "animate-spin" : ""}`} />
+                  {enriching ? "Enriching…" : "Enrich Profile"}
+                </button>
+              )}
             </div>
 
             {/* Profile completeness indicator with hover tooltip */}
@@ -256,8 +258,8 @@ export default function AttendeeMatches() {
               </div>
             )}
 
-            {/* Enriched data — only shown when at least one field has content */}
-            {hasEnrichedData && (
+            {/* Enriched data — admin only (raw scraped data, not for public view) */}
+            {user?.is_admin && hasEnrichedData && (
               <div className="mt-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
                 <div className="text-[10px] text-white/30 uppercase font-medium">Enriched Data</div>
                 {(enriched.linkedin_summary as string) && (
@@ -284,6 +286,19 @@ export default function AttendeeMatches() {
         </div>
       </div>
 
+      {/* Match section — admin sees all matches; attendees only see their own */}
+      {!user?.is_admin && user?.attendee_id !== id ? (
+        <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10 text-center space-y-2">
+          <Sparkles className="w-6 h-6 text-[#E76315] mx-auto" />
+          <p className="text-sm text-white/40">
+            Match recommendations are private to each attendee.
+          </p>
+          <Link to="/matches" className="inline-block text-xs text-[#E76315] hover:underline mt-1">
+            View your own matches →
+          </Link>
+        </div>
+      ) : (
+      <>
       {/* Match heading */}
       <div className="flex items-center gap-3">
         <Sparkles className="w-5 h-5 text-[#E76315]" />
@@ -682,6 +697,8 @@ export default function AttendeeMatches() {
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }

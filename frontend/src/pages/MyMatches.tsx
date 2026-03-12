@@ -30,6 +30,7 @@ export default function MyMatches() {
   const [declineReason, setDeclineReason] = useState("");
 
   const matches = matchData?.matches ?? [];
+  const isAdmin = user?.is_admin ?? false;
 
   // Wait for auth to resolve before redirecting
   if (authLoading) {
@@ -297,8 +298,13 @@ export default function MyMatches() {
                       </div>
                     )}
 
-                    {/* Actions */}
-                    {(() => {
+                    {/* Actions — hidden for admin (read-only preview mode) */}
+                    {isAdmin ? (
+                      <div className="flex items-center gap-2 pt-2 text-xs text-white/30 border-t border-white/5 mt-2">
+                        <Sparkles className="w-3 h-3 text-[#E76315]" />
+                        Admin view — attendees manage their own appointments
+                      </div>
+                    ) : (() => {
                       const myStatus = myStatusFor(match);
                       const otherStatus = otherStatusFor(match);
                       const isMutual = match.status === "accepted";
@@ -549,6 +555,7 @@ export default function MyMatches() {
                 </div>
               );
             })}
+
           </div>
         </>
       )}

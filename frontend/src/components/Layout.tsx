@@ -41,17 +41,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span>Home</span>
               </Link>
             )}
+            {isAuthenticated && (
+              <Link to="/attendees" className={linkCls("/attendees")}>
+                <Users className="w-4 h-4" />
+                <span>Attendees</span>
+              </Link>
+            )}
             {user?.is_admin && (
-              <>
-                <Link to="/attendees" className={linkCls("/attendees")}>
-                  <Users className="w-4 h-4" />
-                  <span>Attendees</span>
-                </Link>
-                <Link to="/dashboard" className={linkCls("/dashboard")}>
-                  <BarChart3 className="w-4 h-4" />
-                  <span>Dashboard</span>
-                </Link>
-              </>
+              <Link to="/dashboard" className={linkCls("/dashboard")}>
+                <BarChart3 className="w-4 h-4" />
+                <span>Dashboard</span>
+              </Link>
             )}
             {isAuthenticated && (
               <Link to="/matches" className={linkCls("/matches")}>
@@ -133,15 +133,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               My Matches
             </Link>
             <Link
-              to="/profile"
+              to="/attendees"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
-                isActive("/profile") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
+                isActive("/attendees") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
               }`}
             >
-              <UserCog className="w-5 h-5" />
-              Profile
+              <Users className="w-5 h-5" />
+              Attendees
             </Link>
-            {user?.is_admin && (
+            {user?.is_admin ? (
               <Link
                 to="/dashboard"
                 className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
@@ -150,6 +150,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               >
                 <BarChart3 className="w-5 h-5" />
                 Dashboard
+              </Link>
+            ) : (
+              <Link
+                to="/profile"
+                className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
+                  isActive("/profile") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
+                }`}
+              >
+                <UserCog className="w-5 h-5" />
+                Profile
               </Link>
             )}
             <button
