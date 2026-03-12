@@ -1,4 +1,4 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import {
   Check, X, Brain, Target, MessageSquare, Sparkles,
   Copy, CheckCheck, Calendar, Clock, Download, Heart, ChevronDown, ChevronUp,
@@ -139,6 +139,56 @@ export default function MyMatches() {
             <Sparkles className="w-4 h-4 text-[#E76315]" />
             We found {matches.length} people you should meet at the Louvre
           </div>
+
+          {/* ── Your Schedule ──────────────────────────────────── */}
+          {(() => {
+            const scheduled = matches.filter((m) => m.meeting_time);
+            if (!scheduled.length) return null;
+            return (
+              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.03] overflow-hidden">
+                <div className="px-5 py-3 border-b border-emerald-400/10 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-emerald-400" />
+                  <span className="text-sm font-semibold text-emerald-400">Your Schedule</span>
+                  <span className="text-xs text-white/30 ml-auto">{scheduled.length} meeting{scheduled.length !== 1 ? "s" : ""} booked</span>
+                </div>
+                <div className="divide-y divide-white/5">
+                  {scheduled
+                    .sort((a, b) => new Date(a.meeting_time!).getTime() - new Date(b.meeting_time!).getTime())
+                    .map((m) => {
+                      const person = m.matched_attendee;
+                      return (
+                        <div key={m.id} className="px-5 py-3 flex items-center gap-4 flex-wrap">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/50 font-semibold text-sm shrink-0">
+                              {person?.name[0]}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate">{person?.name}</div>
+                              <div className="text-xs text-white/30 truncate">{person?.title} · {person?.company}</div>
+                            </div>
+                          </div>
+                          <div className="ml-auto flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <div className="text-sm text-emerald-400 font-medium">{formatMeetingTime(m.meeting_time!)}</div>
+                              {m.meeting_location && (
+                                <div className="text-xs text-white/30">{m.meeting_location}</div>
+                              )}
+                            </div>
+                            <Link
+                              to={`/messages?match=${m.id}`}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/20 text-xs font-medium hover:bg-[#E76315]/20 transition-all"
+                            >
+                              <MessageSquare className="w-3 h-3" />
+                              Chat
+                            </Link>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="space-y-4">
             {matches.map((match, idx) => {

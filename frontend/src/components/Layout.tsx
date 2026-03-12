@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Users, Sparkles, BarChart3, LogIn, LogOut, UserPlus, UserCog, Heart } from "lucide-react";
+import { Users, Sparkles, BarChart3, LogIn, LogOut, UserPlus, UserCog, Heart, MessageSquare } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import ChatWidget from "./chat/ChatWidget";
 
@@ -57,6 +57,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link to="/matches" className={linkCls("/matches")}>
                 <Heart className="w-4 h-4" />
                 <span>My Matches</span>
+              </Link>
+            )}
+            {isAuthenticated && !user?.is_admin && (
+              <Link to="/messages" className={linkCls("/messages")}>
+                <MessageSquare className="w-4 h-4" />
+                <span>Messages</span>
               </Link>
             )}
           </nav>
@@ -153,13 +159,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             ) : (
               <Link
-                to="/profile"
+                to="/messages"
                 className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
-                  isActive("/profile") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
+                  isActive("/messages") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
                 }`}
               >
-                <UserCog className="w-5 h-5" />
-                Profile
+                <MessageSquare className="w-5 h-5" />
+                Messages
               </Link>
             )}
             <button
