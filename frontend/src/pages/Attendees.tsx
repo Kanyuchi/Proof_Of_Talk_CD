@@ -9,14 +9,14 @@ import { useAuth } from "../hooks/useAuth";
 import EmptyState from "../components/EmptyState";
 
 const ticketIcons: Record<string, React.ReactNode> = {
-  vip: <Crown className="w-3.5 h-3.5 text-amber-400" />,
+  vip: <Crown className="w-3.5 h-3.5 text-[#E76315]" />,
   speaker: <Mic className="w-3.5 h-3.5 text-purple-400" />,
   sponsor: <Megaphone className="w-3.5 h-3.5 text-emerald-400" />,
   delegate: <User className="w-3.5 h-3.5 text-blue-400" />,
 };
 
 const ticketColors: Record<string, string> = {
-  vip: "bg-amber-400/10 text-amber-400 border-amber-400/20",
+  vip: "bg-[#E76315]/10 text-[#E76315] border-[#E76315]/20",
   speaker: "bg-purple-400/10 text-purple-400 border-purple-400/20",
   sponsor: "bg-emerald-400/10 text-emerald-400 border-emerald-400/20",
   delegate: "bg-blue-400/10 text-blue-400 border-blue-400/20",
@@ -88,7 +88,7 @@ export default function Attendees() {
             placeholder="Search by name, company, title, or summary…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-amber-400/50"
+            className="w-full pl-10 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-[#E76315]/50"
           />
         </div>
         <div className="flex gap-1.5 flex-wrap">
@@ -136,10 +136,10 @@ export default function Attendees() {
             <Link
               key={attendee.id}
               to={`/attendees/${attendee.id}`}
-              className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-amber-400/30 hover:bg-white/[0.05] transition-all group"
+              className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-[#E76315]/30 hover:bg-white/[0.05] transition-all group"
             >
               {/* Avatar */}
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/20 flex items-center justify-center text-amber-400 font-semibold text-lg shrink-0">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#E76315]/20 to-[#D35400]/20 flex items-center justify-center text-[#E76315] font-semibold text-lg shrink-0">
                 {attendee.name[0]}
               </div>
 
@@ -197,7 +197,7 @@ export default function Attendees() {
                       attendee.deal_readiness_score >= 0.5
                         ? "text-emerald-400"
                         : attendee.deal_readiness_score > 0
-                        ? "text-amber-400"
+                        ? "text-[#E76315]"
                         : "text-white/20"
                     }`}
                   >
@@ -206,7 +206,7 @@ export default function Attendees() {
                 </div>
               )}
 
-              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-amber-400 transition-colors" />
+              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-[#E76315] transition-colors" />
             </Link>
           ))}
         </div>

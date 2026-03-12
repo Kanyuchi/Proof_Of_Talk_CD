@@ -26,7 +26,7 @@ function StatCard({
 }) {
   return (
     <div
-      className={`p-5 rounded-xl bg-white/[0.03] border border-white/10 ${onClick ? "cursor-pointer hover:border-amber-400/30 hover:bg-white/[0.05] transition-all" : ""}`}
+      className={`p-5 rounded-xl bg-white/[0.03] border border-white/10 ${onClick ? "cursor-pointer hover:border-[#E76315]/30 hover:bg-white/[0.05] transition-all" : ""}`}
       onClick={onClick}
     >
       <div className="flex items-center gap-3 mb-3">
@@ -118,10 +118,10 @@ export default function Dashboard() {
 
       {/* Admin actions */}
       {isAdmin && (
-        <div className="p-5 rounded-2xl bg-amber-400/5 border border-amber-400/20">
+        <div className="p-5 rounded-2xl bg-[#E76315]/5 border border-[#E76315]/20">
           <div className="flex items-center gap-2 mb-4">
-            <Zap className="w-5 h-5 text-amber-400" />
-            <h2 className="font-semibold text-amber-400">Admin Actions</h2>
+            <Zap className="w-5 h-5 text-[#E76315]" />
+            <h2 className="font-semibold text-[#E76315]">Admin Actions</h2>
           </div>
           <div className="flex flex-wrap gap-3">
             <button
@@ -160,7 +160,7 @@ export default function Dashboard() {
       {/* Top stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={Users} label="Total Attendees" value={stats.total_attendees.toLocaleString()} color="bg-blue-500" />
-        <StatCard icon={Handshake} label="Matches Generated" value={stats.matches_generated.toLocaleString()} color="bg-amber-500" />
+        <StatCard icon={Handshake} label="Matches Generated" value={stats.matches_generated.toLocaleString()} color="bg-[#D35400]" />
         <StatCard icon={Check} label="Matches Accepted" value={stats.matches_accepted.toLocaleString()} color="bg-emerald-500" />
         <StatCard icon={TrendingUp} label="Avg Match Score" value={`${(stats.avg_match_score * 100).toFixed(0)}%`} color="bg-purple-500" />
       </div>
@@ -197,7 +197,7 @@ export default function Dashboard() {
         {/* Match quality */}
         <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
           <div className="flex items-center gap-2 mb-6">
-            <BarChart3 className="w-5 h-5 text-amber-400" />
+            <BarChart3 className="w-5 h-5 text-[#E76315]" />
             <h2 className="text-lg font-semibold">Match Quality Distribution</h2>
           </div>
           <div className="space-y-3">
@@ -206,7 +206,7 @@ export default function Dashboard() {
                 <span className="text-xs text-white/40 w-14 font-mono">{range}</span>
                 <div className="flex-1 h-6 bg-white/5 rounded-lg overflow-hidden">
                   <div
-                    className="h-full rounded-lg bg-gradient-to-r from-amber-400/60 to-amber-400 transition-all duration-500"
+                    className="h-full rounded-lg bg-gradient-to-r from-[#E76315]/60 to-[#FF833A] transition-all duration-500"
                     style={{ width: maxBarValue > 0 ? `${(count / maxBarValue) * 100}%` : "0%" }}
                   />
                 </div>
@@ -225,7 +225,7 @@ export default function Dashboard() {
         {/* Match type breakdown — clickable */}
         <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
           <div className="flex items-center gap-2 mb-6">
-            <Brain className="w-5 h-5 text-amber-400" />
+            <Brain className="w-5 h-5 text-[#E76315]" />
             <h2 className="text-lg font-semibold">Match Type Breakdown</h2>
             <span className="text-xs text-white/30 ml-auto">Click to explore</span>
           </div>
@@ -263,7 +263,7 @@ export default function Dashboard() {
       {/* Top sectors — clickable */}
       <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
         <div className="flex items-center gap-2 mb-6">
-          <Activity className="w-5 h-5 text-amber-400" />
+          <Activity className="w-5 h-5 text-[#E76315]" />
           <h2 className="text-lg font-semibold">Top Interest Sectors</h2>
           <span className="text-xs text-white/30 ml-auto">Click to see attendees</span>
         </div>
@@ -274,7 +274,7 @@ export default function Dashboard() {
               onClick={() => setDrillSector(sector)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm transition-all hover:scale-105 ${
                 i < 3
-                  ? "bg-amber-400/10 text-amber-400 border-amber-400/20 hover:bg-amber-400/20"
+                  ? "bg-[#E76315]/10 text-[#E76315] border-[#E76315]/20 hover:bg-[#E76315]/20"
                   : "bg-white/5 text-white/50 border-white/10 hover:border-white/20 hover:text-white/70"
               }`}
             >
@@ -289,16 +289,16 @@ export default function Dashboard() {
       <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-amber-400" />
+            <Brain className="w-5 h-5 text-[#E76315]" />
             <h2 className="text-lg font-semibold">AI Processing Coverage</h2>
           </div>
-          <span className="text-2xl font-bold text-amber-400">
+          <span className="text-2xl font-bold text-[#E76315]">
             {(stats.enrichment_coverage * 100).toFixed(0)}%
           </span>
         </div>
         <div className="h-3 bg-white/5 rounded-full overflow-hidden">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-amber-600 to-amber-400 transition-all duration-500"
+            className="h-full rounded-full bg-gradient-to-r from-[#D35400] to-[#FF833A] transition-all duration-500"
             style={{ width: `${stats.enrichment_coverage * 100}%` }}
           />
         </div>
@@ -324,7 +324,7 @@ export default function Dashboard() {
                   <div className="text-sm font-semibold">
                     {match.matched_attendee?.name ?? `Match ${match.id.slice(0, 8)}`}
                   </div>
-                  <span className="text-sm font-bold text-amber-400">{(match.overall_score * 100).toFixed(0)}%</span>
+                  <span className="text-sm font-bold text-[#E76315]">{(match.overall_score * 100).toFixed(0)}%</span>
                 </div>
                 <p className="text-xs text-white/40 line-clamp-2">{match.explanation}</p>
               </div>
@@ -346,7 +346,7 @@ export default function Dashboard() {
           ) : (
             (sectorAttendees?.attendees ?? []).map((a: Attendee) => (
               <div key={a.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/10">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400/20 to-amber-600/20 flex items-center justify-center text-amber-400 font-bold shrink-0">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E76315]/20 to-[#D35400]/20 flex items-center justify-center text-[#E76315] font-bold shrink-0">
                   {a.name[0]}
                 </div>
                 <div>

@@ -123,9 +123,9 @@ export default function Onboarding() {
           <div className="bg-white/5 border border-white/10 rounded-xl p-5 text-left space-y-2">
             <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">What happens next</p>
             <ul className="text-sm text-gray-300 space-y-1.5">
-              <li className="flex gap-2"><span className="text-amber-400">→</span> Our AI enriches your profile from public sources</li>
-              <li className="flex gap-2"><span className="text-amber-400">→</span> Match recommendations generated 2 weeks before the event</li>
-              <li className="flex gap-2"><span className="text-amber-400">→</span> You'll receive an email with your top matches to review</li>
+              <li className="flex gap-2"><span className="text-[#E76315]">→</span> Our AI enriches your profile from public sources</li>
+              <li className="flex gap-2"><span className="text-[#E76315]">→</span> Match recommendations generated 2 weeks before the event</li>
+              <li className="flex gap-2"><span className="text-[#E76315]">→</span> You'll receive an email with your top matches to review</li>
             </ul>
           </div>
           <p className="text-xs text-gray-600">Proof of Talk 2026 · Louvre Palace, Paris · June 2–3</p>
@@ -139,8 +139,8 @@ export default function Onboarding() {
       {/* Header */}
       <div className="text-center mb-10">
         <div className="flex items-center justify-center gap-2 mb-4">
-          <Sparkles className="w-6 h-6 text-amber-400" />
-          <span className="text-xs font-semibold tracking-[0.2em] uppercase text-amber-400">
+          <Sparkles className="w-6 h-6 text-[#E76315]" />
+          <span className="text-xs font-semibold tracking-[0.2em] uppercase text-[#E76315]">
             POT 2026 Matchmaker
           </span>
         </div>
@@ -160,7 +160,7 @@ export default function Onboarding() {
               onClick={() => s < step && setStep(s as 1 | 2 | 3)}
               className={`w-8 h-8 rounded-full text-sm font-semibold transition-all
                 ${step === s
-                  ? "bg-amber-400 text-black"
+                  ? "bg-[#E76315] text-black"
                   : s < step
                   ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 cursor-pointer"
                   : "bg-white/5 text-gray-600 border border-white/10 cursor-default"
@@ -184,7 +184,7 @@ export default function Onboarding() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Ticket code <span className="text-amber-400">*</span>
+                  Ticket code <span className="text-[#E76315]">*</span>
                 </label>
                 <input
                   type="text"
@@ -192,7 +192,7 @@ export default function Onboarding() {
                   placeholder="e.g. POT-ABCD1234"
                   value={form.ticket_code}
                   onChange={(e) => setField("ticket_code", e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition font-mono text-sm"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#E76315]/50 focus:ring-1 focus:ring-[#E76315]/20 transition font-mono text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-600">
                   Found in your Extasy confirmation email under "Ticket Details"
@@ -207,7 +207,7 @@ export default function Onboarding() {
                     placeholder="e.g. Partner, CTO, Head of DeFi"
                     value={form.title}
                     onChange={(e) => setField("title", e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition text-sm"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#E76315]/50 focus:ring-1 focus:ring-[#E76315]/20 transition text-sm"
                   />
                 </div>
                 <div>
@@ -217,7 +217,7 @@ export default function Onboarding() {
                     placeholder="e.g. Andreessen Horowitz"
                     value={form.company}
                     onChange={(e) => setField("company", e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition text-sm"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#E76315]/50 focus:ring-1 focus:ring-[#E76315]/20 transition text-sm"
                   />
                 </div>
               </div>
@@ -229,7 +229,7 @@ export default function Onboarding() {
                   placeholder="linkedin.com/in/yourname"
                   value={form.linkedin_url}
                   onChange={(e) => setField("linkedin_url", e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition text-sm"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#E76315]/50 focus:ring-1 focus:ring-[#E76315]/20 transition text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-600">Enables deeper career-history enrichment for better matches</p>
               </div>
@@ -239,7 +239,7 @@ export default function Onboarding() {
               type="button"
               onClick={() => setStep(2)}
               disabled={!form.ticket_code.trim()}
-              className="w-full flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold py-3.5 rounded-xl transition-all text-sm"
+              className="w-full flex items-center justify-center gap-2 bg-[#E76315] hover:bg-[#FF833A] disabled:opacity-40 disabled:cursor-not-allowed text-black font-semibold py-3.5 rounded-xl transition-all text-sm"
             >
               Continue <ChevronRight className="w-4 h-4" />
             </button>
@@ -266,7 +266,7 @@ export default function Onboarding() {
                       onClick={() => setField("interests", toggle(form.interests, opt))}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all
                         ${form.interests.includes(opt)
-                          ? "bg-amber-400/15 border-amber-400/50 text-amber-300"
+                          ? "bg-[#E76315]/15 border-[#E76315]/50 text-[#FF833A]"
                           : "bg-white/3 border-white/10 text-gray-400 hover:border-white/20 hover:text-gray-300"
                         }`}
                     >
@@ -285,7 +285,7 @@ export default function Onboarding() {
                   placeholder="e.g. Deploying €50M into Series B tokenisation infrastructure. Looking for teams with institutional-grade custody and a live product."
                   value={form.goals}
                   onChange={(e) => setField("goals", e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition text-sm resize-none"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-[#E76315]/50 focus:ring-1 focus:ring-[#E76315]/20 transition text-sm resize-none"
                 />
                 <p className="mt-1 text-xs text-gray-600">The more specific, the better your matches.</p>
               </div>
@@ -302,7 +302,7 @@ export default function Onboarding() {
               <button
                 type="button"
                 onClick={() => setStep(3)}
-                className="flex-[2] flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-black font-semibold py-3.5 rounded-xl transition-all text-sm"
+                className="flex-[2] flex items-center justify-center gap-2 bg-[#E76315] hover:bg-[#FF833A] text-black font-semibold py-3.5 rounded-xl transition-all text-sm"
               >
                 Continue <ChevronRight className="w-4 h-4" />
               </button>
@@ -330,7 +330,7 @@ export default function Onboarding() {
                       onClick={() => setField("deal_stage", form.deal_stage === value ? "" : value)}
                       className={`px-3 py-2.5 rounded-xl text-xs font-medium border text-left transition-all
                         ${form.deal_stage === value
-                          ? "bg-amber-400/15 border-amber-400/50 text-amber-300"
+                          ? "bg-[#E76315]/15 border-[#E76315]/50 text-[#FF833A]"
                           : "bg-white/3 border-white/10 text-gray-400 hover:border-white/20 hover:text-gray-300"
                         }`}
                     >
@@ -380,7 +380,7 @@ export default function Onboarding() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-[2] flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-black font-semibold py-3.5 rounded-xl transition-all text-sm"
+                className="flex-[2] flex items-center justify-center gap-2 bg-[#E76315] hover:bg-[#FF833A] disabled:opacity-60 text-black font-semibold py-3.5 rounded-xl transition-all text-sm"
               >
                 {loading ? (
                   <>

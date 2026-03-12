@@ -13,19 +13,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const linkCls = (to: string) =>
     `px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 min-h-[44px] ${
       isActive(to)
-        ? "bg-white/10 text-amber-400"
+        ? "bg-white/10 text-[#E76315]"
         : "text-white/60 hover:text-white hover:bg-white/5 active:bg-white/10"
     }`;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white pb-16 sm:pb-0">
+    <div className="min-h-screen bg-[#121212] text-white pb-16 sm:pb-0">
       {/* Top nav */}
-      <header className="border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur-xl sticky top-0 z-40">
+      <header className="border-b border-white/10 bg-[#121212]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-3 shrink-0">
             {/* POT logo mark */}
             <div
-              className="w-7 h-9 bg-amber-400 shrink-0"
+              className="w-7 h-9 bg-[#E76315] shrink-0"
               style={{ clipPath: "polygon(0 0, 100% 8%, 100% 92%, 0 100%)" }}
             />
             <span className="font-semibold text-lg tracking-tight hidden sm:block">
@@ -71,8 +71,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <Link
                   to="/profile"
-                  className={`p-2 rounded-lg border border-white/10 text-white/50 hover:text-amber-400 hover:border-amber-400/30 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${
-                    location.pathname === "/profile" ? "text-amber-400 border-amber-400/30 bg-amber-400/10" : ""
+                  className={`p-2 rounded-lg border border-white/10 text-white/50 hover:text-[#E76315] hover:border-amber-400/30 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                    location.pathname === "/profile" ? "text-[#E76315] border-amber-400/30 bg-[#E76315]/10" : ""
                   }`}
                   title="Edit profile"
                 >
@@ -97,7 +97,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <Link
                   to="/register"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-400 text-black text-xs font-semibold hover:bg-amber-300 transition-all min-h-[44px]"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E76315] text-black text-xs font-semibold hover:bg-amber-300 transition-all min-h-[44px]"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Register</span>
@@ -120,13 +120,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </footer>
 
       {/* Mobile bottom tab bar */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0f]/95 backdrop-blur-xl border-t border-white/10 flex items-stretch">
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121212]/95 backdrop-blur-xl border-t border-white/10 flex items-stretch">
         {isAuthenticated ? (
           <>
             <Link
               to="/matches"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
-                isActive("/matches") ? "text-amber-400" : "text-white/40 active:text-white/70"
+                isActive("/matches") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
               }`}
             >
               <Heart className="w-5 h-5" />
@@ -135,7 +135,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link
               to="/profile"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
-                isActive("/profile") ? "text-amber-400" : "text-white/40 active:text-white/70"
+                isActive("/profile") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
               }`}
             >
               <UserCog className="w-5 h-5" />
@@ -145,7 +145,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 to="/dashboard"
                 className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
-                  isActive("/dashboard") ? "text-amber-400" : "text-white/40 active:text-white/70"
+                  isActive("/dashboard") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
                 }`}
               >
                 <BarChart3 className="w-5 h-5" />
@@ -165,7 +165,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link
               to="/"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
-                isActive("/") ? "text-amber-400" : "text-white/40 active:text-white/70"
+                isActive("/") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
               }`}
             >
               <Sparkles className="w-5 h-5" />
@@ -174,7 +174,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link
               to="/login"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
-                isActive("/login") ? "text-amber-400" : "text-white/40 active:text-white/70"
+                isActive("/login") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
               }`}
             >
               <LogIn className="w-5 h-5" />
@@ -182,7 +182,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
             <Link
               to="/register"
-              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium text-amber-400 active:text-amber-300 transition-all"
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium text-[#E76315] active:text-amber-300 transition-all"
             >
               <UserPlus className="w-5 h-5" />
               Register

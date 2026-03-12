@@ -1,1 +1,111 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+/* ── POT Design Tokens ─────────────────────────────── */
+:root {
+  --pot-black:       #000000;
+  --pot-dark:        #121212;
+  --pot-card:        #1a1a1a;
+  --pot-surface:     #262626;
+  --pot-hover:       #292929;
+
+  --pot-orange:      #E76315;
+  --pot-orange-lt:   #FF833A;
+  --pot-orange-dk:   #D35400;
+  --pot-orange-bg:   rgba(231, 99, 21, 0.10);
+  --pot-orange-bdr:  rgba(231, 99, 21, 0.25);
+
+  --pot-cream:       #EFE5D9;
+  --pot-cream-lt:    #EFECE9;
+
+  --font-heading: 'Playfair Display', serif;
+  --font-body:    'Poppins', sans-serif;
+}
+
+/* ── Base ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--pot-dark);
+  color: #ffffff;
+  line-height: 1.6;
+}
+
+/* ── Typography ────────────────────────────────────── */
+h1, h2, h3 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* ── POT Utility Classes ───────────────────────────── */
+.pot-orange        { color: var(--pot-orange); }
+.pot-bg-dark       { background: var(--pot-dark); }
+.pot-card          { background: var(--pot-card); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; }
+.pot-btn-primary   {
+  background: var(--pot-orange);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 600;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+.pot-btn-primary:hover  { background: var(--pot-orange-lt); }
+.pot-btn-primary:active { transform: scale(0.98); }
+
+.pot-btn-ghost {
+  background: transparent;
+  color: rgba(255,255,255,0.55);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.pot-btn-ghost:hover { color: #fff; border-color: rgba(255,255,255,0.25); }
+
+.pot-input {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  padding: 10px 14px;
+  width: 100%;
+  transition: border-color 0.2s;
+  outline: none;
+}
+.pot-input::placeholder { color: rgba(255,255,255,0.20); }
+.pot-input:focus { border-color: var(--pot-orange); }
+
+.pot-badge-orange {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  background: var(--pot-orange-bg);
+  border: 1px solid var(--pot-orange-bdr);
+  border-radius: 60px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--pot-orange-lt);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+/* Orange left-accent card (used on match cards) */
+.pot-match-card {
+  border-left: 3px solid var(--pot-orange);
+  background: var(--pot-card);
+  border-radius: 14px;
+  overflow: hidden;
+}

@@ -131,10 +131,10 @@ export default function AttendeeMatches() {
 
       {/* Goals warning — missing goals reduces match accuracy */}
       {missingGoals && (
-        <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-400/30 bg-amber-400/5">
-          <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-[#E76315]/30 bg-[#E76315]/5">
+          <AlertTriangle className="w-4 h-4 text-[#E76315] mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-medium text-amber-400">Goals not set — match quality may be reduced</p>
+            <p className="text-sm font-medium text-[#E76315]">Goals not set — match quality may be reduced</p>
             <p className="text-xs text-white/40 mt-0.5">
               Adding your conference goals helps the AI find the most relevant connections for you.
               Edit your profile to complete this field.
@@ -146,7 +146,7 @@ export default function AttendeeMatches() {
       {/* Attendee profile card */}
       <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
         <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-amber-400/20 to-amber-600/20 flex items-center justify-center text-amber-400 font-bold text-2xl shrink-0">
+          <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#E76315]/20 to-[#D35400]/20 flex items-center justify-center text-[#E76315] font-bold text-2xl shrink-0">
             {attendee.name[0]}
           </div>
           <div className="flex-1">
@@ -178,7 +178,7 @@ export default function AttendeeMatches() {
               )}
               {attendee.company_website && (
                 <a href={attendee.company_website} target="_blank" rel="noopener noreferrer"
-                  className="text-white/30 hover:text-amber-400 transition-colors">
+                  className="text-white/30 hover:text-[#E76315] transition-colors">
                   <Globe className="w-4 h-4" />
                 </a>
               )}
@@ -186,7 +186,7 @@ export default function AttendeeMatches() {
               <button
                 onClick={handleEnrich}
                 disabled={enriching}
-                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-white/40 text-xs hover:border-amber-400/30 hover:text-amber-400 transition-all disabled:opacity-40"
+                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-white/40 text-xs hover:border-[#E76315]/30 hover:text-[#E76315] transition-all disabled:opacity-40"
               >
                 <RefreshCw className={`w-3 h-3 ${enriching ? "animate-spin" : ""}`} />
                 {enriching ? "Enriching…" : "Enrich Profile"}
@@ -199,7 +199,7 @@ export default function AttendeeMatches() {
                 <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      completeness >= 80 ? "bg-emerald-400" : completeness >= 50 ? "bg-amber-400" : "bg-red-400"
+                      completeness >= 80 ? "bg-emerald-400" : completeness >= 50 ? "bg-[#E76315]" : "bg-red-400"
                     }`}
                     style={{ width: `${completeness}%` }}
                   />
@@ -225,7 +225,7 @@ export default function AttendeeMatches() {
 
             {attendee.ai_summary && (
               <p className="text-sm text-white/40 mt-3 flex items-start gap-2">
-                <Brain className="w-4 h-4 mt-0.5 shrink-0 text-amber-400" />
+                <Brain className="w-4 h-4 mt-0.5 shrink-0 text-[#E76315]" />
                 {attendee.ai_summary}
               </p>
             )}
@@ -239,7 +239,7 @@ export default function AttendeeMatches() {
 
             <div className="flex flex-wrap gap-1.5 mt-3">
               {(attendee.intent_tags ?? []).map((tag) => (
-                <span key={tag} className="px-2.5 py-1 rounded-full bg-amber-400/10 text-amber-400 text-xs border border-amber-400/20">
+                <span key={tag} className="px-2.5 py-1 rounded-full bg-[#E76315]/10 text-[#E76315] text-xs border border-[#E76315]/20">
                   {tag.replace(/_/g, " ")}
                 </span>
               ))}
@@ -274,7 +274,7 @@ export default function AttendeeMatches() {
                 )}
                 {(enriched.website_summary as string) && (
                   <div>
-                    <div className="text-xs text-amber-400 mb-0.5 flex items-center gap-1"><Globe className="w-3 h-3" /> Website</div>
+                    <div className="text-xs text-[#E76315] mb-0.5 flex items-center gap-1"><Globe className="w-3 h-3" /> Website</div>
                     <p className="text-xs text-white/50">{enriched.website_summary as string}</p>
                   </div>
                 )}
@@ -286,7 +286,7 @@ export default function AttendeeMatches() {
 
       {/* Match heading */}
       <div className="flex items-center gap-3">
-        <Sparkles className="w-5 h-5 text-amber-400" />
+        <Sparkles className="w-5 h-5 text-[#E76315]" />
         <h2 className="text-xl font-bold">AI-Recommended Matches</h2>
         <span className="text-white/30 text-sm">({matches.length} connections)</span>
       </div>
@@ -321,7 +321,7 @@ export default function AttendeeMatches() {
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-white/30">Match Score</div>
-                  <div className="text-lg font-bold text-amber-400">
+                  <div className="text-lg font-bold text-[#E76315]">
                     {(match.overall_score * 100).toFixed(0)}%
                   </div>
                 </div>
@@ -355,8 +355,8 @@ export default function AttendeeMatches() {
                 )}
 
                 {/* AI Explanation */}
-                <div className="p-4 rounded-xl bg-amber-400/5 border border-amber-400/10">
-                  <div className="flex items-center gap-2 text-xs text-amber-400 font-medium mb-2">
+                <div className="p-4 rounded-xl bg-[#E76315]/5 border border-[#E76315]/10">
+                  <div className="flex items-center gap-2 text-xs text-[#E76315] font-medium mb-2">
                     <Brain className="w-3.5 h-3.5" />
                     WHY YOU SHOULD MEET
                   </div>
@@ -445,7 +445,7 @@ export default function AttendeeMatches() {
                           {user && (
                             <button
                               onClick={() => handleMessage(match.id)}
-                              className="flex items-center gap-2 px-3 py-1.5 bg-amber-400/10 text-amber-400 border border-amber-400/20 rounded-lg text-sm font-medium hover:bg-amber-400/20 transition-all"
+                              className="flex items-center gap-2 px-3 py-1.5 bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/20 rounded-lg text-sm font-medium hover:bg-[#E76315]/20 transition-all"
                             >
                               <MessageSquare className="w-3.5 h-3.5" />
                               Send Message
@@ -479,7 +479,7 @@ export default function AttendeeMatches() {
                                   match.explanation,
                                 )
                               }
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/50 border border-white/10 rounded-lg text-xs hover:text-amber-400 hover:border-amber-400/30 transition-all"
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/50 border border-white/10 rounded-lg text-xs hover:text-[#E76315] hover:border-[#E76315]/30 transition-all"
                             >
                               <Download className="w-3 h-3" />
                               Add to Calendar
@@ -493,7 +493,7 @@ export default function AttendeeMatches() {
                                 setSchedulingMatchId(isScheduling ? null : match.id);
                                 setSelectedTime(null);
                               }}
-                              className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/[0.02] text-sm text-white/50 hover:text-amber-400 hover:bg-amber-400/5 transition-all text-left"
+                              className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/[0.02] text-sm text-white/50 hover:text-[#E76315] hover:bg-[#E76315]/5 transition-all text-left"
                             >
                               <Clock className="w-4 h-4" />
                               {isScheduling ? "Cancel scheduling" : "Schedule a meeting at POT 2026"}
@@ -509,7 +509,7 @@ export default function AttendeeMatches() {
                                       onClick={() => { setSelectedDay(day); setSelectedTime(null); }}
                                       className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                                         selectedDay === day
-                                          ? "bg-amber-400/10 border-amber-400/30 text-amber-400"
+                                          ? "bg-[#E76315]/10 border-[#E76315]/30 text-[#E76315]"
                                           : "bg-white/5 border-white/10 text-white/40 hover:text-white/60"
                                       }`}
                                     >
@@ -531,7 +531,7 @@ export default function AttendeeMatches() {
                                           onClick={() => setSelectedTime(time)}
                                           className={`px-3 py-1 rounded-lg text-xs font-mono border transition-all ${
                                             selectedTime === time
-                                              ? "bg-amber-400/20 border-amber-400/40 text-amber-400"
+                                              ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
                                               : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
                                           }`}
                                         >
@@ -553,7 +553,7 @@ export default function AttendeeMatches() {
                                       );
                                     }}
                                     disabled={scheduleMeeting.isPending}
-                                    className="w-full flex items-center justify-center gap-2 py-2 bg-amber-400/10 text-amber-400 border border-amber-400/30 rounded-lg text-sm font-medium hover:bg-amber-400/20 transition-all disabled:opacity-50"
+                                    className="w-full flex items-center justify-center gap-2 py-2 bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/30 rounded-lg text-sm font-medium hover:bg-[#E76315]/20 transition-all disabled:opacity-50"
                                   >
                                     <Calendar className="w-4 h-4" />
                                     {scheduleMeeting.isPending
@@ -582,7 +582,7 @@ export default function AttendeeMatches() {
                                   }
                                   className={`w-7 h-7 rounded-md border text-xs ${
                                     (match.satisfaction_score ?? 0) >= v
-                                      ? "bg-amber-400/20 border-amber-400/40 text-amber-400"
+                                      ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
                                       : "bg-white/5 border-white/10 text-white/50"
                                   }`}
                                 >
@@ -612,7 +612,7 @@ export default function AttendeeMatches() {
                               </span>
                               <button
                                 onClick={() => handleCopyIcebreaker(icebreaker, match.id)}
-                                className="flex items-center gap-1 text-[10px] text-white/30 hover:text-amber-400 transition-colors"
+                                className="flex items-center gap-1 text-[10px] text-white/30 hover:text-[#E76315] transition-colors"
                               >
                                 {copiedId === match.id ? (
                                   <><CheckCheck className="w-3 h-3 text-emerald-400" /> <span className="text-emerald-400">Copied</span></>
@@ -633,7 +633,7 @@ export default function AttendeeMatches() {
                   if (iAccepted && !isMutual) {
                     return (
                       <div className="flex items-center gap-2 pt-2">
-                        <div className="flex items-center gap-2 text-sm text-amber-400/70">
+                        <div className="flex items-center gap-2 text-sm text-[#E76315]/70">
                           <Check className="w-4 h-4" />
                           You accepted — waiting for {person?.name.split(" ")[0] ?? "them"} to respond
                         </div>
@@ -653,7 +653,7 @@ export default function AttendeeMatches() {
                   return (
                     <div className="space-y-2 pt-2">
                       {otherAccepted && (
-                        <div className="text-xs text-amber-400 flex items-center gap-1.5 mb-1">
+                        <div className="text-xs text-[#E76315] flex items-center gap-1.5 mb-1">
                           <Sparkles className="w-3 h-3" />
                           {person?.name.split(" ")[0] ?? "They"} already accepted — accept to confirm your meeting!
                         </div>

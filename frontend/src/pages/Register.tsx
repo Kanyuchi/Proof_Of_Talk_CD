@@ -119,19 +119,19 @@ export default function Register() {
   };
 
   const inputCls =
-    "w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-amber-400/50";
+    "w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-[#E76315]/50";
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center py-8">
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 mb-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-[#E76315] to-[#D35400] mb-4">
             <Sparkles className="w-7 h-7 text-black" />
           </div>
-          <h1 className="text-2xl font-bold">Join Proof of Talk 2026</h1>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-heading)" }}>Join Proof of Talk 2026</h1>
           <p className="text-white/40 text-sm mt-1">
-            Register your profile and let AI find your perfect connections
+            Tell us what you need. We'll tell you who to meet.
           </p>
         </div>
 
@@ -142,9 +142,9 @@ export default function Register() {
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                   s < step
-                    ? "bg-amber-400 text-black"
+                    ? "bg-[#E76315] text-black"
                     : s === step
-                    ? "bg-amber-400/20 text-amber-400 border border-amber-400/40"
+                    ? "bg-[#E76315]/20 text-[#E76315] border border-[#E76315]/40"
                     : "bg-white/5 text-white/30 border border-white/10"
                 }`}
               >
@@ -183,7 +183,7 @@ export default function Register() {
                 <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Confirm Password *</label>
                 <input type="password" required value={form.confirmPassword} onChange={(e) => set("confirmPassword", e.target.value)} placeholder="••••••••" className={inputCls} />
               </div>
-              <button onClick={handleNext} className="w-full flex items-center justify-center gap-2 py-3 bg-amber-400 text-black font-semibold rounded-xl hover:bg-amber-300 transition-all">
+              <button onClick={handleNext} className="w-full flex items-center justify-center gap-2 py-3 bg-[#E76315] text-black font-semibold rounded-xl hover:bg-[#FF833A] transition-all">
                 Continue <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -217,7 +217,7 @@ export default function Register() {
                       onClick={() => set("ticket_type", value)}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         form.ticket_type === value
-                          ? "bg-amber-400/10 border-amber-400/40 text-amber-400"
+                          ? "bg-[#E76315]/10 border-[#E76315]/40 text-[#E76315]"
                           : "bg-white/[0.02] border-white/10 text-white/60 hover:border-white/20"
                       }`}
                     >
@@ -231,7 +231,7 @@ export default function Register() {
                 <button onClick={() => setStep(1)} className="flex items-center gap-1 px-4 py-3 rounded-xl border border-white/10 text-white/60 hover:text-white transition-all text-sm">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
-                <button onClick={handleNext} className="flex-1 flex items-center justify-center gap-2 py-3 bg-amber-400 text-black font-semibold rounded-xl hover:bg-amber-300 transition-all">
+                <button onClick={handleNext} className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#E76315] text-black font-semibold rounded-xl hover:bg-[#FF833A] transition-all">
                   Continue <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -246,7 +246,7 @@ export default function Register() {
                 <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">Interests</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {form.interests.map((tag) => (
-                    <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/10 text-amber-400 text-xs border border-amber-400/20">
+                    <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#E76315]/10 text-[#E76315] text-xs border border-[#E76315]/20">
                       {tag}
                       <button type="button" onClick={() => removeInterest(tag)}>
                         <X className="w-3 h-3" />
@@ -297,7 +297,7 @@ export default function Register() {
                 <button type="button" onClick={() => setStep(2)} className="flex items-center gap-1 px-4 py-3 rounded-xl border border-white/10 text-white/60 hover:text-white transition-all text-sm">
                   <ChevronLeft className="w-4 h-4" /> Back
                 </button>
-                <button type="submit" disabled={loading} className="flex-1 flex items-center justify-center gap-2 py-3 bg-amber-400 text-black font-semibold rounded-xl hover:bg-amber-300 transition-all disabled:opacity-50">
+                <button type="submit" disabled={loading} className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#E76315] text-black font-semibold rounded-xl hover:bg-[#FF833A] transition-all disabled:opacity-50">
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                   ) : (
@@ -312,7 +312,7 @@ export default function Register() {
 
         <p className="text-center text-sm text-white/40 mt-4">
           Already have an account?{" "}
-          <Link to="/login" className="text-amber-400 hover:text-amber-300">
+          <Link to="/login" className="text-[#E76315] hover:text-[#FF833A]">
             Sign in
           </Link>
         </p>

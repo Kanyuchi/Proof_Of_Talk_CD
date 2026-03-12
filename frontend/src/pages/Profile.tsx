@@ -101,7 +101,7 @@ export default function Profile() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        <div className="w-6 h-6 border-2 border-[#E76315] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -110,14 +110,14 @@ export default function Profile() {
     <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-5 mb-8">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-black font-bold text-xl shrink-0">
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#E76315] to-[#D35400] flex items-center justify-center text-black font-bold text-xl shrink-0">
           {initials}
         </div>
         <div>
           <h1 className="text-2xl font-bold">{user?.full_name}</h1>
           <p className="text-white/40 text-sm">{user?.email}</p>
           {user?.is_admin && (
-            <span className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-400">
+            <span className="mt-1 inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#E76315]/20 text-[#E76315]">
               Admin
             </span>
           )}
@@ -143,7 +143,7 @@ export default function Profile() {
                 value={form.name}
                 onChange={set("name")}
                 placeholder="Your name"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-400/50"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50"
               />
             </div>
             <div className="space-y-1">
@@ -152,7 +152,7 @@ export default function Profile() {
                 value={form.company}
                 onChange={set("company")}
                 placeholder="Your company"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-400/50"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50"
               />
             </div>
             <div className="sm:col-span-2 space-y-1">
@@ -161,7 +161,7 @@ export default function Profile() {
                 value={form.title}
                 onChange={set("title")}
                 placeholder="Your role / title"
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-400/50"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50"
               />
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function Profile() {
               onChange={set("goals")}
               rows={3}
               placeholder="What are you hoping to achieve at Proof of Talk?"
-              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-400/50 resize-none"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50 resize-none"
             />
           </div>
         </section>
@@ -186,7 +186,7 @@ export default function Profile() {
             {form.interests.map((tag) => (
               <span
                 key={tag}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-400/15 text-amber-400 text-xs font-medium"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#E76315]/15 text-[#E76315] text-xs font-medium"
               >
                 {tag}
                 <button type="button" onClick={() => removeInterest(tag)} className="hover:text-white">
@@ -206,7 +206,7 @@ export default function Profile() {
                 key={s}
                 type="button"
                 onClick={() => addInterest(s)}
-                className="px-2 py-0.5 rounded-full border border-white/10 text-white/40 text-xs hover:border-amber-400/40 hover:text-amber-400 transition-all"
+                className="px-2 py-0.5 rounded-full border border-white/10 text-white/40 text-xs hover:border-[#E76315]/40 hover:text-[#E76315] transition-all"
               >
                 + {s}
               </button>
@@ -222,7 +222,7 @@ export default function Profile() {
                 if (e.key === "Enter") { e.preventDefault(); addInterest(interestInput); }
               }}
               placeholder="Add custom interest…"
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-400/50"
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50"
             />
             <button
               type="button"
@@ -245,7 +245,7 @@ export default function Profile() {
                 value={form.linkedin_url}
                 onChange={set("linkedin_url")}
                 placeholder="https://linkedin.com/in/yourhandle"
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-400/50"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50"
               />
             </div>
             <div className="flex items-center gap-3">
@@ -254,7 +254,7 @@ export default function Profile() {
                 value={form.twitter_handle}
                 onChange={set("twitter_handle")}
                 placeholder="@handle"
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-400/50"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50"
               />
             </div>
             <div className="flex items-center gap-3">
@@ -263,7 +263,7 @@ export default function Profile() {
                 value={form.company_website}
                 onChange={set("company_website")}
                 placeholder="https://yourcompany.com"
-                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-amber-400/50"
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50"
               />
             </div>
           </div>
@@ -292,7 +292,7 @@ export default function Profile() {
           <button
             type="submit"
             disabled={saving || !user?.attendee_id}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-400 text-black text-sm font-semibold hover:bg-amber-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#E76315] text-black text-sm font-semibold hover:bg-[#FF833A] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             <Save className="w-4 h-4" />
             {saving ? "Saving…" : "Save changes"}

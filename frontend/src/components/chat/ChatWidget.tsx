@@ -13,7 +13,7 @@ export default function ChatWidget() {
         className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 ${
           open
             ? "bg-white/10 border border-white/20 text-white/60 scale-90"
-            : "bg-gradient-to-br from-amber-400 to-amber-600 text-black hover:scale-110"
+            : "bg-gradient-to-br from-[#E76315] to-[#D35400] text-black hover:scale-110"
         }`}
         aria-label="Open AI Concierge"
       >

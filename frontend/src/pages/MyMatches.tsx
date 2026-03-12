@@ -118,12 +118,12 @@ export default function MyMatches() {
     <div className="space-y-8">
       {/* Page header */}
       <div>
-        <div className="flex items-center gap-3">
-          <Heart className="w-6 h-6 text-amber-400" />
-          <h1 className="text-3xl font-bold">My Matches</h1>
-        </div>
-        <p className="text-white/40 mt-1">
-          AI-curated connections for you at Proof of Talk 2026 · Louvre Palace, Paris
+        <div className="pot-badge-orange mb-4">Private Matchmaking Briefing</div>
+        <h1 className="text-3xl font-normal text-white" style={{ fontFamily: "var(--font-heading)" }}>
+          Your Top Introductions for Proof of Talk Paris
+        </h1>
+        <p className="text-white/40 mt-2">
+          The conversations most likely to matter · Louvre Palace, June 2–3
         </p>
       </div>
 
@@ -135,7 +135,7 @@ export default function MyMatches() {
       ) : (
         <>
           <div className="flex items-center gap-2 text-sm text-white/40">
-            <Sparkles className="w-4 h-4 text-amber-400" />
+            <Sparkles className="w-4 h-4 text-[#E76315]" />
             We found {matches.length} people you should meet at the Louvre
           </div>
 
@@ -170,7 +170,7 @@ export default function MyMatches() {
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-white/30">Compatibility</div>
-                      <div className="text-lg font-bold text-amber-400">
+                      <div className="text-lg font-bold text-[#E76315]">
                         {match.overall_score >= 0.85 ? "Strong match" : match.overall_score >= 0.7 ? "Good match" : "Potential match"}
                       </div>
                     </div>
@@ -205,8 +205,8 @@ export default function MyMatches() {
                     )}
 
                     {/* AI Explanation — collapsible if long */}
-                    <div className="p-4 rounded-xl bg-amber-400/5 border border-amber-400/10">
-                      <div className="flex items-center gap-2 text-xs text-amber-400 font-medium mb-2">
+                    <div className="p-4 rounded-xl bg-[#E76315]/5 border border-[#E76315]/10">
+                      <div className="flex items-center gap-2 text-xs text-[#E76315] font-medium mb-2">
                         <Brain className="w-3.5 h-3.5" />
                         Why this meeting matters
                       </div>
@@ -218,7 +218,7 @@ export default function MyMatches() {
                       {longExplanation && (
                         <button
                           onClick={() => toggleExpanded(match.id)}
-                          className="mt-2 flex items-center gap-1 text-xs text-amber-400/60 hover:text-amber-400 transition-colors"
+                          className="mt-2 flex items-center gap-1 text-xs text-[#E76315]/60 hover:text-[#E76315] transition-colors"
                         >
                           {isExpanded ? (
                             <><ChevronUp className="w-3 h-3" /> Show less</>
@@ -359,7 +359,7 @@ export default function MyMatches() {
                                       match.explanation,
                                     )
                                   }
-                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/50 border border-white/10 rounded-lg text-xs hover:text-amber-400 hover:border-amber-400/30 transition-all"
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/50 border border-white/10 rounded-lg text-xs hover:text-[#E76315] hover:border-[#E76315]/30 transition-all"
                                 >
                                   <Download className="w-3 h-3" />
                                   Add to Calendar
@@ -372,7 +372,7 @@ export default function MyMatches() {
                                     setSchedulingMatchId(isScheduling ? null : match.id);
                                     setSelectedTime(null);
                                   }}
-                                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/[0.02] text-sm text-white/50 hover:text-amber-400 hover:bg-amber-400/5 transition-all text-left"
+                                  className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/[0.02] text-sm text-white/50 hover:text-[#E76315] hover:bg-[#E76315]/5 transition-all text-left"
                                 >
                                   <Clock className="w-4 h-4" />
                                   {isScheduling ? "Cancel" : "Save a preferred time for Paris"}
@@ -387,7 +387,7 @@ export default function MyMatches() {
                                           onClick={() => { setSelectedDay(day); setSelectedTime(null); }}
                                           className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                                             selectedDay === day
-                                              ? "bg-amber-400/10 border-amber-400/30 text-amber-400"
+                                              ? "bg-[#E76315]/10 border-[#E76315]/30 text-[#E76315]"
                                               : "bg-white/5 border-white/10 text-white/40 hover:text-white/60"
                                           }`}
                                         >
@@ -407,7 +407,7 @@ export default function MyMatches() {
                                               onClick={() => setSelectedTime(time)}
                                               className={`px-3 py-2 rounded-lg text-xs font-mono border transition-all min-h-[44px] flex items-center justify-center ${
                                                 selectedTime === time
-                                                  ? "bg-amber-400/20 border-amber-400/40 text-amber-400"
+                                                  ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
                                                   : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
                                               }`}
                                             >
@@ -427,7 +427,7 @@ export default function MyMatches() {
                                           );
                                         }}
                                         disabled={scheduleMeeting.isPending}
-                                        className="w-full flex items-center justify-center gap-2 py-2 bg-amber-400/10 text-amber-400 border border-amber-400/30 rounded-lg text-sm font-medium hover:bg-amber-400/20 transition-all disabled:opacity-50"
+                                        className="w-full flex items-center justify-center gap-2 py-2 bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/30 rounded-lg text-sm font-medium hover:bg-[#E76315]/20 transition-all disabled:opacity-50"
                                       >
                                         <Calendar className="w-4 h-4" />
                                         {scheduleMeeting.isPending ? "Saving…" : `Save ${selectedDay}, ${selectedTime}`}
@@ -451,7 +451,7 @@ export default function MyMatches() {
                                       onClick={() => feedback.mutate({ matchId: match.id, satisfaction_score: v })}
                                       className={`w-7 h-7 rounded-md border text-xs ${
                                         (match.satisfaction_score ?? 0) >= v
-                                          ? "bg-amber-400/20 border-amber-400/40 text-amber-400"
+                                          ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
                                           : "bg-white/5 border-white/10 text-white/50"
                                       }`}
                                     >
@@ -480,7 +480,7 @@ export default function MyMatches() {
                                   </span>
                                   <button
                                     onClick={() => handleCopyIcebreaker(icebreaker, match.id)}
-                                    className="flex items-center gap-1 text-[10px] text-white/30 hover:text-amber-400 transition-colors"
+                                    className="flex items-center gap-1 text-[10px] text-white/30 hover:text-[#E76315] transition-colors"
                                   >
                                     {copiedId === match.id ? (
                                       <><CheckCheck className="w-3 h-3 text-emerald-400" /> <span className="text-emerald-400">Copied</span></>
@@ -499,7 +499,7 @@ export default function MyMatches() {
                       if (iAccepted && !isMutual) {
                         return (
                           <div className="flex items-center gap-2 pt-2">
-                            <div className="flex items-center gap-2 text-sm text-amber-400/70">
+                            <div className="flex items-center gap-2 text-sm text-[#E76315]/70">
                               <Check className="w-4 h-4" />
                               You accepted — waiting for {person?.name.split(" ")[0] ?? "them"} to respond
                             </div>
@@ -518,7 +518,7 @@ export default function MyMatches() {
                       return (
                         <div className="space-y-2 pt-2">
                           {otherAccepted && (
-                            <div className="text-xs text-amber-400 flex items-center gap-1.5 mb-1">
+                            <div className="text-xs text-[#E76315] flex items-center gap-1.5 mb-1">
                               <Sparkles className="w-3 h-3" />
                               {person?.name.split(" ")[0] ?? "They"} already accepted — accept to confirm your meeting!
                             </div>
