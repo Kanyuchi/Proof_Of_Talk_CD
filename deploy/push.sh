@@ -46,6 +46,9 @@ echo "==> Running database migrations..."
 echo "==> Restarting backend service..."
 "${SSH[@]}" "sudo systemctl restart pot-matchmaker"
 
+echo "==> Fixing frontend permissions for nginx..."
+"${SSH[@]}" "chmod o+x /home/ec2-user /home/ec2-user/app /home/ec2-user/app/frontend /home/ec2-user/app/frontend/dist && chmod -R o+r /home/ec2-user/app/frontend/dist"
+
 echo "==> Reloading nginx..."
 "${SSH[@]}" "sudo nginx -t && sudo systemctl reload nginx"
 
