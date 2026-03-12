@@ -7,51 +7,56 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
 
+  const isActive = (to: string) =>
+    to === "/" ? location.pathname === to : location.pathname.startsWith(to);
+
+  const linkCls = (to: string) =>
+    `px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 min-h-[44px] ${
+      isActive(to)
+        ? "bg-white/10 text-amber-400"
+        : "text-white/60 hover:text-white hover:bg-white/5 active:bg-white/10"
+    }`;
+
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-[#0a0a0f] text-white pb-16 sm:pb-0">
       {/* Top nav */}
       <header className="border-b border-white/10 bg-[#0a0a0f]/80 backdrop-blur-xl sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-3 shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-black" />
-            </div>
-            <span className="font-semibold text-lg tracking-tight">
-              POT <span className="text-amber-400">Matchmaker</span>
+            {/* POT logo mark */}
+            <div
+              className="w-7 h-9 bg-amber-400 shrink-0"
+              style={{ clipPath: "polygon(0 0, 100% 8%, 100% 92%, 0 100%)" }}
+            />
+            <span className="font-semibold text-lg tracking-tight hidden sm:block">
+              Proof of Talk
             </span>
           </Link>
 
-          <nav className="flex items-center gap-1">
-            {navItems.map(({ to, label, icon: Icon }) => {
-              const active = location.pathname === to || (to !== "/" && location.pathname.startsWith(to));
-              return (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                    active
-                      ? "bg-white/10 text-amber-400"
-                      : "text-white/60 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="hidden sm:inline">{label}</span>
+          {/* Desktop nav */}
+          <nav className="hidden sm:flex items-center gap-1">
+            {!isAuthenticated && (
+              <Link to="/" className={linkCls("/")}>
+                <Sparkles className="w-4 h-4" />
+                <span>Home</span>
+              </Link>
+            )}
+            {user?.is_admin && (
+              <>
+                <Link to="/attendees" className={linkCls("/attendees")}>
+                  <Users className="w-4 h-4" />
+                  <span>Attendees</span>
                 </Link>
-              );
-            })}
-
-            {/* My Matches (only when logged in) */}
+                <Link to="/dashboard" className={linkCls("/dashboard")}>
+                  <BarChart3 className="w-4 h-4" />
+                  <span>Dashboard</span>
+                </Link>
+              </>
+            )}
             {isAuthenticated && (
-              <Link
-                to="/matches"
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                  location.pathname === "/matches"
-                    ? "bg-white/10 text-amber-400"
-                    : "text-white/60 hover:text-white hover:bg-white/5"
-                }`}
-              >
+              <Link to="/matches" className={linkCls("/matches")}>
                 <Heart className="w-4 h-4" />
-                <span className="hidden sm:inline">My Matches</span>
+                <span>My Matches</span>
               </Link>
             )}
           </nav>
@@ -66,33 +71,33 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <Link
                   to="/profile"
-                  className={`p-1.5 rounded-lg border border-white/10 text-white/50 hover:text-amber-400 hover:border-amber-400/30 transition-all ${
+                  className={`p-2 rounded-lg border border-white/10 text-white/50 hover:text-amber-400 hover:border-amber-400/30 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center ${
                     location.pathname === "/profile" ? "text-amber-400 border-amber-400/30 bg-amber-400/10" : ""
                   }`}
                   title="Edit profile"
                 >
-                  <UserCog className="w-3.5 h-3.5" />
+                  <UserCog className="w-4 h-4" />
                 </Link>
                 <button
                   onClick={logout}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-white/50 text-xs hover:text-white/80 hover:border-white/20 transition-all"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-white/50 text-xs hover:text-white/80 hover:border-white/20 transition-all min-h-[44px]"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Sign out</span>
+                  <span>Sign out</span>
                 </button>
               </>
             ) : (
               <>
                 <Link
                   to="/login"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/50 text-xs hover:text-white/80 hover:bg-white/5 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-white/50 text-xs hover:text-white/80 hover:bg-white/5 transition-all min-h-[44px]"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Sign in</span>
                 </Link>
                 <Link
                   to="/register"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 text-black text-xs font-semibold hover:bg-amber-300 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-400 text-black text-xs font-semibold hover:bg-amber-300 transition-all min-h-[44px]"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Register</span>
@@ -104,15 +109,87 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">{children}</main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/10 mt-auto">
+      {/* Footer — desktop only */}
+      <footer className="hidden sm:block border-t border-white/10 mt-auto">
         <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between text-sm text-white/40">
           <span>Proof of Talk 2026 &middot; Louvre Palace, Paris</span>
           <span>XVentures Labs</span>
         </div>
       </footer>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0a0a0f]/95 backdrop-blur-xl border-t border-white/10 flex items-stretch">
+        {isAuthenticated ? (
+          <>
+            <Link
+              to="/matches"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
+                isActive("/matches") ? "text-amber-400" : "text-white/40 active:text-white/70"
+              }`}
+            >
+              <Heart className="w-5 h-5" />
+              My Matches
+            </Link>
+            <Link
+              to="/profile"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
+                isActive("/profile") ? "text-amber-400" : "text-white/40 active:text-white/70"
+              }`}
+            >
+              <UserCog className="w-5 h-5" />
+              Profile
+            </Link>
+            {user?.is_admin && (
+              <Link
+                to="/dashboard"
+                className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
+                  isActive("/dashboard") ? "text-amber-400" : "text-white/40 active:text-white/70"
+                }`}
+              >
+                <BarChart3 className="w-5 h-5" />
+                Dashboard
+              </Link>
+            )}
+            <button
+              onClick={logout}
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium text-white/40 active:text-white/70 transition-all"
+            >
+              <LogOut className="w-5 h-5" />
+              Sign out
+            </button>
+          </>
+        ) : (
+          <>
+            <Link
+              to="/"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
+                isActive("/") ? "text-amber-400" : "text-white/40 active:text-white/70"
+              }`}
+            >
+              <Sparkles className="w-5 h-5" />
+              Home
+            </Link>
+            <Link
+              to="/login"
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
+                isActive("/login") ? "text-amber-400" : "text-white/40 active:text-white/70"
+              }`}
+            >
+              <LogIn className="w-5 h-5" />
+              Sign in
+            </Link>
+            <Link
+              to="/register"
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium text-amber-400 active:text-amber-300 transition-all"
+            >
+              <UserPlus className="w-5 h-5" />
+              Register
+            </Link>
+          </>
+        )}
+      </nav>
 
       {/* Floating AI Concierge */}
       <ChatWidget />
