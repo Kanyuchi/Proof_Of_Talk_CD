@@ -29,7 +29,13 @@ echo "==> Installing gunicorn..."
 pip3.12 install --user gunicorn uvicorn[standard]
 
 echo "==> Copying nginx config..."
-sudo cp "$APP_DIR/deploy/nginx.conf" /etc/nginx/conf.d/pot-matchmaker.conf
+# On first run, nginx.conf is uploaded to ~/ by green-deploy.sh before this script runs.
+# On re-runs it's already in $APP_DIR/deploy/ (synced by push.sh).
+if [[ -f ~/nginx.conf ]]; then
+  sudo cp ~/nginx.conf /etc/nginx/conf.d/pot-matchmaker.conf
+else
+  sudo cp "$APP_DIR/deploy/nginx.conf" /etc/nginx/conf.d/pot-matchmaker.conf
+fi
 sudo nginx -t && sudo systemctl enable nginx && sudo systemctl start nginx
 
 echo "==> Installing systemd service..."
