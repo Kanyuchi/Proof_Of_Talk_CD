@@ -69,8 +69,9 @@ echo "==> Uploading deploy scripts..."
 SCP_OPTS=(-o StrictHostKeyChecking=no)
 [[ -n "$KEY_FILE" ]] && SCP_OPTS+=(-i "$KEY_FILE")
 
-scp "${SCP_OPTS[@]}" "$SCRIPT_DIR/setup-ec2.sh" "ec2-user@$GREEN_IP:~/"
-scp "${SCP_OPTS[@]}" "$SCRIPT_DIR/nginx.conf"    "ec2-user@$GREEN_IP:~/"
+scp "${SCP_OPTS[@]}" "$SCRIPT_DIR/setup-ec2.sh"           "ec2-user@$GREEN_IP:~/"
+scp "${SCP_OPTS[@]}" "$SCRIPT_DIR/nginx.conf"             "ec2-user@$GREEN_IP:~/"
+scp "${SCP_OPTS[@]}" "$SCRIPT_DIR/pot-matchmaker.service" "ec2-user@$GREEN_IP:~/"
 
 # ── Step 2: First-time bootstrap ─────────────────────────────────────────────
 echo ""

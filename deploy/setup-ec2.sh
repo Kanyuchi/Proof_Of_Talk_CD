@@ -39,7 +39,11 @@ fi
 sudo nginx -t && sudo systemctl enable nginx && sudo systemctl start nginx
 
 echo "==> Installing systemd service..."
-sudo cp "$APP_DIR/deploy/pot-matchmaker.service" /etc/systemd/system/
+if [[ -f ~/pot-matchmaker.service ]]; then
+  sudo cp ~/pot-matchmaker.service /etc/systemd/system/
+else
+  sudo cp "$APP_DIR/deploy/pot-matchmaker.service" /etc/systemd/system/
+fi
 sudo systemctl daemon-reload
 sudo systemctl enable pot-matchmaker
 
