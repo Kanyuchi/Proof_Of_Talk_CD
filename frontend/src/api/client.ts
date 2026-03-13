@@ -176,6 +176,19 @@ export async function triggerMatching(): Promise<{ total_matches: number }> {
   return data;
 }
 
+export async function syncExtasy(): Promise<{
+  status: string;
+  total_fetched: number;
+  paid_count: number;
+  inserted: number;
+  upgraded: number;
+  skipped: number;
+  errors: number;
+}> {
+  const { data } = await api.post("/dashboard/sync-extasy");
+  return data;
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────
 
 export async function loginUser(email: string, password: string): Promise<Token> {
@@ -222,6 +235,7 @@ export async function updateProfile(body: {
   linkedin_url?: string;
   twitter_handle?: string;
   company_website?: string;
+  photo_url?: string;
 }): Promise<{ user: User; attendee: Attendee }> {
   const { data } = await api.put("/auth/profile", body);
   return data;

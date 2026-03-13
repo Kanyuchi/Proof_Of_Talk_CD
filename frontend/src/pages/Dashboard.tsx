@@ -9,7 +9,7 @@ import {
   useAttendeesBySector, useTriggerProcessing, useTriggerMatching,
 } from "../hooks/useDashboard";
 import { useAuth } from "../hooks/useAuth";
-import { enrichAll } from "../api/client";
+import { enrichAll, syncExtasy } from "../api/client";
 
 function StatCard({
   icon: Icon,
@@ -71,6 +71,7 @@ export default function Dashboard() {
   const [drillType, setDrillType] = useState<string | null>(null);
   const [drillSector, setDrillSector] = useState<string | null>(null);
   const [enrichingAll, setEnrichingAll] = useState(false);
+  const [syncingExtasy, setSyncingExtasy] = useState(false);
   const [actionResult, setActionResult] = useState<string | null>(null);
 
   const { data: typeMatches, isLoading: loadingTypeMatches } = useMatchesByType(drillType);
@@ -95,6 +96,22 @@ export default function Dashboard() {
       setActionResult("Enrichment triggered for all attendees");
     } finally {
       setEnrichingAll(false);
+    }
+  };
+
+  const handleSyncExtasy = async () => {
+    setSyncingExtasy(true);
+    setActionResult(null);
+    try {
+      const result = await syncExtasy();
+      setActionResult(
+        `Extasy sync complete — ${result.inserted} inserted, ${result.upgraded} upgraded, ${result.skipped} skipped (${result.paid_count} paid orders from ${result.total_fetched} total)`
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sync failed";
+      setActionResult(`Extasy sync error: ${msg}`);
+    } finally {
+      setSyncingExtasy(false);
     }
   };
 
@@ -147,6 +164,14 @@ export default function Dashboard() {
             >
               <RefreshCw className={`w-4 h-4 ${enrichingAll ? "animate-spin" : ""}`} />
               {enrichingAll ? "Enriching…" : "Enrich All Profiles"}
+            </button>
+            <button
+              onClick={handleSyncExtasy}
+              disabled={syncingExtasy}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E76315]/10 border border-[#E76315]/30 text-sm text-[#E76315] hover:bg-[#E76315]/20 hover:border-[#E76315]/50 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncingExtasy ? "animate-spin" : ""}`} />
+              {syncingExtasy ? "Syncing…" : "Sync from Extasy"}
             </button>
           </div>
           {actionResult && (

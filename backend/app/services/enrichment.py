@@ -44,6 +44,10 @@ class EnrichmentService:
                 enriched["linkedin"] = linkedin_data
                 enriched["linkedin_summary"] = self._summarize_linkedin(linkedin_data)
                 enriched["linkedin_enriched_at"] = datetime.utcnow().isoformat()
+                # Auto-populate photo_url from LinkedIn if not already set
+                pic = linkedin_data.get("profile_pic_url")
+                if pic and not attendee.photo_url:
+                    attendee.photo_url = pic
 
         if attendee.twitter_handle and settings.TWITTER_BEARER_TOKEN:
             twitter_data = await self._enrich_twitter(attendee.twitter_handle)
@@ -208,9 +212,27 @@ class EnrichmentService:
                 for pos in positions[:5]
             ]
 
+            # Extract photo URL from profilePicture -> vectorImage artifacts
+            profile_pic_url = None
+            try:
+                vector_image = (
+                    profile_obj.get("profilePicture", {})
+                    .get("displayImageReference", {})
+                    .get("vectorImage", {})
+                )
+                root_url = vector_image.get("rootUrl", "")
+                artifacts = vector_image.get("artifacts", [])
+                if root_url and artifacts:
+                    # Pick the largest artifact
+                    largest = max(artifacts, key=lambda a: a.get("width", 0))
+                    profile_pic_url = root_url + largest.get("fileIdentifyingUrlPathSegment", "")
+            except Exception:
+                pass
+
             return {
                 "headline": profile_obj.get("headline"),
                 "summary": profile_obj.get("summary"),
+                "profile_pic_url": profile_pic_url,
                 "experiences": experiences,
                 "skills": [s.get("name") for s in skills[:15] if s.get("name")],
                 "education": [
@@ -241,6 +263,7 @@ class EnrichmentService:
                 return {
                     "headline": data.get("headline"),
                     "summary": data.get("summary"),
+                    "profile_pic_url": data.get("profile_pic_url"),
                     "experiences": [
                         {
                             "title": exp.get("title"),

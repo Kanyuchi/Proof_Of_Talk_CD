@@ -1,11 +1,12 @@
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 import {
   Check, X, Brain, Target, MessageSquare, Sparkles,
-  Copy, CheckCheck, Calendar, Clock, Download, Heart, ChevronDown, ChevronUp,
+  Copy, CheckCheck, Calendar, Clock, Download, Heart, ChevronDown, ChevronUp, Send,
 } from "lucide-react";
 import AttendeeAvatar from "../components/AttendeeAvatar";
 import { useAuth } from "../hooks/useAuth";
 import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedback } from "../hooks/useMatches";
+import { useSendMatchMessage } from "../hooks/useMessages";
 import { useState } from "react";
 import {
   CONFERENCE_SLOTS, slotToISO, formatMeetingTime, downloadICS,
@@ -13,6 +14,7 @@ import {
 } from "../utils/matchHelpers";
 
 export default function MyMatches() {
+  const navigate = useNavigate();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const attendeeId = user?.attendee_id ?? undefined;
 
@@ -20,6 +22,7 @@ export default function MyMatches() {
   const updateStatus = useUpdateMatchStatus(attendeeId);
   const scheduleMeeting = useScheduleMeeting(attendeeId);
   const feedback = useMeetingFeedback(attendeeId);
+  const sendIntro = useSendMatchMessage();
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [schedulingMatchId, setSchedulingMatchId] = useState<string | null>(null);
@@ -28,6 +31,7 @@ export default function MyMatches() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [decliningMatchId, setDecliningMatchId] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
+  const [sentIntroIds, setSentIntroIds] = useState<Set<string>>(new Set());
 
   const matches = matchData?.matches ?? [];
   const isAdmin = user?.is_admin ?? false;
@@ -543,7 +547,20 @@ export default function MyMatches() {
                                     )}
                                   </button>
                                 </div>
-                                <p className="text-xs text-white/50 italic leading-relaxed">"{icebreaker}"</p>
+                                <p className="text-xs text-white/50 italic leading-relaxed mb-3">"{icebreaker}"</p>
+                                <button
+                                  onClick={() => {
+                                    sendIntro.mutate(
+                                      { matchId: match.id, content: icebreaker },
+                                      { onSuccess: () => navigate(`/messages?match=${match.id}`) },
+                                    );
+                                  }}
+                                  disabled={sendIntro.isPending}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/20 rounded-lg text-xs font-medium hover:bg-[#E76315]/20 transition-all disabled:opacity-50"
+                                >
+                                  <Send className="w-3 h-3" />
+                                  {sendIntro.isPending ? "Sending…" : "Send & open chat"}
+                                </button>
                               </div>
                             )}
                           </div>
@@ -551,18 +568,71 @@ export default function MyMatches() {
                       }
 
                       if (iAccepted && !isMutual) {
+                        const icebreaker = person
+                          ? buildIcebreaker(
+                              person.name,
+                              person.title,
+                              person.company,
+                              match.shared_context?.action_items,
+                            )
+                          : "";
+                        const introSent = sentIntroIds.has(match.id);
+
                         return (
-                          <div className="flex items-center gap-2 pt-2">
-                            <div className="flex items-center gap-2 text-sm text-[#E76315]/70">
-                              <Check className="w-4 h-4" />
-                              You accepted — waiting for {person?.name.split(" ")[0] ?? "them"} to respond
+                          <div className="space-y-3 pt-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 text-sm text-[#E76315]/70">
+                                <Check className="w-4 h-4" />
+                                You accepted — waiting for {person?.name.split(" ")[0] ?? "them"} to respond
+                              </div>
+                              <button
+                                onClick={() => handleDecline(match.id)}
+                                className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/30 border border-white/10 rounded-lg text-xs hover:text-white/50 transition-all"
+                              >
+                                <X className="w-3 h-3" /> Cancel
+                              </button>
                             </div>
-                            <button
-                              onClick={() => handleDecline(match.id)}
-                              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/30 border border-white/10 rounded-lg text-xs hover:text-white/50 transition-all"
-                            >
-                              <X className="w-3 h-3" /> Cancel
-                            </button>
+
+                            {icebreaker && (
+                              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/10">
+                                <div className="flex items-center gap-1.5 mb-2">
+                                  <Sparkles className="w-3 h-3 text-[#E76315]" />
+                                  <span className="text-[10px] text-white/30 uppercase font-medium">Send an introduction</span>
+                                </div>
+                                <p className="text-xs text-white/50 italic leading-relaxed mb-3">"{icebreaker}"</p>
+                                {introSent ? (
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-xs text-emerald-400">
+                                      <CheckCheck className="w-3.5 h-3.5" />
+                                      Introduction sent — they'll see it when they accept
+                                    </div>
+                                    <Link
+                                      to={`/messages?match=${match.id}`}
+                                      className="flex items-center gap-1 text-[10px] text-[#E76315]/60 hover:text-[#E76315] transition-colors"
+                                    >
+                                      <MessageSquare className="w-3 h-3" /> View
+                                    </Link>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      sendIntro.mutate(
+                                        { matchId: match.id, content: icebreaker },
+                                        {
+                                          onSuccess: () =>
+                                            setSentIntroIds((prev) => new Set([...prev, match.id])),
+                                        },
+                                      );
+                                    }}
+                                    disabled={sendIntro.isPending}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/20 rounded-lg text-xs font-medium hover:bg-[#E76315]/20 transition-all disabled:opacity-50"
+                                  >
+                                    <Send className="w-3 h-3" />
+                                    {sendIntro.isPending ? "Sending…" : "Send introduction"}
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         );
                       }

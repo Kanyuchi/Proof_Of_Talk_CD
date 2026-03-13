@@ -1,9 +1,12 @@
 import structlog
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from app.core.config import get_settings
 from app.core.limiter import limiter
@@ -24,11 +27,33 @@ structlog.configure(
 )
 logger = structlog.get_logger(__name__)
 
+# ── Daily Extasy sync + enrichment job ────────────────────────────────────────
+async def _daily_extasy_sync():
+    try:
+        from app.services.extasy_sync import sync_and_enrich
+        result = await sync_and_enrich()
+        logger.info("scheduler: daily extasy sync complete", **result)
+    except Exception as exc:
+        logger.error("scheduler: daily extasy sync failed", error=str(exc))
+
+scheduler = AsyncIOScheduler()
+# Run every day at 02:00 UTC — after midnight registrations settle
+scheduler.add_job(_daily_extasy_sync, CronTrigger(hour=2, minute=0, timezone="UTC"))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler.start()
+    logger.info("scheduler: started — extasy sync runs daily at 02:00 UTC")
+    yield
+    scheduler.shutdown(wait=False)
+    logger.info("scheduler: stopped")
+
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title=settings.APP_NAME,
     description="AI Matchmaking Engine for Proof of Talk 2026",
     version="0.1.0",
+    lifespan=lifespan,
     docs_url="/api/docs" if settings.DEBUG else None,
     redoc_url="/api/redoc" if settings.DEBUG else None,
     openapi_url="/api/openapi.json" if settings.DEBUG else None,

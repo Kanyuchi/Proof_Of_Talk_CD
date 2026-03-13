@@ -340,6 +340,16 @@ async def trigger_matching(
     }
 
 
+@router.post("/sync-extasy")
+async def sync_extasy(
+    _admin: User = Depends(require_admin),
+):
+    """Admin: pull confirmed (PAID) attendees from Extasy, upsert into DB, then enrich new attendees."""
+    from app.services.extasy_sync import sync_and_enrich
+    result = await sync_and_enrich()
+    return {"status": "completed", **result}
+
+
 @router.get("/engagement/nudges/dry-run")
 async def nudge_dry_run(
     db: AsyncSession = Depends(get_db),

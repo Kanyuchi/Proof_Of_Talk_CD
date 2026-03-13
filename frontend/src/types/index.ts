@@ -11,6 +11,7 @@ export interface Attendee {
   not_looking_for: string[];
   preferred_geographies: string[];
   deal_stage: string | null;
+  photo_url: string | null;
   linkedin_url: string | null;
   twitter_handle: string | null;
   company_website: string | null;

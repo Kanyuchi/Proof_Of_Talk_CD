@@ -50,15 +50,19 @@ async def list_conversations(
     """List all conversations (accepted matches) for the current user."""
     attendee = await _get_attendee(user, db)
 
-    accepted = (await db.execute(
+    # Include mutual matches + any match where this user has accepted and already sent a message
+    from sqlalchemy import or_, and_
+    user_accepted = (await db.execute(
         select(Match).where(
-            ((Match.attendee_a_id == attendee.id) | (Match.attendee_b_id == attendee.id))
-            & (Match.status == "accepted")
+            or_(
+                and_(Match.attendee_a_id == attendee.id, Match.status_a == "accepted"),
+                and_(Match.attendee_b_id == attendee.id, Match.status_b == "accepted"),
+            )
         )
     )).scalars().all()
 
     summaries = []
-    for match in accepted:
+    for match in user_accepted:
         other_id = match.attendee_b_id if match.attendee_a_id == attendee.id else match.attendee_a_id
         other = await db.get(Attendee, other_id)
 
@@ -88,9 +92,16 @@ async def list_conversations(
             )).scalars().all()
             unread = len(unread_msgs)
 
+        # Only include pending (non-mutual) matches if there's already a message
+        is_mutual = match.status == "accepted"
+        has_messages = last_msg_content is not None
+        if not is_mutual and not has_messages:
+            continue
+
         summaries.append({
             "match_id": str(match.id),
             "match_status": match.status,
+            "is_mutual": is_mutual,
             "conversation_id": str(conv.id) if conv else None,
             "other_attendee_id": str(other.id) if other else None,
             "other_attendee_name": other.name if other else "Unknown",

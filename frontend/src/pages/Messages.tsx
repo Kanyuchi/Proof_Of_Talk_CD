@@ -172,6 +172,11 @@ export default function Messages() {
                     {thread.other_attendee.title} · {thread.other_attendee.company}
                   </div>
                 </div>
+                {thread.match_status !== "accepted" && (
+                  <div className="ml-auto text-[10px] text-amber-400/70 border border-amber-400/20 bg-amber-400/5 px-2 py-1 rounded-full">
+                    Awaiting their acceptance
+                  </div>
+                )}
               </div>
             )}
 
@@ -214,23 +219,30 @@ export default function Messages() {
 
             {/* Input */}
             <div className="p-4 border-t border-white/10">
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 focus-within:border-[#E76315]/30 transition-all">
-                <input
-                  type="text"
-                  value={messageInput}
-                  onChange={(e) => setMessageInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type a message…"
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-white/20 focus:outline-none"
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={!messageInput.trim() || sendMutation.isPending}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#E76315] text-black hover:bg-[#FF833A] transition-all disabled:opacity-40 shrink-0"
-                >
+              {thread?.match_status !== "accepted" ? (
+                <div className="flex items-center justify-center gap-2 py-2.5 text-xs text-white/25">
                   <Send className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                  Chat will unlock when they accept the match
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 focus-within:border-[#E76315]/30 transition-all">
+                  <input
+                    type="text"
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type a message…"
+                    className="flex-1 bg-transparent text-sm text-white placeholder:text-white/20 focus:outline-none"
+                  />
+                  <button
+                    onClick={handleSend}
+                    disabled={!messageInput.trim() || sendMutation.isPending}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#E76315] text-black hover:bg-[#FF833A] transition-all disabled:opacity-40 shrink-0"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}

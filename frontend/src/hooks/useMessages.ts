@@ -41,6 +41,19 @@ export function useSendMessage(matchId: string | null) {
   });
 }
 
+// Generic send — works before mutual acceptance (for intro messages)
+export function useSendMatchMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ matchId, content }: { matchId: string; content: string }) =>
+      sendMessage(matchId, content),
+    onSuccess: (_, { matchId }) => {
+      queryClient.invalidateQueries({ queryKey: ["conversation", matchId] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+}
+
 export function useUnreadCount() {
   return useQuery({
     queryKey: ["unread-count"],

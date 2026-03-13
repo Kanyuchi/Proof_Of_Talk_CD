@@ -110,7 +110,7 @@ async def update_profile(
     allowed = {
         "name", "company", "title", "goals", "interests",
         "seeking", "not_looking_for", "preferred_geographies", "deal_stage",
-        "linkedin_url", "twitter_handle", "company_website",
+        "linkedin_url", "twitter_handle", "company_website", "photo_url",
     }
     for field, value in data.items():
         if field in allowed:

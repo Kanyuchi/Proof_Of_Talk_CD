@@ -38,6 +38,7 @@ supabase>=2.0.0
 # Utils
 structlog==24.4.0
 tenacity==9.0.0
+apscheduler==3.10.4
 
 # Rate limiting & validation
 slowapi>=0.1.9

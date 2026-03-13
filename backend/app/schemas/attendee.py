@@ -33,6 +33,7 @@ class AttendeeResponse(BaseModel):
     not_looking_for: list[str]
     preferred_geographies: list[str]
     deal_stage: str | None
+    photo_url: str | None
     linkedin_url: str | None
     twitter_handle: str | None
     company_website: str | None

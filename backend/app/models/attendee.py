@@ -35,6 +35,9 @@ class Attendee(Base):
     preferred_geographies: Mapped[list] = mapped_column(ARRAY(String), default=list)
     deal_stage: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # Profile photo (user-set URL; falls back to enriched data / Gravatar in frontend)
+    photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     # Enriched data (populated by enrichment pipeline)
     linkedin_url: Mapped[str] = mapped_column(String(500), nullable=True)
     twitter_handle: Mapped[str] = mapped_column(String(255), nullable=True)
