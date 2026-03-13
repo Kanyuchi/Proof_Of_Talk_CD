@@ -29,6 +29,8 @@ export default function AttendeeMatches() {
   const [schedulingMatchId, setSchedulingMatchId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>("June 2");
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [decliningMatchId, setDecliningMatchId] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
 
   const matches = matchData?.matches ?? [];
   const isLoading = loadingAttendee || loadingMatches;
@@ -42,8 +44,14 @@ export default function AttendeeMatches() {
   };
 
   const handleDecline = (matchId: string) => {
-    const reason = window.prompt("Optional: why are you declining this match?");
-    handleStatus(matchId, "declined", reason?.trim() || undefined);
+    setDecliningMatchId(matchId);
+    setDeclineReason("");
+  };
+
+  const confirmDecline = (matchId: string) => {
+    handleStatus(matchId, "declined", declineReason.trim() || undefined);
+    setDecliningMatchId(null);
+    setDeclineReason("");
   };
 
   const handleMarkMet = (matchId: string) => {
@@ -647,18 +655,48 @@ export default function AttendeeMatches() {
 
                   if (iAccepted && !isMutual) {
                     return (
-                      <div className="flex items-center gap-2 pt-2">
-                        <div className="flex items-center gap-2 text-sm text-[#E76315]/70">
-                          <Check className="w-4 h-4" />
-                          You accepted — waiting for {person?.name.split(" ")[0] ?? "them"} to respond
+                      <div className="space-y-2 pt-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 text-sm text-[#E76315]/70">
+                            <Check className="w-4 h-4" />
+                            You accepted — waiting for {person?.name.split(" ")[0] ?? "them"} to respond
+                          </div>
+                          {decliningMatchId !== match.id && (
+                            <button
+                              onClick={() => handleDecline(match.id)}
+                              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/30 border border-white/10 rounded-lg text-xs hover:text-white/50 transition-all"
+                            >
+                              <X className="w-3 h-3" />
+                              Cancel
+                            </button>
+                          )}
                         </div>
-                        <button
-                          onClick={() => handleDecline(match.id)}
-                          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/30 border border-white/10 rounded-lg text-xs hover:text-white/50 transition-all"
-                        >
-                          <X className="w-3 h-3" />
-                          Cancel
-                        </button>
+                        {decliningMatchId === match.id && (
+                          <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+                            <p className="text-xs text-white/40">Optional: why are you withdrawing?</p>
+                            <textarea
+                              value={declineReason}
+                              onChange={(e) => setDeclineReason(e.target.value)}
+                              rows={2}
+                              placeholder="Changed my mind, not the right fit…"
+                              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none"
+                            />
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => confirmDecline(match.id)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-all"
+                              >
+                                <X className="w-3 h-3" /> Confirm
+                              </button>
+                              <button
+                                onClick={() => setDecliningMatchId(null)}
+                                className="px-3 py-1.5 text-white/30 border border-white/10 rounded-lg text-xs hover:text-white/50 transition-all"
+                              >
+                                Keep
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -673,22 +711,49 @@ export default function AttendeeMatches() {
                           {person?.name.split(" ")[0] ?? "They"} already accepted — accept to confirm your meeting!
                         </div>
                       )}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleStatus(match.id, "accepted")}
-                          className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-all"
-                        >
-                          <Check className="w-4 h-4" />
-                          {otherAccepted ? "Accept & Confirm Meeting" : "Accept Meeting"}
-                        </button>
-                        <button
-                          onClick={() => handleDecline(match.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-white/5 text-white/40 border border-white/10 rounded-lg text-sm font-medium hover:text-white/60 transition-all"
-                        >
-                          <X className="w-4 h-4" />
-                          Not Now
-                        </button>
-                      </div>
+                      {decliningMatchId === match.id ? (
+                        <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+                          <p className="text-xs text-white/40">Optional: why are you declining?</p>
+                          <textarea
+                            value={declineReason}
+                            onChange={(e) => setDeclineReason(e.target.value)}
+                            rows={2}
+                            placeholder="Not the right fit, wrong timing…"
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-white/20 resize-none"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => confirmDecline(match.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-xs font-medium hover:bg-red-500/20 transition-all"
+                            >
+                              <X className="w-3 h-3" /> Confirm decline
+                            </button>
+                            <button
+                              onClick={() => setDecliningMatchId(null)}
+                              className="px-3 py-1.5 text-white/30 border border-white/10 rounded-lg text-xs hover:text-white/50 transition-all"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleStatus(match.id, "accepted")}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-all"
+                          >
+                            <Check className="w-4 h-4" />
+                            {otherAccepted ? "Accept & Confirm Meeting" : "Accept Meeting"}
+                          </button>
+                          <button
+                            onClick={() => handleDecline(match.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/5 text-white/40 border border-white/10 rounded-lg text-sm font-medium hover:text-white/60 transition-all"
+                          >
+                            <X className="w-4 h-4" />
+                            Not Now
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
