@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { MessageSquare, Send, Crown, Mic, Megaphone, User } from "lucide-react";
+import { useSearchParams, Link } from "react-router-dom";
+import { MessageSquare, Send, Crown, Mic, Megaphone, User, Heart } from "lucide-react";
 import { useConversations, useConversation, useSendMessage } from "../hooks/useMessages";
 import { useAuth } from "../hooks/useAuth";
 
@@ -79,11 +79,38 @@ export default function Messages() {
           {loadingConvs ? (
             <div className="text-center py-8 text-white/20 text-sm">Loading…</div>
           ) : conversations.length === 0 ? (
-            <div className="p-4 text-center">
-              <MessageSquare className="w-8 h-8 text-white/10 mx-auto mb-2" />
-              <p className="text-xs text-white/30">
-                No conversations yet. Accept a match to start messaging.
-              </p>
+            <div className="p-5 space-y-4">
+              <div className="text-center">
+                <MessageSquare className="w-8 h-8 text-white/10 mx-auto mb-3" />
+                <p className="text-sm font-medium text-white/50">No chats yet</p>
+                <p className="text-xs text-white/25 mt-1 leading-relaxed">
+                  Chat opens when <strong className="text-white/40">both attendees</strong> accept the same match.
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-2">
+                <p className="text-[11px] text-white/40 font-medium uppercase tracking-wide">How it works</p>
+                <div className="space-y-2">
+                  {[
+                    { step: "1", text: "Go to My Matches" },
+                    { step: "2", text: "Click \"I'd like to meet\" on any match" },
+                    { step: "3", text: "When they accept too → chat unlocks" },
+                  ].map(({ step, text }) => (
+                    <div key={step} className="flex items-start gap-2">
+                      <span className="w-4 h-4 rounded-full bg-[#E76315]/20 text-[#E76315] text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        {step}
+                      </span>
+                      <span className="text-xs text-white/40">{text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <Link
+                to="/matches"
+                className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/20 text-xs font-medium hover:bg-[#E76315]/20 transition-all"
+              >
+                <Heart className="w-3.5 h-3.5" />
+                View my matches
+              </Link>
             </div>
           ) : (
             conversations.map((conv) => (
