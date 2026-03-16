@@ -6,11 +6,11 @@ interface RegisterData {
   email: string;
   password: string;
   name: string;
-  company: string;
-  title: string;
-  ticket_type: string;
-  interests: string[];
-  goals: string;
+  company?: string;
+  title?: string;
+  ticket_type?: string;
+  interests?: string[];
+  goals?: string;
   seeking?: string[];
   not_looking_for?: string[];
   preferred_geographies?: string[];

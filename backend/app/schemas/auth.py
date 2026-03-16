@@ -14,8 +14,8 @@ class RegisterRequest(BaseModel):
     password: str
     # Attendee profile
     name: str
-    company: str
-    title: str
+    company: str = ""
+    title: str = ""
     ticket_type: str = "delegate"
     interests: list[str] = []
     goals: str | None = None
@@ -40,7 +40,7 @@ class RegisterRequest(BaseModel):
             raise ValueError("Password must contain at least one digit")
         return v
 
-    @field_validator("name", "company", "title")
+    @field_validator("name")
     @classmethod
     def no_empty_strings(cls, v: str) -> str:
         if not v.strip():

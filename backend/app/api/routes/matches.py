@@ -142,6 +142,7 @@ async def update_match_status(
         return MatchResponse.model_validate(match)
 
     # Recompute overall status from both sides
+    prev_status = match.status
     match.status = _compute_overall_status(match.status_a, match.status_b)
 
     if data.status == "declined":
@@ -149,6 +150,27 @@ async def update_match_status(
 
     await db.commit()
     await db.refresh(match)
+
+    # Fire-and-forget: notify both parties when a mutual match is newly confirmed
+    if match.status == "accepted" and prev_status != "accepted":
+        try:
+            from app.services.email import send_mutual_match_email
+            attendee_a = await db.get(Attendee, match.attendee_a_id)
+            attendee_b = await db.get(Attendee, match.attendee_b_id)
+            if attendee_a and attendee_b:
+                for recipient, partner in [(attendee_a, attendee_b), (attendee_b, attendee_a)]:
+                    if recipient.email:
+                        send_mutual_match_email(
+                            to_email=recipient.email,
+                            attendee_name=recipient.name,
+                            other_name=partner.name,
+                            other_title=partner.title or "",
+                            other_company=partner.company or "",
+                        )
+        except Exception as exc:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("Mutual match email failed: %s", exc)
+
     return MatchResponse.model_validate(match)
 
 
@@ -175,6 +197,35 @@ async def schedule_meeting(
 
     await db.commit()
     await db.refresh(match)
+
+    # Fire-and-forget: send meeting confirmation to both parties
+    try:
+        from datetime import timezone
+        from app.services.email import send_meeting_confirmation_email
+        attendee_a = await db.get(Attendee, match.attendee_a_id)
+        attendee_b = await db.get(Attendee, match.attendee_b_id)
+        if attendee_a and attendee_b and match.meeting_time:
+            # Format the time for the email (simple ISO → readable)
+            dt = match.meeting_time
+            if hasattr(dt, "strftime"):
+                time_str = dt.strftime("%a %b %-d · %H:%M") + " (Louvre time)"
+            else:
+                time_str = str(match.meeting_time)
+            location = match.meeting_location or "Louvre Palace, Paris"
+            for recipient, partner in [(attendee_a, attendee_b), (attendee_b, attendee_a)]:
+                if recipient.email:
+                    send_meeting_confirmation_email(
+                        to_email=recipient.email,
+                        attendee_name=recipient.name,
+                        other_name=partner.name,
+                        other_company=partner.company or "",
+                        meeting_time_str=time_str,
+                        meeting_location=location,
+                    )
+    except Exception as exc:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("Meeting confirmation email failed: %s", exc)
+
     return MatchResponse.model_validate(match)
 
 

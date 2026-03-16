@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     AWS_REGION: str = "eu-west-1"
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_SES_FROM_EMAIL: str = ""  # Verified SES sender address
 
     # Auth
     SECRET_KEY: str = "change-me-in-production"

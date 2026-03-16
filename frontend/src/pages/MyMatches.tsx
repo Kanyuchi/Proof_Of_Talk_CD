@@ -2,6 +2,7 @@ import { Navigate, Link, useNavigate } from "react-router-dom";
 import {
   Check, X, Brain, Target, MessageSquare, Sparkles,
   Copy, CheckCheck, Calendar, Clock, Download, Heart, ChevronDown, ChevronUp, Send,
+  Bookmark, BookmarkCheck,
 } from "lucide-react";
 import AttendeeAvatar from "../components/AttendeeAvatar";
 import { useAuth } from "../hooks/useAuth";
@@ -32,6 +33,15 @@ export default function MyMatches() {
   const [decliningMatchId, setDecliningMatchId] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [sentIntroIds, setSentIntroIds] = useState<Set<string>>(new Set());
+  const [savedMatchIds, setSavedMatchIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem("pot_saved_matches");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
 
   const matches = matchData?.matches ?? [];
   const isAdmin = user?.is_admin ?? false;
@@ -73,6 +83,15 @@ export default function MyMatches() {
     navigator.clipboard.writeText(text).then(() => {
       setCopiedId(matchId);
       setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  const toggleSaved = (matchId: string) => {
+    setSavedMatchIds((prev) => {
+      const next = new Set(prev);
+      next.has(matchId) ? next.delete(matchId) : next.add(matchId);
+      localStorage.setItem("pot_saved_matches", JSON.stringify([...next]));
+      return next;
     });
   };
 
@@ -139,9 +158,32 @@ export default function MyMatches() {
         </div>
       ) : (
         <>
-          <div className="flex items-center gap-2 text-sm text-white/40">
-            <Sparkles className="w-4 h-4 text-[#E76315]" />
-            We found {matches.length} people you should meet at the Louvre
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2 text-sm text-white/40">
+              <Sparkles className="w-4 h-4 text-[#E76315]" />
+              We found {matches.length} people you should meet at the Louvre
+            </div>
+            {savedMatchIds.size > 0 && (
+              <div className="flex items-center gap-1 p-1 bg-white/5 rounded-lg">
+                <button
+                  onClick={() => setActiveTab("all")}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    activeTab === "all" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+                  }`}
+                >
+                  All ({matches.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("saved")}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    activeTab === "saved" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+                  }`}
+                >
+                  <BookmarkCheck className="w-3 h-3" />
+                  Saved ({savedMatchIds.size})
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── Your Schedule ──────────────────────────────────── */}
@@ -195,7 +237,7 @@ export default function MyMatches() {
           })()}
 
           <div className="space-y-4">
-            {matches.map((match, idx) => {
+            {(activeTab === "saved" ? matches.filter((m) => savedMatchIds.has(m.id)) : matches).map((match, idx) => {
               const config = matchTypeConfig[match.match_type] ?? matchTypeConfig.complementary;
               const Icon = config.icon;
               const person = match.matched_attendee;
@@ -223,10 +265,26 @@ export default function MyMatches() {
                       </span>
                       <span className="text-xs text-white/30 hidden sm:block">{config.description}</span>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-white/30">Compatibility</div>
-                      <div className="text-lg font-bold text-[#E76315]">
-                        {match.overall_score >= 0.85 ? "Strong match" : match.overall_score >= 0.7 ? "Good match" : "Potential match"}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => toggleSaved(match.id)}
+                        className={`p-1.5 rounded-lg transition-all ${
+                          savedMatchIds.has(match.id)
+                            ? "text-[#E76315] bg-[#E76315]/10"
+                            : "text-white/20 hover:text-white/50"
+                        }`}
+                        title={savedMatchIds.has(match.id) ? "Remove from saved" : "Save for later"}
+                      >
+                        {savedMatchIds.has(match.id)
+                          ? <BookmarkCheck className="w-4 h-4" />
+                          : <Bookmark className="w-4 h-4" />
+                        }
+                      </button>
+                      <div className="text-right">
+                        <div className="text-xs text-white/30">Compatibility</div>
+                        <div className="text-lg font-bold text-[#E76315]">
+                          {match.overall_score >= 0.85 ? "Strong match" : match.overall_score >= 0.7 ? "Good match" : "Potential match"}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -647,14 +705,14 @@ export default function MyMatches() {
                               {person?.name.split(" ")[0] ?? "They"} already accepted — accept to confirm your meeting!
                             </div>
                           )}
-                          <div className="flex items-center gap-2">
+                          <div className="space-y-2">
                             <button
                               onClick={() => handleStatus(match.id, "accepted")}
                               disabled={updateStatus.isPending}
-                              className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-all disabled:opacity-50"
+                              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                             >
                               {updateStatus.isPending ? (
-                                <div className="w-4 h-4 border-2 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin" />
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                               ) : (
                                 <Check className="w-4 h-4" />
                               )}
@@ -663,9 +721,9 @@ export default function MyMatches() {
                             <button
                               onClick={() => handleDecline(match.id)}
                               disabled={updateStatus.isPending}
-                              className="flex items-center gap-2 px-4 py-2 bg-white/5 text-white/40 border border-white/10 rounded-lg text-sm font-medium hover:text-white/60 transition-all disabled:opacity-50"
+                              className="w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-1 disabled:opacity-50"
                             >
-                              <X className="w-4 h-4" /> Maybe later
+                              Maybe later
                             </button>
                           </div>
                         </div>

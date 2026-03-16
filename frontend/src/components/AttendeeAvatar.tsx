@@ -32,19 +32,9 @@ function getExplicitPhoto(
   return null;
 }
 
-// Layer 3: Clearbit company logo from domain
-function clearbitUrl(companyWebsite: string | null | undefined): string | null {
-  if (!companyWebsite) return null;
-  try {
-    const url = companyWebsite.startsWith("http")
-      ? companyWebsite
-      : `https://${companyWebsite}`;
-    const domain = new URL(url).hostname.replace(/^www\./, "");
-    if (!domain || domain.includes(" ")) return null;
-    return `https://logo.clearbit.com/${domain}`;
-  } catch {
-    return null;
-  }
+// Layer 3: ui-avatars — always returns a styled letter avatar (no external dependency issues)
+function uiAvatarsUrl(name: string): string {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1a1a2e&color=E76315&size=200&bold=true&format=svg`;
 }
 
 // Layer 2: Gravatar via SHA-256 (async, uses native Web Crypto)
@@ -64,10 +54,9 @@ async function gravatarUrl(email: string): Promise<string | null> {
 
 export default function AttendeeAvatar({ attendee, size = "md" }: Props) {
   const explicit = getExplicitPhoto(attendee.photo_url, attendee.enriched_profile ?? {});
-  const clearbit = clearbitUrl(attendee.company_website);
+  const uiAvatar = uiAvatarsUrl(attendee.name);
 
-  // Cycle: explicit → gravatar → clearbit → initials
-  // We track which sources have failed so we can move to the next
+  // Cycle: explicit → gravatar → ui-avatars (always works)
   const [failedSources, setFailedSources] = useState<Set<string>>(new Set());
   const [gravatarSrc, setGravatarSrc] = useState<string | null>(null);
 
@@ -80,48 +69,20 @@ export default function AttendeeAvatar({ attendee, size = "md" }: Props) {
   const markFailed = (src: string) =>
     setFailedSources((prev) => new Set([...prev, src]));
 
-  // Pick the first non-failed source
+  // Pick the first non-failed source; ui-avatars is always the final fallback
   const src =
     explicit && !failedSources.has(explicit)
       ? explicit
       : gravatarSrc && !failedSources.has(gravatarSrc)
       ? gravatarSrc
-      : clearbit && !failedSources.has(clearbit)
-      ? clearbit
-      : null;
-
-  const initials = attendee.name
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
-
-  const colors = [
-    "bg-blue-500/20 text-blue-300",
-    "bg-purple-500/20 text-purple-300",
-    "bg-emerald-500/20 text-emerald-300",
-    "bg-[#E76315]/20 text-[#FF833A]",
-    "bg-pink-500/20 text-pink-300",
-  ];
-  const color = colors[initials.charCodeAt(0) % colors.length];
-
-  if (src) {
-    return (
-      <img
-        src={src}
-        alt={attendee.name}
-        onError={() => markFailed(src)}
-        className={`${sizes[size]} rounded-lg object-cover shrink-0 bg-white/5`}
-      />
-    );
-  }
+      : uiAvatar;
 
   return (
-    <div
-      className={`${sizes[size]} rounded-lg ${color} flex items-center justify-center font-semibold shrink-0`}
-    >
-      {initials}
-    </div>
+    <img
+      src={src}
+      alt={attendee.name}
+      onError={src !== uiAvatar ? () => markFailed(src) : undefined}
+      className={`${sizes[size]} rounded-lg object-cover shrink-0 bg-white/5`}
+    />
   );
 }

@@ -433,6 +433,30 @@ Return ONLY the JSON array. No markdown, no commentary."""
             matches.append(match)
 
         await self.db.commit()
+
+        # Fire-and-forget: notify attendee of their top match via email
+        if matches:
+            try:
+                from app.services.email import send_match_intro_email
+                top = matches[0]
+                top_candidate_id = (
+                    top.attendee_b_id if top.attendee_a_id == attendee.id else top.attendee_a_id
+                )
+                top_candidate = await self.db.get(Attendee, top_candidate_id)
+                if top_candidate and attendee.email:
+                    send_match_intro_email(
+                        to_email=attendee.email,
+                        attendee_name=attendee.name,
+                        match_name=top_candidate.name,
+                        match_title=top_candidate.title or "",
+                        match_company=top_candidate.company or "",
+                        explanation=top.explanation or "",
+                        match_count=len(matches),
+                    )
+            except Exception as exc:  # noqa: BLE001
+                import logging
+                logging.getLogger(__name__).warning("Post-match email failed: %s", exc)
+
         return matches
 
     async def generate_all_matches(self, top_k: int = 10) -> int:

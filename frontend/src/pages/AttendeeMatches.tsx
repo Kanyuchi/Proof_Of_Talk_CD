@@ -381,7 +381,7 @@ export default function AttendeeMatches() {
                 <div className="p-4 rounded-xl bg-[#E76315]/5 border border-[#E76315]/10">
                   <div className="flex items-center gap-2 text-xs text-[#E76315] font-medium mb-2">
                     <Brain className="w-3.5 h-3.5" />
-                    WHY YOU SHOULD MEET
+                    Why this meeting matters
                   </div>
                   <p className="text-sm text-white/70 leading-relaxed">{match.explanation}</p>
                 </div>
@@ -737,20 +737,19 @@ export default function AttendeeMatches() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="space-y-2">
                           <button
                             onClick={() => handleStatus(match.id, "accepted")}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg text-sm font-medium hover:bg-emerald-500/20 transition-all"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20"
                           >
                             <Check className="w-4 h-4" />
-                            {otherAccepted ? "Accept & Confirm Meeting" : "Accept Meeting"}
+                            {otherAccepted ? "I'd like to meet — confirm" : "I'd like to meet"}
                           </button>
                           <button
                             onClick={() => handleDecline(match.id)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/5 text-white/40 border border-white/10 rounded-lg text-sm font-medium hover:text-white/60 transition-all"
+                            className="w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-1"
                           >
-                            <X className="w-4 h-4" />
-                            Not Now
+                            Maybe later
                           </button>
                         </div>
                       )}
