@@ -36,7 +36,8 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 # ── Target API ─────────────────────────────────────────────────────────────────
 TARGETS = {
-    "live":  "http://54.89.55.202",
+    "live":  "http://3.239.218.239",   # green (active)
+    "blue":  "http://54.89.55.202",    # blue (previous)
     "local": "http://localhost:8000",
 }
 
@@ -384,7 +385,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--target",
         default="live",
-        help="'live' (default: http://54.89.55.202), 'local' (http://localhost:8000), or a full URL",
+        help="'live' (default: http://3.239.218.239), 'blue' (http://54.89.55.202), 'local' (http://localhost:8000), or a full URL",
     )
     parser.add_argument(
         "--dry-run",
