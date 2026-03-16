@@ -13,6 +13,7 @@
 
 - **Mutual match nav badge** — show pending count on `/matches` nav item so attendees know when someone accepted them without checking manually
 - **Wire ML feedback loop** — pass prior decline reasons as negative examples into GPT re-ranking prompt; satisfaction scores are already captured in DB, just not fed back
+- **Match card transparency cues (item #19 remainder)** — inline "Why this match" context on each card ("Based on your stated goal + public profile"); lightweight "Show me more like this" / "Not relevant" feedback buttons next to each match card
 
 ## Later / Backlog
 
@@ -40,6 +41,5 @@
 - ✓ Saved shortlist — bookmark icon, All/Saved tab filter, localStorage persistence
 - ✓ Email service — AWS SES (new matches, mutual match confirmed, meeting scheduled)
 - ✓ Reduced registration friction — 9 fields / 3 steps → 4 fields / 1 step
-- ✓ Profile photo fallback — ui-avatars replaces deprecated Clearbit
+- ✓ Profile photos (item #8) — GDPR decision: no auto-fetch from LinkedIn or third parties; users upload their own photo URL; ui-avatars styled initials always render as fallback
 - ✓ OpenAI API key replaced on EC2 — enrichment pipeline fully functional
-- ✓ Profile photo auto-fetch removed — GDPR compliance; users upload their own photo
