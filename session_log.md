@@ -89,3 +89,10 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **`netlify.toml`**: Confirmed correct — proxies `/api/*` → `http://3.239.218.239`; SPA fallback in place
 - **whats_next.md**: Item #8 GDPR decision consolidated in Done ✓; item #19 transparency cues added to Soon
 - Deployed latest code to green EC2; nginx reloaded; service healthy
+
+## 2026-03-17 16:05 — Fix Netlify 503: attendees route trailing-slash redirect
+
+- **Root cause**: FastAPI routes defined as `"/"` trigger a 307 redirect to `<scheme>://<host>/api/v1/attendees/`; nginx `proxy_redirect` could not rewrite it because FastAPI uses the `Host` header (`3.239.218.239`) to build the URL, not `localhost:8000`; Netlify passed the 307 to the browser which blocked `http://3.239.218.239/...` as mixed content → original 503
+- **Fix**: Changed `@router.get("/")` and `@router.post("/")` in `attendees.py` to `""` — no redirect is issued; endpoint responds directly to `/api/v1/attendees`
+- **Also cleaned**: removed unused `proxy_redirect` directive from `deploy/nginx.conf`
+- **Verified**: `https://meet.proofoftalk.io/api/v1/attendees` now returns 401 (correct — needs auth token); 503 gone
