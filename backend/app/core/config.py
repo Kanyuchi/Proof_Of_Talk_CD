@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_SES_FROM_EMAIL: str = ""  # Verified SES sender address
+    APP_PUBLIC_URL: str = "http://54.89.55.202"  # Override when frontend moves
 
     # Auth
     SECRET_KEY: str = "change-me-in-production"

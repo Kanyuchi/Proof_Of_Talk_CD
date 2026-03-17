@@ -39,7 +39,7 @@ def send_match_intro_email(
     match_company: str,
     explanation: str,
     match_count: int,
-    app_url: str = "http://54.89.55.202",
+    app_url: str | None = None,
 ) -> None:
     """Send the 'we found your top match' email after pipeline completes.
 
@@ -57,6 +57,9 @@ def send_match_intro_email(
     client = _ses_client()
     if not client:
         return
+
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
 
     first_name = attendee_name.split()[0] if attendee_name else attendee_name
     short_explanation = explanation[:220] + "…" if len(explanation) > 220 else explanation
@@ -125,7 +128,7 @@ def send_mutual_match_email(
     other_name: str,
     other_title: str,
     other_company: str,
-    app_url: str = "http://54.89.55.202",
+    app_url: str | None = None,
 ) -> None:
     """Send a 'mutual match confirmed' notification email.
 
@@ -141,6 +144,9 @@ def send_mutual_match_email(
     client = _ses_client()
     if not client:
         return
+
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
 
     first_name = attendee_name.split()[0] if attendee_name else attendee_name
     other_first = other_name.split()[0] if other_name else other_name
@@ -209,7 +215,7 @@ def send_meeting_confirmation_email(
     other_company: str,
     meeting_time_str: str,
     meeting_location: str,
-    app_url: str = "http://54.89.55.202",
+    app_url: str | None = None,
 ) -> None:
     """Send a meeting confirmation email with time/location when a slot is booked.
 
@@ -226,6 +232,9 @@ def send_meeting_confirmation_email(
     client = _ses_client()
     if not client:
         return
+
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
 
     first_name = attendee_name.split()[0] if attendee_name else attendee_name
     other_first = other_name.split()[0] if other_name else other_name
