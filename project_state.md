@@ -1,7 +1,7 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-03-16 (enrichment verified, 34 attendees, 121 matches)
-**Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · PostgreSQL + pgvector on AWS RDS · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES
+**Last updated:** 2026-03-17 (Netlify domain live, green EC2 503 fixed, SES env vars wired)
+**Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · PostgreSQL + pgvector on AWS RDS · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES · Netlify (frontend) · Supabase (DB — pending migration from RDS)
 
 ---
 
@@ -18,10 +18,18 @@
 - **Daily match refresh** — cron at 02:00 UTC
 - **Profile photos** — user-uploaded only; AttendeeAvatar falls back to ui-avatars styled initials when no photo is set
 
+## Infrastructure
+
+- **Production URL**: `https://meet.proofoftalk.io` (Netlify, live)
+- **Backend**: green EC2 `3.239.218.239` — gunicorn + nginx; proxied via `netlify.toml`
+- **Blue EC2** (`54.89.55.202`): still running as fallback; same RDS DB
+- **Database**: AWS RDS PostgreSQL + pgvector (`eu-west-1`) — 34 attendees, 121 matches; Supabase migration pending
+
 ## Broken / Incomplete
 
-- **SES email not activated** — code is deployed but silently no-ops; needs `AWS_SES_FROM_EMAIL` added to EC2 `.env` + sender verified in AWS SES console (eu-west-1)
+- **SES email not activated** — `APP_PUBLIC_URL` + CORS wired; still needs `AWS_SES_FROM_EMAIL` set on green EC2 + sender verified in AWS SES console
 - **ML feedback loop not wired** — decline reasons and satisfaction scores are captured in DB but not fed back into future GPT ranking prompts
+- **Supabase DB migration** — manager has Supabase set up but backend still points to RDS; migration not done yet
 
 ## Key Decisions Made
 

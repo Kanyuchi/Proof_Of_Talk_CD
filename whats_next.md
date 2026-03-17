@@ -6,8 +6,8 @@
 
 ## Now
 
-1. **Activate SES email** — add `AWS_SES_FROM_EMAIL` to EC2 `.env` + verify sender in SES console; email code is shipped but silently no-ops until this is done
-2. **Smoke test the full attendee journey** — register via new 1-step form, accept a match, bookmark, schedule a meeting, confirm ICS + email fire end-to-end
+1. **Activate SES email** — add `AWS_SES_FROM_EMAIL` to green EC2 `.env` + verify sender in AWS SES console (eu-west-1); `APP_PUBLIC_URL` already set to `https://meet.proofoftalk.io`; email code is ready
+2. **Smoke test the full attendee journey on `meet.proofoftalk.io`** — register, accept a match, bookmark, schedule a meeting, confirm ICS + email fire end-to-end on the live domain
 
 ## Soon
 
