@@ -42,7 +42,7 @@ async def search_attendees(
     )
 
 
-@router.get("/", response_model=AttendeeListResponse)
+@router.get("", response_model=AttendeeListResponse)
 async def list_attendees(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -79,7 +79,7 @@ async def get_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db), _u
     return AttendeeResponse.model_validate(attendee)
 
 
-@router.post("/", response_model=AttendeeResponse, status_code=201)
+@router.post("", response_model=AttendeeResponse, status_code=201)
 async def create_attendee(data: AttendeeCreate, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """Register a new attendee."""
     # Check for duplicate email
