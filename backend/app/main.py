@@ -54,7 +54,6 @@ app = FastAPI(
     description="AI Matchmaking Engine for Proof of Talk 2026",
     version="0.1.0",
     lifespan=lifespan,
-    redirect_slashes=False,
     docs_url="/api/docs" if settings.DEBUG else None,
     redoc_url="/api/redoc" if settings.DEBUG else None,
     openapi_url="/api/openapi.json" if settings.DEBUG else None,
