@@ -1,8 +1,8 @@
 """
 Extasy → Supabase ingestion script
 ====================================
-Fetches confirmed (PAID) attendees from the Extasy ticketing API and
-upserts them into the Supabase attendees table.
+Fetches confirmed (PAID + REDEEMED) attendees from the Extasy ticketing API
+and upserts them into the Supabase attendees table.
 
 Usage:
     cd backend
@@ -60,8 +60,8 @@ TICKET_TYPE_MAP = {
 # Test / internal tickets to skip
 TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
 
-# Orders with these statuses are real confirmed attendees
-PAID_STATUSES = {"PAID"}
+# Orders with these statuses are real confirmed attendees (includes complimentary tickets)
+VALID_STATUSES = {"PAID", "REDEEMED"}
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -233,15 +233,15 @@ def run(dry_run: bool, force: bool) -> None:
     orders = fetch_extasy(ORDERS_URL)
     print(f"  Total orders fetched: {len(orders)}")
 
-    # 2. Filter to PAID only
-    paid_orders = [o for o in orders if o.get("status") in PAID_STATUSES]
-    print(f"  PAID orders: {len(paid_orders)}")
+    # 2. Filter to valid orders (PAID + REDEEMED)
+    valid_orders = [o for o in orders if o.get("status") in VALID_STATUSES]
+    print(f"  Valid orders (PAID + REDEEMED): {len(valid_orders)}")
 
     # 3. Build attendee records
     records = []
     seen_emails = set()
 
-    for order in paid_orders:
+    for order in valid_orders:
         ticket_name = (order.get("ticketNames") or "").split(",")[0].strip()
 
         # Skip test / internal tickets

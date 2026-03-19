@@ -1,8 +1,8 @@
 """
 Extasy → RDS sync service
 =========================
-Fetches PAID orders from the Extasy ticketing API and upserts them into
-the PostgreSQL database via SQLAlchemy.
+Fetches valid orders (PAID + REDEEMED) from the Extasy ticketing API and
+upserts them into the PostgreSQL database via SQLAlchemy.
 
 Called from POST /api/v1/dashboard/sync-extasy (admin only).
 """
@@ -26,8 +26,8 @@ EXTASY_BASE     = "https://api.b2b.extasy.com/operations/reports"
 ORDERS_URL      = f"{EXTASY_BASE}/orders/{EXTASY_EVENT_ID}"
 TICKETS_URL     = f"{EXTASY_BASE}/tickets/{EXTASY_EVENT_ID}"
 
-# Only ingest orders with these statuses
-PAID_STATUSES = {"PAID"}
+# Only ingest orders with these statuses (includes complimentary/voucher tickets)
+VALID_STATUSES = {"PAID", "REDEEMED"}
 
 # Skip internal test tickets
 TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
@@ -94,10 +94,11 @@ def _tier_index(ticket_type: TicketType) -> int:
 
 async def sync_extasy_to_db(db: AsyncSession) -> dict:
     """
-    Pull PAID orders from Extasy and upsert into the attendees table.
+    Pull valid orders (PAID + REDEEMED) from Extasy and upsert into the
+    attendees table.
 
     Returns a dict with sync stats:
-        total_fetched, paid_count, inserted, upgraded, skipped, errors
+        total_fetched, valid_count, inserted, upgraded, skipped, errors
     """
     logger.info("extasy_sync: fetching orders from %s", ORDERS_URL)
 
@@ -108,7 +109,7 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
         raise RuntimeError(f"Failed to reach Extasy API: {exc}") from exc
 
     total_fetched = len(orders)
-    paid_orders = [o for o in orders if o.get("status") in PAID_STATUSES]
+    valid_orders = [o for o in orders if o.get("status") in VALID_STATUSES]
 
     inserted      = 0
     upgraded      = 0
@@ -117,7 +118,7 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
     inserted_ids: list[str] = []
     seen_emails: set[str] = set()
 
-    for order in paid_orders:
+    for order in valid_orders:
         try:
             ticket_name = (order.get("ticketNames") or "").split(",")[0].strip()
 
@@ -149,6 +150,8 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
                 "phone":           order.get("phoneNumber") or None,
                 "city":            order.get("city") or None,
                 "country":         order.get("countryIso3Code") or None,
+                "paid_amount":     order.get("paymentsAmount") or None,
+                "voucher_code":    order.get("voucherCode") or None,
                 "synced_at":       datetime.now(timezone.utc).isoformat(),
             }
 
@@ -193,7 +196,7 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
 
     result_stats = {
         "total_fetched":  total_fetched,
-        "paid_count":     len(paid_orders),
+        "valid_count":    len(valid_orders),
         "inserted":       inserted,
         "upgraded":       upgraded,
         "skipped":        skipped,
@@ -209,7 +212,7 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
 async def sync_and_enrich() -> dict:
     """
     Daily pipeline:
-      1. Pull PAID orders from Extasy → upsert into DB
+      1. Pull valid orders (PAID + REDEEMED) from Extasy → upsert into DB
       2. Enrich + embed only the newly inserted attendees
       3. Return combined stats
 

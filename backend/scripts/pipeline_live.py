@@ -1,9 +1,9 @@
 """
 Extasy → Live FastAPI Pipeline
 ================================
-Fetches confirmed (PAID) attendees from the Extasy ticketing API and loads
-them directly into the live app's RDS database by calling the FastAPI REST
-endpoints. Optionally triggers enrichment + match generation.
+Fetches confirmed (PAID + REDEEMED) attendees from the Extasy ticketing API
+and loads them directly into the live app's RDS database by calling the
+FastAPI REST endpoints. Optionally triggers enrichment + match generation.
 
 Usage:
     cd backend && source .venv/bin/activate
@@ -63,7 +63,7 @@ TICKET_TYPE_MAP = {
 }
 
 TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
-PAID_STATUSES     = {"PAID"}
+VALID_STATUSES    = {"PAID", "REDEEMED"}
 GENERIC_DOMAINS   = {"gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com"}
 
 
@@ -129,18 +129,18 @@ def build_attendee_payload(order: dict, ticket_name: str) -> dict:
 
 
 def collect_records() -> list[dict]:
-    """Fetch from Extasy, filter to PAID non-test, deduplicate by email."""
+    """Fetch from Extasy, filter to valid (PAID/REDEEMED) non-test, deduplicate by email."""
     print("Fetching orders from Extasy API...")
     orders = fetch_extasy(ORDERS_URL)
     print(f"  Total orders fetched: {len(orders)}")
 
-    paid = [o for o in orders if o.get("status") in PAID_STATUSES]
-    print(f"  PAID orders: {len(paid)}")
+    valid = [o for o in orders if o.get("status") in VALID_STATUSES]
+    print(f"  Valid orders (PAID + REDEEMED): {len(valid)}")
 
     records: list[dict] = []
     seen: set[str]      = set()
 
-    for order in paid:
+    for order in valid:
         ticket_name = (order.get("ticketNames") or "").split(",")[0].strip()
 
         if is_test_ticket(ticket_name):
@@ -167,7 +167,7 @@ def collect_records() -> list[dict]:
 
         records.append(build_attendee_payload(order, ticket_name))
 
-    print(f"\nUnique confirmed attendees: {len(records)}\n")
+    print(f"\nUnique valid attendees: {len(records)}\n")
     return records
 
 
@@ -205,7 +205,7 @@ class LiveAPIClient:
         limit = 200
         while True:
             resp = self.client.get(
-                f"{self.base_url}/api/v1/attendees/",
+                f"{self.base_url}/api/v1/attendees",
                 headers=self._auth_headers(),
                 params={"skip": skip, "limit": limit},
             )
@@ -221,7 +221,7 @@ class LiveAPIClient:
 
     def create_attendee(self, payload: dict) -> dict | None:
         resp = self.client.post(
-            f"{self.base_url}/api/v1/attendees/",
+            f"{self.base_url}/api/v1/attendees",
             headers=self._auth_headers(),
             json=payload,
         )
