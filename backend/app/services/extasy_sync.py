@@ -221,7 +221,7 @@ async def sync_and_enrich() -> dict:
     from app.core.database import async_session
     from app.models.attendee import Attendee as AttendeeModel
     from app.services.enrichment import EnrichmentService
-    from app.services.embeddings import generate_ai_summary, embed_attendee, classify_intents
+    from app.services.embeddings import generate_ai_summary, embed_attendee, classify_intents, classify_verticals
     from datetime import datetime
 
     logger.info("sync_and_enrich: starting daily pipeline")
@@ -248,6 +248,7 @@ async def sync_and_enrich() -> dict:
                         attendee.enriched_at = datetime.utcnow()
                         attendee.ai_summary = await generate_ai_summary(attendee)
                         attendee.intent_tags = await classify_intents(attendee)
+                        attendee.vertical_tags = await classify_verticals(attendee)
                         attendee.embedding = await embed_attendee(attendee)
                         await db.commit()
                     enriched_ok += 1

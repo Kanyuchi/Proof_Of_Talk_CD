@@ -39,6 +39,7 @@ class AttendeeResponse(BaseModel):
     company_website: str | None
     ai_summary: str | None
     intent_tags: list[str]
+    vertical_tags: list[str]
     deal_readiness_score: float | None
     enriched_profile: dict
     created_at: datetime

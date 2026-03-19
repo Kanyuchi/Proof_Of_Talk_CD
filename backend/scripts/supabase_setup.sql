@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS attendees (
     ai_summary            TEXT,
     embedding             vector(1536),
     intent_tags           TEXT[] NOT NULL DEFAULT '{}',
+    vertical_tags         TEXT[] NOT NULL DEFAULT '{}',
     deal_readiness_score  FLOAT,
 
     -- Data intelligence

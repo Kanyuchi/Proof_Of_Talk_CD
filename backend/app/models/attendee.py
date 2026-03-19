@@ -48,6 +48,7 @@ class Attendee(Base):
     ai_summary: Mapped[str] = mapped_column(Text, nullable=True)  # AI-generated profile summary
     embedding: Mapped[list] = mapped_column(Vector(1536), nullable=True)  # OpenAI embedding
     intent_tags: Mapped[list] = mapped_column(ARRAY(String), default=list)  # AI-classified intents
+    vertical_tags: Mapped[list] = mapped_column(ARRAY(String), default=list)  # 1000minds sector verticals
     deal_readiness_score: Mapped[float] = mapped_column(Float, nullable=True)  # 0-1 score
 
     # Data intelligence extras

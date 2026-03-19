@@ -121,6 +121,46 @@ Return 2-4 most relevant tags as a JSON array. Nothing else."""
         return ["knowledge_exchange"]
 
 
+async def classify_verticals(attendee) -> list[str]:
+    """Use GPT-4o to classify attendee into 1000minds sector verticals."""
+    prompt = f"""Classify this conference attendee into sector verticals.
+
+Attendee: {attendee.name}, {attendee.title} at {attendee.company}
+Goals: {attendee.goals or 'Not specified'}
+Interests: {', '.join(attendee.interests) if attendee.interests else 'Not specified'}
+AI Summary: {attendee.ai_summary or 'Not available'}
+
+Return ONLY a JSON array of vertical tags from this taxonomy:
+- "tokenisation_of_finance" (RWA tokenisation, institutional DeFi, digital securities)
+- "infrastructure_and_scaling" (L1/L2, rollups, interoperability, developer tooling)
+- "decentralized_finance" (DEXs, lending, yield, stablecoins, DeFi protocols)
+- "ai_depin_frontier_tech" (AI agents, DePIN, IoT, compute networks, frontier tech)
+- "policy_regulation_macro" (regulation, compliance, CBDC, macro policy)
+- "ecosystem_and_foundations" (protocol foundations, grants, ecosystem growth)
+- "investment_and_capital_markets" (VC, fund management, capital allocation, trading)
+- "culture_media_gaming" (NFTs, gaming, metaverse, media, entertainment)
+- "bitcoin" (Bitcoin L2, mining, ordinals, Bitcoin-native DeFi)
+- "prediction_markets" (prediction markets, information markets, betting protocols)
+- "decentralized_ai" (decentralised AI, federated learning, AI DAOs, AI compute)
+
+Return 1-3 most relevant verticals as a JSON array. Nothing else."""
+
+    response = await client.chat.completions.create(
+        model=settings.OPENAI_CHAT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+        max_tokens=100,
+    )
+    import json
+    raw = response.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+
+
 def cosine_similarity(a: list[float], b: list[float]) -> float:
     """Compute cosine similarity between two embedding vectors."""
     a_arr = np.array(a)

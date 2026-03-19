@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.attendee import Attendee
 from app.services.enrichment import EnrichmentService
-from app.services.embeddings import generate_ai_summary, embed_attendee, classify_intents
+from app.services.embeddings import generate_ai_summary, embed_attendee, classify_intents, classify_verticals
 from app.core.deps import require_auth, require_admin
 from app.models.user import User
 
@@ -84,6 +84,7 @@ async def enrich_all(db: AsyncSession = Depends(get_db), _admin: User = Depends(
             attendee.enriched_at = datetime.utcnow()
             attendee.ai_summary = await generate_ai_summary(attendee)
             attendee.intent_tags = await classify_intents(attendee)
+            attendee.vertical_tags = await classify_verticals(attendee)
             attendee.embedding = await embed_attendee(attendee)
             results.append({"attendee_id": str(attendee.id), "sources": list(enriched.keys())})
 
@@ -109,6 +110,7 @@ async def enrich_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db),
         # Regenerate AI fields after enrichment
         attendee.ai_summary = await generate_ai_summary(attendee)
         attendee.intent_tags = await classify_intents(attendee)
+        attendee.vertical_tags = await classify_verticals(attendee)
         attendee.embedding = await embed_attendee(attendee)
 
         await db.commit()
