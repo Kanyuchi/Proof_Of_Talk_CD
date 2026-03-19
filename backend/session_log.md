@@ -11,3 +11,10 @@
 - Fixed trailing-slash 307 redirect bug in `pipeline_live.py` API client URLs
 - Ran live pipeline: Pierre Kaklamanos (REDEEMED comp ticket) loaded into RDS — 38 total attendees
 - Supabase sync blocked: `attendees` table doesn't exist yet in Supabase (migration pending)
+
+## 2026-03-19 — Deploy + enrich + match Pierre Kaklamanos
+- Deployed updated code to green EC2 (3.239.218.239) via `push.sh` — health check passed
+- Enriched Pierre Kaklamanos: AI summary + intent tags generated (`seeking_partnerships`, `knowledge_exchange`)
+- Generated 8 matches for Pierre (top: Steve Wallace @ Monolythic, score 0.74 complementary)
+- OpenAI API key confirmed working on EC2 (no 429 errors)
+- Supabase `attendees` table still needs manual creation — SQL ready at `scripts/supabase_setup.sql`
