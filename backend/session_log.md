@@ -18,3 +18,9 @@
 - Generated 8 matches for Pierre (top: Steve Wallace @ Monolythic, score 0.74 complementary)
 - OpenAI API key confirmed working on EC2 (no 429 errors)
 - Supabase `attendees` table still needs manual creation — SQL ready at `scripts/supabase_setup.sql`
+
+## 2026-03-19 — Supabase tables created + attendees synced
+- Ran `supabase_setup.sql` via direct Postgres connection — created `attendees`, `matches`, `users` tables + indexes + triggers
+- Added `SUPABASE_DB_URL` to `backend/.env` for future automation
+- Ran `ingest_extasy.py`: 24/24 attendees inserted into Supabase (0 skipped, 0 errors)
+- Verified: 24 attendees in Supabase matches 24 unique valid orders from Extasy API

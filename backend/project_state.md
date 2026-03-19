@@ -2,17 +2,20 @@
 
 ## What's Working
 - Extasy → RDS pipeline pulls PAID + REDEEMED orders (complimentary tickets included)
-- 38 attendees in RDS, 129 matches (121 + 8 new for Pierre), enrichment coverage back to ~100%
+- 38 attendees in RDS, ~129 matches, enrichment coverage ~100%
 - Green EC2 (3.239.218.239) serving production via meet.proofoftalk.io
 - OpenAI API key working on EC2 (enrichment, embeddings, match generation all functional)
+- Supabase tables created (`attendees`, `matches`, `users`) with indexes + triggers
+- 24 Extasy attendees synced to Supabase
 
 ## Broken / Incomplete
-- Supabase `attendees` table doesn't exist — `ingest_extasy.py` fails with 404
-- Need to run `scripts/supabase_setup.sql` in Supabase SQL editor to create tables
+- Supabase only has Extasy attendees (24) — seed profiles, matches, embeddings not yet migrated
+- Frontend may still need config update to read from Supabase instead of RDS
 
 ## Key Decisions Made
 - Include REDEEMED status alongside PAID for Extasy ingestion (Jessica confirmed all valid orders)
 - Exclude FAILED and REFUNDED statuses
+- Direct Postgres connection to Supabase (SUPABASE_DB_URL in .env) for automation
 
 ## Current Focus
-- Supabase migration: create tables + sync data so frontend can pull from Supabase
+- Verify frontend works with Supabase data, confirm order count with Chiara
