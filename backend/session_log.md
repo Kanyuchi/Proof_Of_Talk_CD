@@ -24,3 +24,8 @@
 - Added `SUPABASE_DB_URL` to `backend/.env` for future automation
 - Ran `ingest_extasy.py`: 24/24 attendees inserted into Supabase (0 skipped, 0 errors)
 - Verified: 24 attendees in Supabase matches 24 unique valid orders from Extasy API
+
+## 2026-03-19 — Full RDS → Supabase sync
+- Synced all 38 attendees, 129 matches, AI summaries, embeddings, and enrichment data from RDS to Supabase
+- Supabase is now an exact mirror of RDS (the final production deployment target)
+- Cleared previous 24 Extasy-only records and replaced with full dataset including seed + internal profiles
