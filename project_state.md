@@ -7,7 +7,7 @@
 
 ## What's Working
 
-- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; 129 matches across 38 attendees, avg score 0.69; vertical_tags + intent_tags now integrated into embeddings, GPT prompt, and deterministic reranking
+- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; **140 matches** across 38 attendees, avg score **0.70**, 36 above 0.75; vertical_tags + intent_tags integrated into embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS boost
 - **Data enrichment** — 38/38 attendees have AI summaries, embeddings, intent_tags, and vertical_tags; enrichment pipeline fully functional on EC2
 - **1000minds vertical_tags** — 11 sector verticals; 38/38 attendees classified by GPT-4o; 9/11 verticals represented; `COMPLEMENTARY_VERTICALS` map drives cross-sector boost in reranking
 - **AI Concierge markdown rendering** — assistant responses render with styled markdown (bold names, numbered lists, orange headers) via react-markdown; system prompt includes formatting instructions
@@ -26,7 +26,7 @@
 - **Production URL**: `https://meet.proofoftalk.io` (Netlify, live)
 - **Backend**: green EC2 `3.239.218.239` — gunicorn + nginx; proxied via `netlify.toml`
 - **Blue EC2** (`54.89.55.202`): still running as fallback; same RDS DB
-- **Database**: AWS RDS PostgreSQL + pgvector (`eu-west-1`) — 38 attendees, 129 matches; Supabase fully synced as mirror
+- **Database**: AWS RDS PostgreSQL + pgvector (`eu-west-1`) — 38 attendees, 140 matches; Supabase fully synced as mirror
 
 ## Broken / Incomplete
 
