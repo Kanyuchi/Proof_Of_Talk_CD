@@ -26,11 +26,11 @@
 - **Production URL**: `https://meet.proofoftalk.io` (Netlify, live)
 - **Backend**: green EC2 `3.239.218.239` — gunicorn + nginx; proxied via `netlify.toml`
 - **Blue EC2** (`54.89.55.202`): still running as fallback; same RDS DB
-- **Database**: AWS RDS PostgreSQL + pgvector (`eu-west-1`) — 38 attendees, 140 matches; Supabase fully synced as mirror
+- **Database**: AWS RDS PostgreSQL + pgvector (`eu-west-1`) — 38 attendees, 140 matches; Supabase synced (140 matches)
 
 ## Broken / Incomplete
 
-- **SES email not activated** — `APP_PUBLIC_URL` + CORS wired; still needs `AWS_SES_FROM_EMAIL` set on green EC2 + sender verified in AWS SES console
+- **SES email not activated** — IAM user `Proof_Of_Talk` lacks `ses:*` permissions; needs `AmazonSESFullAccess` policy in AWS Console, sender email verified in SES, and `AWS_SES_FROM_EMAIL` set on green EC2 `.env`
 - **ML feedback loop not wired** — decline reasons and satisfaction scores are captured in DB but not fed back into future GPT ranking prompts
 - **Supabase DB migration** — Supabase is synced as a mirror of RDS; backend still points to RDS; cutover to Supabase as primary not done yet
 

@@ -6,9 +6,8 @@
 
 ## Now
 
-1. **Activate SES email** — add `AWS_SES_FROM_EMAIL` to green EC2 `.env` + verify sender in AWS SES console (eu-west-1); `APP_PUBLIC_URL` already set to `https://meet.proofoftalk.io`; email code is ready
-2. **Smoke test the full attendee journey on `meet.proofoftalk.io`** — register, accept a match, bookmark, schedule a meeting, confirm ICS + email fire end-to-end on the live domain
-3. **Sync Supabase with new matches** — 140 matches (was 129); re-run Supabase sync script
+1. **Activate SES email** — IAM user `Proof_Of_Talk` needs `AmazonSESFullAccess` policy (AWS Console → IAM → Users → Proof_Of_Talk → Add permissions); then verify sender email in SES console; then add `AWS_SES_FROM_EMAIL=matches@proofoftalk.io` to green EC2 `.env` and restart service
+2. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test in-app messaging between mutual matches
 
 ## Soon
 
@@ -48,3 +47,5 @@
 - ✓ Matching engine: vertical_tags + intent_tags in embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS map
 - ✓ AI Concierge: markdown rendering (react-markdown + MarkdownMessage component), formatting instructions in system prompt, vertical_tags in context + sector filter
 - ✓ Deploy + re-embed + re-match: 129→140 matches, avg 0.69→0.70, 36 above 0.75; backend on green EC2, frontend on Netlify
+- ✓ Supabase sync: 140 matches synced via REST API
+- ✓ Smoke test: health, registration, concierge markdown, matches endpoint, frontend bundle all verified
