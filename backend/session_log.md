@@ -29,3 +29,12 @@
 - Synced all 38 attendees, 129 matches, AI summaries, embeddings, and enrichment data from RDS to Supabase
 - Supabase is now an exact mirror of RDS (the final production deployment target)
 - Cleared previous 24 Extasy-only records and replaced with full dataset including seed + internal profiles
+
+## 2026-03-19 — Add vertical_tags (1000minds sector verticals)
+- Added `vertical_tags` column to Attendee model, RDS (Alembic migration), and Supabase
+- Created `classify_verticals()` in embeddings.py — GPT-4o classifies attendees into 11 1000minds verticals
+- Wired into enrichment routes (batch + single), sync pipeline, and API response schema
+- Deployed to green EC2, ran enrichment on all 38 attendees — 38/38 tagged
+- Synced vertical_tags to Supabase
+- Distribution: investment_and_capital_markets (27), infrastructure_and_scaling (25), tokenisation_of_finance (13), ecosystem_and_foundations (12), decentralized_finance (12), ai_depin_frontier_tech (10), decentralized_ai (7), policy_regulation_macro (5), culture_media_gaming (1)
+- 9/11 verticals represented; bitcoin and prediction_markets not yet assigned (no matching attendees)
