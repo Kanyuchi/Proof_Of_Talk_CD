@@ -96,3 +96,10 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Fix**: Changed `@router.get("/")` and `@router.post("/")` in `attendees.py` to `""` — no redirect is issued; endpoint responds directly to `/api/v1/attendees`
 - **Also cleaned**: removed unused `proxy_redirect` directive from `deploy/nginx.conf`
 - **Verified**: `https://meet.proofoftalk.io/api/v1/attendees` now returns 401 (correct — needs auth token); 503 gone
+
+## 2026-03-20 — Friday weekly update email
+
+- Created `docs/friday-update-2026-03-20.md` — weekly update for team covering 2026-03-17 → 2026-03-20
+- Content: production domain live, Supabase sync complete, 1000minds verticals shipped, comp tickets included, 503 fix
+- Numbers: 38 attendees, 129 matches, 100% enrichment, 9/11 verticals represented
+- Feedback asks: vertical accuracy, Extasy order count confirmation, vertical visibility decision, priority call on verticals vs onboarding

@@ -1,14 +1,16 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-03-17 (Netlify domain live, green EC2 503 fixed, SES env vars wired)
+**Last updated:** 2026-03-20 (38 attendees, 129 matches, Supabase synced, vertical_tags shipped)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · PostgreSQL + pgvector on AWS RDS · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES · Netlify (frontend) · Supabase (DB — pending migration from RDS)
 
 ---
 
 ## What's Working
 
-- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; 121 matches across 34 attendees, avg score 0.69
-- **Data enrichment** — 34/34 attendees have AI summaries and embeddings; enrichment pipeline fully functional on EC2 (verified 2026-03-16)
+- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; 129 matches across 38 attendees, avg score 0.69
+- **Data enrichment** — 38/38 attendees have AI summaries, embeddings, intent_tags, and vertical_tags; enrichment pipeline fully functional on EC2
+- **1000minds vertical_tags** — 11 sector verticals; 38/38 attendees classified by GPT-4o; 9/11 verticals represented
+- **Supabase synced** — full mirror of RDS: 38 attendees, 129 matches, all AI data; ready for migration cutover
 - **Full attendee journey** — register (1-step form), browse matches, accept/decline with inline reason capture, mutual match confirmation, in-app messaging, meeting scheduling, ICS download, satisfaction rating
 - **Role-based UI** — admin sees all attendees + matches read-only; attendees see only their own private briefing
 - **POT brand design** — dark theme, `#E76315` orange, heading font, mobile-responsive (44px targets)
@@ -23,13 +25,13 @@
 - **Production URL**: `https://meet.proofoftalk.io` (Netlify, live)
 - **Backend**: green EC2 `3.239.218.239` — gunicorn + nginx; proxied via `netlify.toml`
 - **Blue EC2** (`54.89.55.202`): still running as fallback; same RDS DB
-- **Database**: AWS RDS PostgreSQL + pgvector (`eu-west-1`) — 34 attendees, 121 matches; Supabase migration pending
+- **Database**: AWS RDS PostgreSQL + pgvector (`eu-west-1`) — 38 attendees, 129 matches; Supabase fully synced as mirror
 
 ## Broken / Incomplete
 
 - **SES email not activated** — `APP_PUBLIC_URL` + CORS wired; still needs `AWS_SES_FROM_EMAIL` set on green EC2 + sender verified in AWS SES console
 - **ML feedback loop not wired** — decline reasons and satisfaction scores are captured in DB but not fed back into future GPT ranking prompts
-- **Supabase DB migration** — manager has Supabase set up but backend still points to RDS; migration not done yet
+- **Supabase DB migration** — Supabase is synced as a mirror of RDS; backend still points to RDS; cutover to Supabase as primary not done yet
 
 ## Key Decisions Made
 

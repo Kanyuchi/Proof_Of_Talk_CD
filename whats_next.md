@@ -43,3 +43,4 @@
 - ✓ Reduced registration friction — 9 fields / 3 steps → 4 fields / 1 step
 - ✓ Profile photos (item #8) — GDPR decision: no auto-fetch from LinkedIn or third parties; users upload their own photo URL; ui-avatars styled initials always render as fallback
 - ✓ OpenAI API key replaced on EC2 — enrichment pipeline fully functional
+- ✓ Friday weekly update email (`docs/friday-update-2026-03-20.md`) — team update covering 2026-03-17 → 2026-03-20
