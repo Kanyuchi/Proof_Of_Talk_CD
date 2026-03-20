@@ -34,9 +34,11 @@ def _brief_attendee_line(a: Attendee) -> str:
     deal = f"{a.deal_readiness_score:.0%}" if a.deal_readiness_score else "0%"
     interests = ", ".join((a.interests or [])[:4]) or "none"
     stage = a.deal_stage or "unspecified"
+    verticals = ", ".join(a.vertical_tags) if a.vertical_tags else "not classified"
     return (
         f"• {a.name} ({a.ticket_type.upper()}) — {a.title}, {a.company}\n"
         f"  Interests: {interests}\n"
+        f"  Verticals: {verticals}\n"
         f"  Intents: {intents} | Deal Readiness: {deal} | Stage: {stage}\n"
         f"  Summary: {summary}"
     )
@@ -119,6 +121,7 @@ def _apply_tool_filters(attendees: list[Attendee], plan: dict[str, Any]) -> list
             for a in filtered
             if sector in " ".join((a.interests or [])).lower()
             or sector in (a.ai_summary or "").lower()
+            or sector in " ".join(a.vertical_tags or []).lower()
         ]
     if target_name:
         filtered = [a for a in filtered if target_name in a.name.lower()]
@@ -165,7 +168,12 @@ Guidelines:
 - Explain WHY a connection is valuable, not just that it exists
 - Suggest concrete meeting topics and potential deal structures
 - Keep responses concise (3–6 sentences) unless detail is needed
-- If asked who to meet, recommend 2–3 people with brief explanations"""
+- If asked who to meet, recommend 2–3 people with brief explanations
+- Format responses using markdown: **bold** for names/companies, numbered lists for recommendations, ### headers for sections
+- For attendee recommendations use:
+  1. **Name** (Role) — Title, Company
+     Why: [specific explanation of mutual value]
+- Never use raw bullet points without context"""
 
     messages = [{"role": "system", "content": system_prompt}]
     messages.extend(history)

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { X, Send, Brain, Sparkles } from "lucide-react";
 import { useChat } from "../../hooks/useChat";
 import { useAuth } from "../../hooks/useAuth";
+import MarkdownMessage from "./MarkdownMessage";
 
 const SUGGESTED_PROMPTS = [
   "Who should I meet at this conference?",
@@ -120,7 +121,7 @@ export default function ChatPanel({ onClose }: ChatPanelProps) {
                   : "bg-white/5 text-white/80 rounded-tl-sm"
               }`}
             >
-              {msg.content}
+              <MarkdownMessage content={msg.content} role={msg.role} />
             </div>
           </div>
         ))}

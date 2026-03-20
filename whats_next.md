@@ -6,8 +6,10 @@
 
 ## Now
 
-1. **Activate SES email** — add `AWS_SES_FROM_EMAIL` to green EC2 `.env` + verify sender in AWS SES console (eu-west-1); `APP_PUBLIC_URL` already set to `https://meet.proofoftalk.io`; email code is ready
-2. **Smoke test the full attendee journey on `meet.proofoftalk.io`** — register, accept a match, bookmark, schedule a meeting, confirm ICS + email fire end-to-end on the live domain
+1. **Deploy + re-embed + re-match** — push backend to green EC2, null out embeddings, trigger enrich-all + generate-all to activate vertical_tags in matching pipeline; compare avg score and seed profile quality
+2. **Deploy frontend to Netlify** — react-markdown + MarkdownMessage component; verify concierge formatting renders correctly
+3. **Activate SES email** — add `AWS_SES_FROM_EMAIL` to green EC2 `.env` + verify sender in AWS SES console (eu-west-1); `APP_PUBLIC_URL` already set to `https://meet.proofoftalk.io`; email code is ready
+4. **Smoke test the full attendee journey on `meet.proofoftalk.io`** — register, accept a match, bookmark, schedule a meeting, confirm ICS + email fire end-to-end on the live domain
 
 ## Soon
 
@@ -44,3 +46,5 @@
 - ✓ Profile photos (item #8) — GDPR decision: no auto-fetch from LinkedIn or third parties; users upload their own photo URL; ui-avatars styled initials always render as fallback
 - ✓ OpenAI API key replaced on EC2 — enrichment pipeline fully functional
 - ✓ Friday weekly update email (`docs/friday-update-2026-03-20.md`) — team update covering 2026-03-17 → 2026-03-20
+- ✓ Matching engine: vertical_tags + intent_tags in embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS map
+- ✓ AI Concierge: markdown rendering (react-markdown + MarkdownMessage component), formatting instructions in system prompt, vertical_tags in context + sector filter

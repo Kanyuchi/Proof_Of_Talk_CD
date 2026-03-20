@@ -1,15 +1,16 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-03-20 (38 attendees, 129 matches, Supabase synced, vertical_tags shipped)
+**Last updated:** 2026-03-20 (38 attendees, 129 matches, vertical_tags integrated into matching pipeline, concierge markdown rendering)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · PostgreSQL + pgvector on AWS RDS · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES · Netlify (frontend) · Supabase (DB — pending migration from RDS)
 
 ---
 
 ## What's Working
 
-- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; 129 matches across 38 attendees, avg score 0.69
+- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; 129 matches across 38 attendees, avg score 0.69; vertical_tags + intent_tags now integrated into embeddings, GPT prompt, and deterministic reranking
 - **Data enrichment** — 38/38 attendees have AI summaries, embeddings, intent_tags, and vertical_tags; enrichment pipeline fully functional on EC2
-- **1000minds vertical_tags** — 11 sector verticals; 38/38 attendees classified by GPT-4o; 9/11 verticals represented
+- **1000minds vertical_tags** — 11 sector verticals; 38/38 attendees classified by GPT-4o; 9/11 verticals represented; `COMPLEMENTARY_VERTICALS` map drives cross-sector boost in reranking
+- **AI Concierge markdown rendering** — assistant responses render with styled markdown (bold names, numbered lists, orange headers) via react-markdown; system prompt includes formatting instructions
 - **Supabase synced** — full mirror of RDS: 38 attendees, 129 matches, all AI data; ready for migration cutover
 - **Full attendee journey** — register (1-step form), browse matches, accept/decline with inline reason capture, mutual match confirmation, in-app messaging, meeting scheduling, ICS download, satisfaction rating
 - **Role-based UI** — admin sees all attendees + matches read-only; attendees see only their own private briefing
@@ -44,4 +45,5 @@
 
 ## Current Focus
 
+- Deploy backend to green EC2, re-embed + re-match (vertical_tags now in embeddings + ranking)
 - Activate SES email: add `AWS_SES_FROM_EMAIL` to EC2 `.env`, verify sender in AWS SES console, confirm end-to-end email flow works for a test attendee

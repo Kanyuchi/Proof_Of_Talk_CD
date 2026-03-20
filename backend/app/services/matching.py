@@ -16,6 +16,21 @@ client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 # Only persist matches above this quality threshold — avoids padding with weak connections
 MIN_MATCH_SCORE = 0.60
 
+# Cross-sector verticals that create high-value complementary matches
+COMPLEMENTARY_VERTICALS = {
+    "policy_regulation_macro": ["infrastructure_and_scaling", "tokenisation_of_finance", "decentralized_finance"],
+    "tokenisation_of_finance": ["investment_and_capital_markets", "policy_regulation_macro", "infrastructure_and_scaling"],
+    "infrastructure_and_scaling": ["decentralized_finance", "policy_regulation_macro", "ai_depin_frontier_tech"],
+    "investment_and_capital_markets": ["tokenisation_of_finance", "decentralized_finance", "bitcoin"],
+    "decentralized_finance": ["infrastructure_and_scaling", "policy_regulation_macro", "tokenisation_of_finance"],
+    "ai_depin_frontier_tech": ["infrastructure_and_scaling", "decentralized_ai", "ecosystem_and_foundations"],
+    "decentralized_ai": ["ai_depin_frontier_tech", "infrastructure_and_scaling"],
+    "bitcoin": ["investment_and_capital_markets", "infrastructure_and_scaling"],
+    "ecosystem_and_foundations": ["infrastructure_and_scaling", "ai_depin_frontier_tech", "culture_media_gaming"],
+    "culture_media_gaming": ["ecosystem_and_foundations", "decentralized_finance"],
+    "prediction_markets": ["decentralized_finance", "ai_depin_frontier_tech"],
+}
+
 
 class MatchingEngine:
     """3-stage AI matchmaking pipeline: Embed -> Retrieve -> Rank & Explain."""
@@ -221,6 +236,7 @@ class MatchingEngine:
                 f"  Interests: {', '.join(candidate.interests) if candidate.interests else 'Not specified'}\n"
                 f"  AI Summary: {candidate.ai_summary or 'Not available'}\n"
                 f"  Intent Tags: {', '.join(candidate.intent_tags) if candidate.intent_tags else 'Not classified'}\n"
+                f"  Vertical Tags: {', '.join(candidate.vertical_tags) if candidate.vertical_tags else 'Not classified'}\n"
                 f"  Deal Readiness: {candidate.deal_readiness_score or 0:.2f}\n"
                 f"  Vector Similarity: {sim_score:.3f}"
             )
@@ -232,6 +248,8 @@ Your task: Re-rank and explain match recommendations for the attendee below. Go 
 2. **Non-obvious connections** — participants from CLEARLY DIFFERENT sectors who share an underlying common problem they'd uniquely benefit from solving together. Do NOT classify as non_obvious if both parties work in related or overlapping sectors — that is complementary.
 3. **Deal-ready pairs** — both parties have explicit, active deal signals (deploying_capital + raising_capital; seeking_customers + has_product). Must be transactable at this event, not just networking.
 
+Consider sector verticals when assessing complementarity. Cross-sector matches between complementary verticals (e.g., policy + infrastructure, tokenisation + investment) often create higher value than same-sector matches.
+
 TARGET ATTENDEE:
 Name: {attendee.name}
 Title: {attendee.title}
@@ -240,6 +258,7 @@ Goals: {attendee.goals or 'Not specified'}
 Interests: {', '.join(attendee.interests) if attendee.interests else 'Not specified'}
 AI Summary: {attendee.ai_summary or 'Not available'}
 Intent Tags: {', '.join(attendee.intent_tags) if attendee.intent_tags else 'Not classified'}
+Vertical Tags: {', '.join(attendee.vertical_tags) if attendee.vertical_tags else 'Not classified'}
 Deal Readiness: {attendee.deal_readiness_score or 0:.2f}
 
 CANDIDATES:
@@ -291,7 +310,7 @@ Return ONLY the JSON array. No markdown, no commentary."""
 
         # Deterministic rerank for diversity/novelty and duplicate-topic suppression
         if settings.AI_RERANK_ENABLED:
-            ranked = self._deterministic_rerank(ranked)
+            ranked = self._deterministic_rerank(ranked, attendee, candidates)
 
         if settings.AI_CONFIDENCE_ENABLED:
             for entry in ranked:
@@ -310,7 +329,7 @@ Return ONLY the JSON array. No markdown, no commentary."""
             return str(synergies[0]).strip().lower()
         return "unknown"
 
-    def _deterministic_rerank(self, ranked: list[dict]) -> list[dict]:
+    def _deterministic_rerank(self, ranked: list[dict], attendee: Attendee, candidates: list[tuple]) -> list[dict]:
         """Apply deterministic boosts/penalties after LLM ranking."""
         adjusted = []
         seen_topics = set()
@@ -328,6 +347,21 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 score -= 0.05
             else:
                 seen_topics.add(topic)
+
+            # Vertical affinity boost
+            idx = entry.get("candidate_index", 0) - 1
+            if 0 <= idx < len(candidates):
+                candidate = candidates[idx][0]
+                a_verts = set(attendee.vertical_tags or [])
+                c_verts = set(candidate.vertical_tags or [])
+                complementary_hit = any(
+                    v in COMPLEMENTARY_VERTICALS.get(av, [])
+                    for av in a_verts for v in c_verts
+                )
+                if complementary_hit:
+                    score += 0.04
+                elif a_verts & c_verts:
+                    score += 0.02
 
             entry["overall_score"] = max(0.0, min(1.0, score))
             adjusted.append(entry)
