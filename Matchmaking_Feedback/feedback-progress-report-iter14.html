@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POT Matchmaker — Feedback Implementation Progress · iter-14</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Poppins:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --orange:   #E76315;
+    --orange-dim: rgba(231,99,21,0.12);
+    --orange-border: rgba(231,99,21,0.25);
+    --emerald:  #34d399;
+    --emerald-dim: rgba(52,211,153,0.10);
+    --amber:    #fbbf24;
+    --amber-dim: rgba(251,191,36,0.10);
+    --blue:     #60a5fa;
+    --blue-dim: rgba(96,165,250,0.08);
+    --red:      #f87171;
+    --red-dim:  rgba(248,113,113,0.08);
+    --bg:       #0d0d0d;
+    --surface:  #141414;
+    --surface2: #1a1a1a;
+    --border:   rgba(255,255,255,0.07);
+    --text:     #f0f0f0;
+    --muted:    rgba(255,255,255,0.38);
+    --muted2:   rgba(255,255,255,0.18);
+  }
+
+  html { background: var(--bg); color: var(--text); font-family: 'Poppins', sans-serif; font-size: 14px; line-height: 1.6; }
+  body { max-width: 920px; margin: 0 auto; padding: 48px 32px 80px; }
+
+  /* ── HEADER ── */
+  .header {
+    padding: 52px 0 44px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+    position: relative;
+  }
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px; left: 0;
+    width: 72px; height: 2px;
+    background: var(--orange);
+  }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--orange);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 900;
+    line-height: 1.1;
+    color: #fff;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+    font-weight: 300;
+  }
+  .subtitle span {
+    color: var(--orange);
+    font-weight: 500;
+  }
+
+  /* ── SUMMARY CARDS ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 36px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card.green::before  { background: var(--emerald); }
+  .stat-card.amber::before  { background: var(--amber); }
+  .stat-card.grey::before   { background: var(--muted2); }
+
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .stat-fraction {
+    font-family: 'Playfair Display', serif;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .stat-pct { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .badge.green  { background: var(--emerald-dim); color: var(--emerald); border: 1px solid rgba(52,211,153,0.3); }
+  .badge.amber  { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,0.3); }
+  .badge.grey   { background: rgba(255,255,255,0.05); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ── DELTA CHIP ── */
+  .delta {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 2px 7px;
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .delta.up { background: rgba(52,211,153,0.12); color: #34d399; }
+
+  /* ── OVERALL BAR ── */
+  .overall-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+  .overall-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+  }
+  .overall-label {
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .overall-pct {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--orange);
+  }
+  .bar-track {
+    height: 10px;
+    background: var(--surface2);
+    border-radius: 100px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 100px;
+    background: linear-gradient(90deg, #D35400 0%, var(--orange) 60%, #FF9A52 100%);
+    transition: width 1s ease;
+    position: relative;
+  }
+  .bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 4px; height: 100%;
+    background: rgba(255,255,255,0.5);
+    border-radius: 2px;
+  }
+  .bar-note { font-size: 11px; color: var(--muted2); }
+
+  /* ── SECTIONS ── */
+  .section { margin-bottom: 36px; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-radius: 10px 10px 0 0;
+    border: 1px solid;
+    border-bottom: none;
+    margin-bottom: 0;
+    gap: 12px;
+  }
+  .section-header.green { background: rgba(52,211,153,0.05); border-color: rgba(52,211,153,0.2); }
+  .section-header.orange { background: var(--orange-dim); border-color: var(--orange-border); }
+  .section-header.blue { background: rgba(96,165,250,0.05); border-color: rgba(96,165,250,0.15); }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title.green  { color: var(--emerald); }
+  .section-title.orange { color: var(--orange); }
+  .section-title.blue   { color: var(--blue); }
+
+  .section-meta {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+  }
+
+  .section-bar-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 20px;
+    border-left: 1px solid; border-right: 1px solid;
+  }
+  .section-bar-row.green  { border-color: rgba(52,211,153,0.2); background: rgba(52,211,153,0.02); }
+  .section-bar-row.orange { border-color: var(--orange-border); background: rgba(231,99,21,0.03); }
+  .section-bar-row.blue   { border-color: rgba(96,165,250,0.15); background: rgba(96,165,250,0.02); }
+
+  .mini-track {
+    flex: 1; height: 5px;
+    background: var(--surface2);
+    border-radius: 100px; overflow: hidden;
+  }
+  .mini-fill { height: 100%; border-radius: 100px; }
+  .mini-fill.green  { background: var(--emerald); }
+  .mini-fill.orange { background: var(--orange); }
+  .mini-fill.blue   { background: var(--blue); }
+  .mini-pct { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; min-width: 36px; text-align: right; }
+
+  /* ── TABLE ── */
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid;
+    border-radius: 0 0 10px 10px;
+    overflow: hidden;
+  }
+  .items-table.green  { border-color: rgba(52,211,153,0.2); }
+  .items-table.orange { border-color: var(--orange-border); }
+  .items-table.blue   { border-color: rgba(96,165,250,0.15); }
+
+  .items-table th {
+    padding: 9px 14px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted2);
+    font-weight: 500;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .items-table td {
+    padding: 11px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .items-table tr:last-child td { border-bottom: none; }
+  .items-table tr:nth-child(even) td { background: rgba(255,255,255,0.012); }
+  .items-table tr:hover td { background: rgba(255,255,255,0.025); }
+
+  .num { color: var(--muted2); font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+  .item-name { font-weight: 500; color: var(--text); }
+  .item-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 3px 9px; border-radius: 100px;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .pill.done    { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+  .pill.partial { background: rgba(251,191,36,0.10); color: #fbbf24; border: 1px solid rgba(251,191,36,0.25); }
+  .pill.pending { background: rgba(255,255,255,0.04); color: var(--muted); border: 1px solid var(--border); }
+  .pill.new     { background: rgba(52,211,153,0.18); color: #34d399; border: 1px solid rgba(52,211,153,0.35); font-weight: 700; }
+
+  /* ── WHAT CHANGED ── */
+  .changelog-block {
+    background: var(--surface);
+    border: 1px solid var(--orange-border);
+    border-left: 3px solid var(--orange);
+    border-radius: 10px;
+    padding: 24px 24px 20px;
+    margin-bottom: 40px;
+  }
+  .changelog-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .changelog-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    line-height: 1.5;
+  }
+  .changelog-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .changelog-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .changelog-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--emerald); margin-top: 6px; flex-shrink: 0;
+  }
+  .changelog-text strong { display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .changelog-text span { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+  /* ── NUMBERS BLOCK ── */
+  .numbers-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+  .numbers-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 16px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .numbers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .number-item {
+    padding: 14px 16px;
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .number-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .number-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .number-delta {
+    font-size: 10px;
+    color: var(--emerald);
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 2px;
+  }
+
+  /* ── BEYOND THE BRIEF ── */
+  .beyond-block {
+    background: var(--surface);
+    border: 1px solid var(--orange-border);
+    border-left: 3px solid var(--orange);
+    border-radius: 10px;
+    padding: 24px 24px 20px;
+    margin-bottom: 40px;
+  }
+  .beyond-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .beyond-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 18px;
+    line-height: 1.5;
+  }
+  .beyond-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .beyond-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .beyond-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--orange); margin-top: 6px; flex-shrink: 0;
+  }
+  .beyond-dot.new {
+    background: var(--emerald);
+  }
+  .beyond-text strong { display: block; font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .beyond-text span { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .beyond-new-label {
+    display: inline-block;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(52,211,153,0.15);
+    color: #34d399;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  /* ── REPORT CARD ── */
+  .report-card-block {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 48px;
+  }
+  .rc-header {
+    padding: 16px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; gap: 12px;
+  }
+  .rc-title { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .rc-note  { font-size: 11px; color: var(--muted2); }
+  table.rc { width: 100%; border-collapse: collapse; }
+  table.rc th {
+    padding: 8px 14px;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted2); font-weight: 500;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  table.rc td { padding: 10px 14px; font-size: 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.rc tr:last-child td { border-bottom: none; }
+  table.rc tr:hover td { background: rgba(255,255,255,0.02); }
+  .grade {
+    display: inline-block;
+    font-family: 'Playfair Display', serif;
+    font-size: 15px; font-weight: 700;
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .grade.a-plus  { background: rgba(52,211,153,0.15); color: #34d399; }
+  .grade.a       { background: rgba(52,211,153,0.10); color: #6ee7b7; }
+  .grade.a-minus { background: rgba(52,211,153,0.08); color: #86efac; }
+  .grade.b-minus { background: rgba(251,191,36,0.10); color: var(--amber); }
+  .grade.c-plus  { background: rgba(251,191,36,0.08); color: #fcd34d; }
+  .grade.c       { background: rgba(251,191,36,0.06); color: #fde68a; }
+  .grade.d-plus  { background: rgba(248,113,113,0.10); color: #fca5a5; }
+  .grade.d       { background: rgba(248,113,113,0.15); color: var(--red); }
+  .rc-comment { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .rc-gpa {
+    padding: 14px 20px;
+    background: var(--orange-dim);
+    border-top: 1px solid var(--orange-border);
+    font-size: 12px; color: var(--orange); line-height: 1.6;
+  }
+  .rc-gpa strong { font-weight: 600; }
+
+  /* ── FOOTER ── */
+  .footer {
+    padding-top: 28px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--muted2);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── PRINT ── */
+  @media print {
+    html { background: #fff; color: #111; }
+    body { padding: 24px; }
+    :root {
+      --bg: #fff; --surface: #f8f8f8; --surface2: #f0f0f0;
+      --text: #111; --border: rgba(0,0,0,0.1);
+      --muted: #555; --muted2: #888;
+    }
+    .stat-card, .overall-block, .beyond-block, .report-card-block, .changelog-block, .numbers-block { border-color: #ddd; }
+  }
+
+  @media (max-width: 600px) {
+    body { padding: 24px 16px 48px; }
+    .summary-grid { grid-template-columns: 1fr; }
+    .beyond-grid, .changelog-grid { grid-template-columns: 1fr; }
+    .numbers-grid { grid-template-columns: 1fr 1fr; }
+    h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="eyebrow">Proof of Talk 2026 · AI Matchmaker</div>
+  <h1>Feedback Implementation<br>Progress Report</h1>
+  <div class="subtitle">
+    <span>Kanyuchi → Z</span> &nbsp;·&nbsp; March 2026 &nbsp;·&nbsp; <span>iter-14</span>
+  </div>
+</header>
+
+<!-- SUMMARY CARDS -->
+<div class="summary-grid">
+  <div class="stat-card green">
+    <div class="stat-label">Must Fix</div>
+    <div class="stat-fraction">6/6</div>
+    <div class="stat-pct">100% resolved</div>
+    <span class="badge green">Complete</span>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-label">Must Improve</div>
+    <div class="stat-fraction">5.5/7</div>
+    <div class="stat-pct">79% addressed</div>
+    <span class="badge amber">In Progress</span>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-label">Nice to Have</div>
+    <div class="stat-fraction">4.5/8</div>
+    <div class="stat-pct">56% addressed</div>
+    <span class="badge amber">In Progress</span>
+    <span class="delta up">+2.0</span>
+  </div>
+</div>
+
+<!-- OVERALL BAR -->
+<div class="overall-block">
+  <div class="overall-header">
+    <div class="overall-label">Overall Progress · Weighted by Priority</div>
+    <div class="overall-pct">84%</div>
+  </div>
+  <div class="bar-track">
+    <div class="bar-fill" style="width:84%"></div>
+  </div>
+  <div class="bar-note">Must Fix × 3 · Must Improve × 2 · Nice to Have × 1 — weighted score: 33.5 / 40 points <span class="delta up">+2.0 vs iter-13</span></div>
+</div>
+
+<!-- WHAT CHANGED THIS ITERATION -->
+<div class="changelog-block">
+  <div class="changelog-title">What Changed · iter-13 → iter-14</div>
+  <div class="changelog-sub">Status changes and new completions since last report (March 13 → March 20).</div>
+  <div class="changelog-grid">
+    <div class="changelog-item">
+      <div class="changelog-dot"></div>
+      <div class="changelog-text">
+        <strong>#14 Email Confirmation: Pending → Partial</strong>
+        <span>AWS SES email service built with 3 templates (match intro, mutual match, meeting confirmation). Sender verification in AWS console still needed.</span>
+      </div>
+    </div>
+    <div class="changelog-item">
+      <div class="changelog-dot"></div>
+      <div class="changelog-text">
+        <strong>#16 Email Delivery: Pending → Partial</strong>
+        <span>Email templates built using AWS SES (not Postmark/SendGrid). Fire-and-forget architecture — no-ops gracefully if unconfigured. Activation pending.</span>
+      </div>
+    </div>
+    <div class="changelog-item">
+      <div class="changelog-dot"></div>
+      <div class="changelog-text">
+        <strong>#19 Saved Shortlist: Pending → Done</strong>
+        <span>Bookmark icon on every match card. All / Saved tab filter. State persists in localStorage. Fully functional.</span>
+      </div>
+    </div>
+    <div class="changelog-item">
+      <div class="changelog-dot"></div>
+      <div class="changelog-text">
+        <strong>Production domain live</strong>
+        <span>meet.proofoftalk.io on Netlify (frontend) proxying to green EC2 (backend). 503 redirect bug fixed. HTTPS end-to-end.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BY THE NUMBERS -->
+<div class="numbers-block">
+  <div class="numbers-title">By the Numbers</div>
+  <div class="numbers-grid">
+    <div class="number-item">
+      <div class="number-value">38</div>
+      <div class="number-label">Attendees</div>
+      <div class="number-delta">+4 from iter-13</div>
+    </div>
+    <div class="number-item">
+      <div class="number-value">129</div>
+      <div class="number-label">Matches</div>
+      <div class="number-delta">+8 from iter-13</div>
+    </div>
+    <div class="number-item">
+      <div class="number-value">100%</div>
+      <div class="number-label">Enrichment</div>
+      <div class="number-delta">38/38 enriched</div>
+    </div>
+    <div class="number-item">
+      <div class="number-value">0.69</div>
+      <div class="number-label">Avg Match Score</div>
+      <div class="number-delta">min threshold: 0.60</div>
+    </div>
+    <div class="number-item">
+      <div class="number-value">38/38</div>
+      <div class="number-label">Verticals Tagged</div>
+      <div class="number-delta">new — 9/11 sectors</div>
+    </div>
+    <div class="number-item">
+      <div class="number-value">24</div>
+      <div class="number-label">Extasy Orders</div>
+      <div class="number-delta">paid + comp tickets</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── SECTION A: MUST FIX ── -->
+<div class="section">
+  <div class="section-header green">
+    <div class="section-title green">🛑 &nbsp;Must Fix — Before Any Real User Touches This</div>
+    <div class="section-meta">6 / 6 &nbsp;·&nbsp; 100%</div>
+  </div>
+  <div class="section-bar-row green">
+    <div class="mini-track"><div class="mini-fill green" style="width:100%"></div></div>
+    <div class="mini-pct" style="color: var(--emerald)">100%</div>
+  </div>
+  <table class="items-table green">
+    <thead>
+      <tr>
+        <th style="width:28px">#</th>
+        <th style="width:200px">Item</th>
+        <th style="width:90px">Status</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">1</td>
+        <td class="item-name">Fix URL Validation</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Auto-normalises <code style="font-size:11px;color:var(--orange)">https://</code>, eliminates German browser error. Register + Onboarding both patched.</td>
+      </tr>
+      <tr>
+        <td class="num">2</td>
+        <td class="item-name">Fix Messaging</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Connected to match acceptance flow. Mutual acceptance unlocks full chat. Upgraded: intro message can be sent before the other party accepts — they see it when they accept.</td>
+      </tr>
+      <tr>
+        <td class="num">3</td>
+        <td class="item-name">Remove JS Prompt on Decline</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Native browser <code style="font-size:11px">prompt()</code> replaced with an inline styled decline panel + optional textarea for reason. Server IP no longer exposed.</td>
+      </tr>
+      <tr>
+        <td class="num">4</td>
+        <td class="item-name">Fix Meeting Scheduling</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Time slot picker persists to DB correctly. "Your Schedule" timeline block at top of My Matches shows all booked meetings for June 2–3.</td>
+      </tr>
+      <tr>
+        <td class="num">5</td>
+        <td class="item-name">Success/Failure States</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Loading spinners, success confirmations ("Intro sent ✓", "Meeting saved", "Copied") on all major CTAs. No blank redirects.</td>
+      </tr>
+      <tr>
+        <td class="num">6</td>
+        <td class="item-name">Mobile Experience</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Bottom tab bar (My Matches · Attendees · Messages). Min 44px tap targets. 3-column Sectors/Synergies/Discuss stacks vertically on mobile. No hover-only states or popups.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── SECTION B: MUST IMPROVE ── -->
+<div class="section">
+  <div class="section-header orange">
+    <div class="section-title orange">🎯 &nbsp;Must Improve — Before Launch to Attendees</div>
+    <div class="section-meta">5.5 / 7 &nbsp;·&nbsp; 79%</div>
+  </div>
+  <div class="section-bar-row orange">
+    <div class="mini-track"><div class="mini-fill orange" style="width:79%"></div></div>
+    <div class="mini-pct" style="color: var(--orange)">79%</div>
+  </div>
+  <table class="items-table orange">
+    <thead>
+      <tr>
+        <th style="width:28px">#</th>
+        <th style="width:200px">Item</th>
+        <th style="width:90px">Status</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">7</td>
+        <td class="item-name">Align Visual Design to POT Brand</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Orange <code style="font-size:11px;color:var(--orange)">#E76315</code> palette applied throughout. Playfair Display + Poppins typography. POT parallelogram logo mark in nav.</td>
+      </tr>
+      <tr>
+        <td class="num">8</td>
+        <td class="item-name">Add Real Profile Photos</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">GDPR decision: no auto-fetch from LinkedIn or third parties. Users upload their own photo URL. AttendeeAvatar renders <code style="font-size:11px;color:var(--orange)">ui-avatars</code> styled initials as fallback. Consistent across all match cards and attendee views.</td>
+      </tr>
+      <tr>
+        <td class="num">9</td>
+        <td class="item-name">Reduce Registration Friction</td>
+        <td><span class="pill partial">~ Partial</span></td>
+        <td class="item-note">Form simplified to 4 essential fields (1 step). Extasy API auto-imports all valid attendees (paid + comp). 38 attendees in DB with zero manual entry. Full prefill from ticket code is next step.</td>
+      </tr>
+      <tr>
+        <td class="num">10</td>
+        <td class="item-name">Simplify Action Model</td>
+        <td><span class="pill partial">~ Partial</span></td>
+        <td class="item-note">"I'd like to meet" / "Maybe later" language in place. Primary CTA is clear. Some secondary actions (LinkedIn, ICS download) still present on card — will consolidate.</td>
+      </tr>
+      <tr>
+        <td class="num">11</td>
+        <td class="item-name">Reframe as Matchmaking Briefing</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">"Your Top Introductions for Proof of Talk Paris" · "Private Matchmaking Briefing" · "The conversations most likely to matter." Full editorial reframe applied.</td>
+      </tr>
+      <tr>
+        <td class="num">12</td>
+        <td class="item-name">Simplify Navigation</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Role-based: attendees see Matches + Attendees + Messages. Admin sees Dashboard (no appointment scheduling). Bottom tabs on mobile. Home tab removed post-login.</td>
+      </tr>
+      <tr>
+        <td class="num">13</td>
+        <td class="item-name">Upgrade All Product Language</td>
+        <td><span class="pill partial">~ Partial</span></td>
+        <td class="item-note">"Strong match", "Why this meeting matters", "Maybe later", "Match Score" removed — ~90% done. One legacy heading in attendee profile view still pending.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── SECTION C: NICE TO HAVE ── -->
+<div class="section">
+  <div class="section-header blue">
+    <div class="section-title blue">💡 &nbsp;Nice to Have — Category-Defining Differentiators</div>
+    <div class="section-meta">4.5 / 8 &nbsp;·&nbsp; 56% <span class="delta up">+25%</span></div>
+  </div>
+  <div class="section-bar-row blue">
+    <div class="mini-track"><div class="mini-fill blue" style="width:56%"></div></div>
+    <div class="mini-pct" style="color: var(--blue)">56%</div>
+  </div>
+  <table class="items-table blue">
+    <thead>
+      <tr>
+        <th style="width:28px">#</th>
+        <th style="width:200px">Item</th>
+        <th style="width:90px">Status</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">14</td>
+        <td class="item-name">Scheduling with Email Confirmation</td>
+        <td><span class="pill partial">~ Partial</span></td>
+        <td class="item-note">UI and DB persistence done. ICS download implemented. AWS SES email service built — meeting confirmation template ready. Sender verification in AWS console still needed to activate.</td>
+      </tr>
+      <tr>
+        <td class="num">15</td>
+        <td class="item-name">"My Schedule" View</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Timeline block at top of My Matches. Shows all booked meetings sorted by date, with time, location, and one-tap chat link for each.</td>
+      </tr>
+      <tr>
+        <td class="num">16</td>
+        <td class="item-name">Email Delivery of Matches</td>
+        <td><span class="pill partial">~ Partial</span></td>
+        <td class="item-note">AWS SES email service built (not Postmark/SendGrid). Three templates: new match intro, mutual match confirmed, meeting scheduled. Fire-and-forget architecture — no-ops if unconfigured. Sender verification pending.</td>
+      </tr>
+      <tr>
+        <td class="num">17</td>
+        <td class="item-name">Match Refresh as Pool Grows</td>
+        <td><span class="pill done">✓ Done</span></td>
+        <td class="item-note">Extasy ticketing API syncs daily at 02:00 UTC. Now pulls both paid and complimentary tickets. New attendees are automatically enriched and embedded. Admin can also trigger manually from Dashboard.</td>
+      </tr>
+      <tr>
+        <td class="num">18</td>
+        <td class="item-name">Behavioral Learning</td>
+        <td><span class="pill partial">~ Partial</span></td>
+        <td class="item-note">Post-meeting 1–5 star ratings captured. Decline reasons collected. Data feeds Dashboard CSAT metric. ML refinement loop not yet wired.</td>
+      </tr>
+      <tr>
+        <td class="num">19</td>
+        <td class="item-name">Saved Shortlist</td>
+        <td><span class="pill new">✓ New</span></td>
+        <td class="item-note">Bookmark icon on every match card. All / Saved tab filter with count badge. State persists in <code style="font-size:11px;color:var(--orange)">localStorage</code> under <code style="font-size:11px;color:var(--orange)">pot_saved_matches</code>.</td>
+      </tr>
+      <tr>
+        <td class="num">20</td>
+        <td class="item-name">Post-Event Continuation</td>
+        <td><span class="pill pending">Pending</span></td>
+        <td class="item-note">Not implemented. Post-event strategy deferred to POT 2026 post-event phase.</td>
+      </tr>
+      <tr>
+        <td class="num">21</td>
+        <td class="item-name">Session / Content Matching</td>
+        <td><span class="pill pending">Pending</span></td>
+        <td class="item-note">Phase 2. Core people-matching must be solid first. Scoped for after June 2026.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- BEYOND THE BRIEF -->
+<div class="beyond-block">
+  <div class="beyond-title">⚡ Beyond the Brief</div>
+  <div class="beyond-sub">Items shipped that were not in the original feedback document — added to close gaps or raise the baseline.</div>
+  <div class="beyond-grid">
+    <div class="beyond-item">
+      <div class="beyond-dot"></div>
+      <div class="beyond-text">
+        <strong>Intro message from match card</strong>
+        <span>Suggested opener is now a real send button — not just copy. Sends before mutual acceptance; recipient sees it when they accept.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot"></div>
+      <div class="beyond-text">
+        <strong>Extasy ticketing API integration</strong>
+        <span>Live sync from ticketing system. Daily automated pipeline: fetch → upsert → enrich → embed. Now includes paid + complimentary tickets.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot"></div>
+      <div class="beyond-text">
+        <strong>Blue/Green EC2 deployment</strong>
+        <span>New green instance (3.239.218.239) running alongside original. Zero downtime. One-command deploy script.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot"></div>
+      <div class="beyond-text">
+        <strong>Netlify deployment config</strong>
+        <span><code style="font-size:11px;color:var(--orange)">netlify.toml</code> proxy configured. Manager can deploy frontend to CDN; all <code style="font-size:11px;color:var(--orange)">/api/*</code> routes forward to backend automatically.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot"></div>
+      <div class="beyond-text">
+        <strong>AI Concierge chat widget</strong>
+        <span>Floating chat assistant available to all attendees — answers questions about the event, people, and schedule.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot"></div>
+      <div class="beyond-text">
+        <strong>Post-meeting feedback capture</strong>
+        <span>1–5 star satisfaction ratings and meeting outcome tracking feed back into match quality metrics on the organiser dashboard.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot new"></div>
+      <div class="beyond-text">
+        <strong>Production domain <span class="beyond-new-label">new</span></strong>
+        <span><code style="font-size:11px;color:var(--orange)">meet.proofoftalk.io</code> live on Netlify with HTTPS. Proxies to green EC2 backend. 503 trailing-slash bug diagnosed and fixed.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot new"></div>
+      <div class="beyond-text">
+        <strong>Supabase database sync <span class="beyond-new-label">new</span></strong>
+        <span>Full RDS → Supabase mirror: 38 attendees, 129 matches, all AI data (summaries, embeddings, intent tags, vertical tags). Ready for migration cutover.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot new"></div>
+      <div class="beyond-text">
+        <strong>1000minds vertical taxonomy <span class="beyond-new-label">new</span></strong>
+        <span>11 sector verticals classified by GPT-4o for all 38 attendees. 9/11 verticals represented. Ready for integration into matching pipeline.</span>
+      </div>
+    </div>
+    <div class="beyond-item">
+      <div class="beyond-dot new"></div>
+      <div class="beyond-text">
+        <strong>Complimentary ticket pipeline <span class="beyond-new-label">new</span></strong>
+        <span>REDEEMED status added alongside PAID. Pipeline now pulls all valid Extasy orders — paid, comp, and voucher tickets flow through automatically.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ORIGINAL REPORT CARD -->
+<div class="report-card-block">
+  <div class="rc-header">
+    <div class="rc-title">Original Report Card — From Z</div>
+    <div class="rc-note">March 2026 · Grades as received</div>
+  </div>
+  <table class="rc">
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th style="width:60px;text-align:center">Grade</th>
+        <th>Comment</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="font-weight:500">AI Intelligence &amp; Matching Logic</td>
+        <td style="text-align:center"><div class="grade a" style="margin:0 auto">A</div></td>
+        <td class="rc-comment">Smarter than products that cost €50K+. Match categories, deal readiness, suggested openers — this is the real deal.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">Match Explanation Quality</td>
+        <td style="text-align:center"><div class="grade a-plus" style="margin:0 auto">A+</div></td>
+        <td class="rc-comment">Best in class. "$200M into tokenised real-world assets" beats Grip's generic tags.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">Competitive Differentiation</td>
+        <td style="text-align:center"><div class="grade a-minus" style="margin:0 auto">A−</div></td>
+        <td class="rc-comment">Beats Grip, Brella &amp; Swapcard on AI intelligence, zero-friction access, and cost.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">Feature Completeness</td>
+        <td style="text-align:center"><div class="grade b-minus" style="margin:0 auto">B−</div></td>
+        <td class="rc-comment">Dashboard, matches, profiles, scheduling, messaging — it's all there. Problem: half doesn't work yet.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">UX &amp; User Flow</td>
+        <td style="text-align:center"><div class="grade c-plus" style="margin:0 auto">C+</div></td>
+        <td class="rc-comment">Too many steps, too many tabs. Accept/Reject feels like Tinder. C-suite doesn't swipe.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">Microcopy &amp; Tone of Voice</td>
+        <td style="text-align:center"><div class="grade c" style="margin:0 auto">C</div></td>
+        <td class="rc-comment">"Accept Meeting" / "Enrich Profile" — reads like a CRM, not a luxury concierge.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">Mobile Readiness</td>
+        <td style="text-align:center"><div class="grade c" style="margin:0 auto">C</div></td>
+        <td class="rc-comment">Dark mode only. Not tested on actual phones. 70% will open match email on mobile first.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">Visual Design &amp; Brand Alignment</td>
+        <td style="text-align:center"><div class="grade d-plus" style="margin:0 auto">D+</div></td>
+        <td class="rc-comment">Looks like a dev side project, not the Louvre. Zero connection to Proof of Talk brand.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">Bug-Free Reliability</td>
+        <td style="text-align:center"><div class="grade d" style="margin:0 auto">D</div></td>
+        <td class="rc-comment">URL validation breaks registration. Messaging empty. Scheduling broken. JS prompt exposes server IP.</td>
+      </tr>
+      <tr>
+        <td style="font-weight:500">Day-of-Event Utility</td>
+        <td style="text-align:center"><div class="grade d" style="margin:0 auto">D</div></td>
+        <td class="rc-comment">No "My Schedule" view. No way to find next meeting. No event-day features.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="rc-gpa">
+    <strong>Original GPA: B− (2.8/4.0)</strong> — "The brain is A+. The body needs a wardrobe upgrade before it walks into the Louvre. Fix the bugs, dress it in POT's brand, and this becomes the smartest person in the room."
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <span>POT Matchmaker · iter-14 · March 2026</span>
+  <span>Kanyuchi for XVentures Labs</span>
+</footer>
+
+</body>
+</html>

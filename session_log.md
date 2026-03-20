@@ -103,3 +103,11 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - Content: production domain live, Supabase sync complete, 1000minds verticals shipped, comp tickets included, 503 fix
 - Numbers: 38 attendees, 129 matches, 100% enrichment, 9/11 verticals represented
 - Feedback asks: vertical accuracy, Extasy order count confirmation, vertical visibility decision, priority call on verticals vs onboarding
+
+## 2026-03-20 — Progress Report iter-14
+
+- Created `Matchmaking_Feedback/feedback-progress-report-iter14.html` — updated progress report matching iter-13 format
+- Generated `Matchmaking_Feedback/POT_Matchmaker_Progress_Report_iter14.pdf` via Chrome headless
+- Changes from iter-13: #14 Pending→Partial (SES email), #16 Pending→Partial (SES templates), #19 Pending→Done (saved shortlist)
+- Nice to Have: 2.5/8 (31%) → 4.5/8 (56%); Overall: 79% → 84%
+- Added "What Changed" section, "By the Numbers" block, 4 new Beyond the Brief items (production domain, Supabase sync, 1000minds verticals, comp ticket pipeline)
