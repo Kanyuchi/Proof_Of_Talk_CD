@@ -26,3 +26,23 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 def decode_token(token: str) -> dict:
     return jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+
+
+def create_reset_token(user_id: str) -> str:
+    """15-minute JWT with purpose='reset'."""
+    return jwt.encode(
+        {"sub": user_id, "purpose": "reset", "exp": datetime.now(timezone.utc) + timedelta(minutes=15)},
+        settings.SECRET_KEY,
+        algorithm=ALGORITHM,
+    )
+
+
+def decode_reset_token(token: str) -> str | None:
+    """Decode and validate a reset token. Returns user_id or None."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("purpose") != "reset":
+            return None
+        return payload.get("sub")
+    except JWTError:
+        return None

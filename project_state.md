@@ -15,7 +15,8 @@
 - **Full attendee journey** — register (1-step form), browse matches, accept/decline with inline reason capture, mutual match confirmation, in-app messaging, meeting scheduling, ICS download, satisfaction rating
 - **Role-based UI** — admin sees all attendees + matches read-only; attendees see only their own private briefing
 - **POT brand design** — dark theme, `#E76315` orange, heading font, mobile-responsive (44px targets)
-- **Email service** — AWS SES code shipped: new matches email, mutual match email, meeting confirmation; fire-and-forget, no-ops gracefully if unconfigured
+- **Email service** — AWS SES code shipped: new matches email, mutual match email, meeting confirmation, password reset; fire-and-forget, no-ops gracefully if unconfigured
+- **Password reset** — self-service flow: forgot-password (rate-limited, no email enumeration) → SES email with 15-min JWT token → reset-password page with live validation → auto-redirect to login; no DB migration needed (stateless JWT tokens with `purpose: "reset"` claim)
 - **Saved shortlist** — bookmark per match card, All/Saved tab filter, persists in localStorage
 - **Action model** — full-width filled "I'd like to meet" as dominant CTA; "Maybe later" as plain text link
 - **Daily match refresh** — cron at 02:00 UTC
@@ -30,7 +31,7 @@
 
 ## Broken / Incomplete
 
-- **SES email not activated** — IAM user `Proof_Of_Talk` lacks `ses:*` permissions; needs `AmazonSESFullAccess` policy in AWS Console, sender email verified in SES, and `AWS_SES_FROM_EMAIL` set on green EC2 `.env`
+- **SES email pending verification** — IAM policy attached, `AWS_SES_FROM_EMAIL=matches@proofoftalk.io` set on EC2, service restarted; SES identity created in us-east-1 but verification email not yet clicked (needs inbox access or switch to domain verification)
 - **ML feedback loop not wired** — decline reasons and satisfaction scores are captured in DB but not fed back into future GPT ranking prompts
 - **Supabase DB migration** — Supabase is synced as a mirror of RDS; backend still points to RDS; cutover to Supabase as primary not done yet
 

@@ -6,7 +6,7 @@
 
 ## Now
 
-1. **Activate SES email** — IAM user `Proof_Of_Talk` needs `AmazonSESFullAccess` policy (AWS Console → IAM → Users → Proof_Of_Talk → Add permissions); then verify sender email in SES console; then add `AWS_SES_FROM_EMAIL=matches@proofoftalk.io` to green EC2 `.env` and restart service
+1. **Deploy password reset flow** — push backend + frontend, verify SES sends reset emails end-to-end on production
 2. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test in-app messaging between mutual matches
 
 ## Soon
@@ -49,3 +49,4 @@
 - ✓ Deploy + re-embed + re-match: 129→140 matches, avg 0.69→0.70, 36 above 0.75; backend on green EC2, frontend on Netlify
 - ✓ Supabase sync: 140 matches synced via REST API
 - ✓ Smoke test: health, registration, concierge markdown, matches endpoint, frontend bundle all verified
+- ✓ Password reset flow — forgot-password + reset-password endpoints, SES email template, frontend pages, "Forgot password?" link on login

@@ -13,6 +13,8 @@ import MyMatches from "./pages/MyMatches";
 import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
 import Onboarding from "./pages/Onboarding";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +38,8 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/matches" element={<MyMatches />} />
               <Route path="/messages" element={<Messages />} />
               <Route path="/profile" element={<Profile />} />

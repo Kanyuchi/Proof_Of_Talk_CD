@@ -126,4 +126,17 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Re-matched**: `run_matching_pipeline()` produced 140 matches (was 129), avg score 0.700 (was 0.69), 36 above 0.75; 103 complementary, 19 non_obvious, 18 deal_ready
 - **Supabase synced**: cleared old 129 matches, inserted 140 new matches via REST API (3 batches of 50/50/40)
 - **Smoke tested**: health check OK, registration works, concierge returns markdown-formatted response (### headers, **bold** names, numbered lists), matches endpoint returns results, frontend serves react-markdown bundle
-- **SES email blocked**: IAM user `Proof_Of_Talk` lacks `ses:*` permissions — needs `AmazonSESFullAccess` policy attached + sender email verified in AWS Console (cannot do from CLI)
+- **SES email setup**: IAM `AmazonSESFullAccess` attached, `AWS_SES_FROM_EMAIL=matches@proofoftalk.io` set on EC2, service restarted; SES identity created in us-east-1 — pending email verification click (or domain verification as alternative)
+
+## 2026-03-21 — Password reset flow (full stack)
+- **Backend `security.py`**: Added `create_reset_token()` (15-min JWT with `purpose: "reset"`) and `decode_reset_token()` — stateless, no DB migration needed
+- **Backend `schemas/auth.py`**: Added `ForgotPasswordRequest` and `ResetPasswordRequest` with password strength validator
+- **Backend `routes/auth.py`**: Added `POST /auth/forgot-password` (rate-limited 3/min, no email enumeration) and `POST /auth/reset-password` (validates token, updates password)
+- **Backend `services/email.py`**: Added `send_password_reset_email()` — branded HTML template matching existing POT email style
+- **Frontend `client.ts`**: Added `forgotPassword()` and `resetPassword()` API functions
+- **Frontend `ForgotPassword.tsx`**: New page — email form → success state with "check your email" message
+- **Frontend `ResetPassword.tsx`**: New page — reads `?token=` from URL, new password + confirm with live validation, auto-redirect to login on success
+- **Frontend `Login.tsx`**: Added "Forgot password?" link below password field
+- **Frontend `App.tsx`**: Added `/forgot-password` and `/reset-password` routes
+- All imports verified, TypeScript compiles clean, reset token round-trip tested
+- **Concierge chat style overhaul**: rewrote system prompt to produce conversational, chat-friendly responses instead of report-style output — no more `###` headers, shorter per-person blurbs, ends with follow-up question. Updated `MarkdownMessage.tsx` — names render in orange (`#E76315`), better spacing, relaxed line-height, softer list markers, link support

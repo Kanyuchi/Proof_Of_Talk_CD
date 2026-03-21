@@ -217,6 +217,16 @@ export async function registerUser(body: {
   return data;
 }
 
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const { data } = await api.post("/auth/forgot-password", { email });
+  return data;
+}
+
+export async function resetPassword(token: string, new_password: string): Promise<{ message: string }> {
+  const { data } = await api.post("/auth/reset-password", { token, new_password });
+  return data;
+}
+
 export async function getMe(): Promise<User> {
   const { data } = await api.get("/auth/me");
   return data;

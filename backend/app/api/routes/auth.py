@@ -1,16 +1,20 @@
+import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db, async_session
-from app.core.security import verify_password, get_password_hash, create_access_token
+from app.core.security import verify_password, get_password_hash, create_access_token, create_reset_token, decode_reset_token
 from app.core.deps import require_auth
 from app.core.limiter import limiter
 from app.models.user import User
 from app.models.attendee import Attendee
-from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse
+from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
 from app.services.matching import MatchingEngine
+from app.services.email import send_password_reset_email
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -131,3 +135,33 @@ async def update_profile(
         "user": UserResponse.model_validate(user),
         "attendee": AttendeeResponse.model_validate(attendee),
     }
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(request: Request, data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Send a password reset email if the account exists. Always returns success to prevent email enumeration."""
+    user = (await db.execute(select(User).where(User.email == data.email))).scalars().first()
+    if user:
+        token = create_reset_token(str(user.id))
+        send_password_reset_email(to_email=user.email, user_name=user.full_name, reset_token=token)
+        logger.info("Password reset email sent to %s", data.email)
+    else:
+        logger.info("Password reset requested for non-existent email %s", data.email)
+    return {"message": "If that email exists, a reset link has been sent"}
+
+
+@router.post("/reset-password")
+async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    """Reset password using a valid reset token."""
+    user_id = decode_reset_token(data.token)
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or has expired")
+
+    user = (await db.execute(select(User).where(User.id == uuid.UUID(user_id)))).scalars().first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Reset link is invalid or has expired")
+
+    user.hashed_password = get_password_hash(data.new_password)
+    await db.commit()
+    return {"message": "Password updated successfully"}
