@@ -46,5 +46,5 @@
 
 ## Current Focus
 
-- Deploy backend to green EC2, re-embed + re-match (vertical_tags now in embeddings + ranking)
-- Activate SES email: add `AWS_SES_FROM_EMAIL` to EC2 `.env`, verify sender in AWS SES console, confirm end-to-end email flow works for a test attendee
+- Full end-to-end journey test — accept match, mutual match, messaging, meeting scheduling
+- Activate SES email: verify sender identity, confirm password reset + match notification emails arrive

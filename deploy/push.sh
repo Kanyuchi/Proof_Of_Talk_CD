@@ -53,6 +53,14 @@ echo "==> Reloading nginx..."
 "${SSH[@]}" "sudo nginx -t && sudo systemctl reload nginx"
 
 echo ""
-echo "✓ Deployment complete — http://$EC2_HOST"
+echo "==> Deploying frontend to Netlify (pot-matchmaker)..."
+if command -v netlify &>/dev/null; then
+  netlify deploy --prod --dir=frontend/dist
+else
+  echo "⚠  netlify CLI not found — skipping Netlify deploy (run manually)"
+fi
+
+echo ""
+echo "✓ Deployment complete — http://$EC2_HOST + https://meet.proofoftalk.io"
 echo ""
 "${SSH[@]}" "sudo systemctl status pot-matchmaker --no-pager | tail -5"

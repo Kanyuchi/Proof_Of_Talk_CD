@@ -32,3 +32,6 @@ Thumbs.db
 *.whl
 ~$*.docx
 ~$*.xlsx
+
+# Local Netlify folder
+.netlify

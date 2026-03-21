@@ -140,3 +140,10 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Frontend `App.tsx`**: Added `/forgot-password` and `/reset-password` routes
 - All imports verified, TypeScript compiles clean, reset token round-trip tested
 - **Concierge chat style overhaul**: rewrote system prompt to produce conversational, chat-friendly responses instead of report-style output — no more `###` headers, shorter per-person blurbs, ends with follow-up question. Updated `MarkdownMessage.tsx` — names render in orange (`#E76315`), better spacing, relaxed line-height, softer list markers, link support
+
+## 2026-03-21 17:30 — Deploy to pot-matchmaker (XVentures Netlify)
+- Relinked Netlify CLI from personal `gregarious-kitsune-d44915` to XVentures `pot-matchmaker` site
+- Built frontend and deployed to production via `netlify deploy --prod --dir=frontend/dist`
+- Verified: `meet.proofoftalk.io` now serves new bundle (`index-CmmrY8cL.js`) with password reset flow + concierge improvements
+- Verified: `POST /api/v1/auth/forgot-password` returns correct response through Netlify proxy → green EC2
+- Updated `deploy/push.sh` to include Netlify deploy step after EC2 sync (with graceful fallback if CLI not installed)

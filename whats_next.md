@@ -6,8 +6,8 @@
 
 ## Now
 
-1. **Deploy password reset flow** — push backend + frontend, verify SES sends reset emails end-to-end on production
-2. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test in-app messaging between mutual matches
+1. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test in-app messaging between mutual matches
+2. **Activate SES email** — verify sender identity in AWS SES console, confirm password reset + match notification emails arrive end-to-end
 
 ## Soon
 
@@ -50,3 +50,4 @@
 - ✓ Supabase sync: 140 matches synced via REST API
 - ✓ Smoke test: health, registration, concierge markdown, matches endpoint, frontend bundle all verified
 - ✓ Password reset flow — forgot-password + reset-password endpoints, SES email template, frontend pages, "Forgot password?" link on login
+- ✓ Deploy to pot-matchmaker — relinked Netlify CLI to XVentures site, deployed frontend to `meet.proofoftalk.io`, updated `deploy/push.sh` with Netlify step
