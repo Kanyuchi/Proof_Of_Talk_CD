@@ -22,6 +22,7 @@
 - **Cost analysis** — `docs/cost-analysis.md`: €0.39/attendee (optimised 2×/week refresh), under €0.50 target
 - **Investor Heatmap** — `GET /dashboard/investor-heatmap` aggregates capital activity by sector (deploying_capital, co_investment, deal_making); horizontal bar chart + deal readiness summary on Dashboard
 - **QR Business Card Exchange** — scannable QR on Profile page linking to attendee's magic link; copy link + save QR as PNG; uses react-qr-code
+- **Pre-Event Warm-Up Threads** — 11 auto-created vertical-based group discussion threads (tokenisation, DeFi, infrastructure, etc.); attendee's sectors highlighted and sorted first; "Threads" nav link for all authenticated users; 5s live polling
 - **Social links on match cards** — LinkedIn, Twitter, and website icons on MyMatches so attendees can research their recommendations
 - **Auth-aware home page** — logged-in users see "View your matches" / "Edit your profile"; logo links to /matches when authenticated
 - **Saved shortlist** — bookmark per match card, All/Saved tab filter, persists in localStorage

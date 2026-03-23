@@ -7,9 +7,8 @@
 ## Now
 
 1. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
-2. **Pre-Event Warm-Up Threads** — last remaining Quick Win from brainstorm; needs Thread model, endpoints, and UI page
-3. **SES production access** — awaiting AWS approval (case #177412752700989); once approved, all attendees can receive emails without individual verification
-4. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code
+2. **SES production access** — awaiting AWS approval (case #177412752700989); once approved, all attendees can receive emails without individual verification
+3. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code + warm-up threads
 
 ## Soon
 
@@ -61,3 +60,4 @@
 - ✓ Social links on match cards — LinkedIn, Twitter, website icons on MyMatches
 - ✓ Investor Heatmap — capital activity by sector on Dashboard (brainstorm Quick Win)
 - ✓ QR Business Card Exchange — scannable QR on Profile page linking to magic link (brainstorm Quick Win)
+- ✓ Pre-Event Warm-Up Threads — 11 vertical-based group discussion threads, nav link, live polling (brainstorm Quick Win)
