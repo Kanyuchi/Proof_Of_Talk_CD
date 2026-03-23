@@ -22,7 +22,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Top nav */}
       <header className="border-b border-white/10 bg-[#121212]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-3 shrink-0">
+          <Link to={isAuthenticated ? "/matches" : "/"} className="flex items-center gap-3 shrink-0">
             {/* POT logo mark */}
             <div
               className="w-7 h-9 bg-[#E76315] shrink-0"
