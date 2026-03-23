@@ -311,3 +311,44 @@ export async function getUnreadCount(): Promise<{ unread_count: number }> {
   const { data } = await api.get("/messages/unread-count");
   return data;
 }
+
+// ── Threads ─────────────────────────────────────────────────────────
+
+export interface ThreadSummary {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  post_count: number;
+  latest_post_at: string | null;
+  is_member: boolean;
+}
+
+export interface ThreadPost {
+  id: string;
+  sender_name: string;
+  sender_title: string;
+  sender_company: string;
+  sender_attendee_id: string;
+  content: string;
+  created_at: string;
+  is_mine: boolean;
+}
+
+export async function listThreads(): Promise<{ threads: ThreadSummary[] }> {
+  const { data } = await api.get("/threads");
+  return data;
+}
+
+export async function getThread(slug: string): Promise<{
+  thread: { id: string; slug: string; title: string; description: string | null };
+  posts: ThreadPost[];
+}> {
+  const { data } = await api.get(`/threads/${slug}`);
+  return data;
+}
+
+export async function postToThread(slug: string, content: string): Promise<ThreadPost> {
+  const { data } = await api.post(`/threads/${slug}`, { content });
+  return data;
+}

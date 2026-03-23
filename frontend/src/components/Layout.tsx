@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Users, Sparkles, BarChart3, LogIn, LogOut, UserPlus, UserCog, Heart, MessageSquare } from "lucide-react";
+import { Users, Sparkles, BarChart3, LogIn, LogOut, UserPlus, UserCog, Heart, MessageSquare, MessageCircle } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import ChatWidget from "./chat/ChatWidget";
 
@@ -63,6 +63,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <Link to="/messages" className={linkCls("/messages")}>
                 <MessageSquare className="w-4 h-4" />
                 <span>Messages</span>
+              </Link>
+            )}
+            {isAuthenticated && (
+              <Link to="/threads" className={linkCls("/threads")}>
+                <MessageCircle className="w-4 h-4" />
+                <span>Threads</span>
               </Link>
             )}
           </nav>
@@ -139,13 +145,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               My Matches
             </Link>
             <Link
-              to="/attendees"
+              to="/threads"
               className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
-                isActive("/attendees") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
+                isActive("/threads") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
               }`}
             >
-              <Users className="w-5 h-5" />
-              Attendees
+              <MessageCircle className="w-5 h-5" />
+              Threads
             </Link>
             {user?.is_admin ? (
               <Link

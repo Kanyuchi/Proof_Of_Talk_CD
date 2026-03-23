@@ -16,6 +16,7 @@ import Onboarding from "./pages/Onboarding";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import MagicMatches from "./pages/MagicMatches";
+import Threads from "./pages/Threads";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/m/:token" element={<MagicMatches />} />
               <Route path="/matches" element={<MyMatches />} />
               <Route path="/messages" element={<Messages />} />
+              <Route path="/threads" element={<Threads />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="*" element={<NotFound />} />
