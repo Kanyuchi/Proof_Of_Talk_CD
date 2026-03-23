@@ -35,6 +35,9 @@ class Attendee(Base):
     preferred_geographies: Mapped[list] = mapped_column(ARRAY(String), default=list)
     deal_stage: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # Magic link — unique token for no-login dashboard access
+    magic_access_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
+
     # Profile photo (user-set URL; falls back to enriched data / Gravatar in frontend)
     photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 

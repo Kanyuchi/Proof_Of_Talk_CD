@@ -6,8 +6,10 @@
 
 ## Now
 
-1. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test in-app messaging between mutual matches
-2. **Activate SES email** — verify sender identity in AWS SES console, confirm password reset + match notification emails arrive end-to-end
+1. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
+2. **Run Alembic migration + generate tokens** — deploy `magic_access_token` migration to EC2, run `POST /matches/generate-tokens` to create tokens for all 38 existing attendees
+3. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link access
+4. **SES production access** — awaiting AWS approval (case #177412752700989); once approved, all attendees can receive emails without individual verification
 
 ## Soon
 
@@ -51,3 +53,6 @@
 - ✓ Smoke test: health, registration, concierge markdown, matches endpoint, frontend bundle all verified
 - ✓ Password reset flow — forgot-password + reset-password endpoints, SES email template, frontend pages, "Forgot password?" link on login
 - ✓ Deploy to pot-matchmaker — relinked Netlify CLI to XVentures site, deployed frontend to `meet.proofoftalk.io`, updated `deploy/push.sh` with Netlify step
+- ✓ Magic link (no-login access) — `magic_access_token` on Attendee, `/m/:token` frontend route, `GET /matches/m/{token}` backend endpoint, auto-gen on registration, email CTA updated
+- ✓ Architecture & scale doc — `docs/architecture-scale.md` (KR 3.2)
+- ✓ Cost analysis doc — `docs/cost-analysis.md`, €0.39/attendee optimised (KR 3.3)

@@ -1,3 +1,4 @@
+import secrets
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, or_, and_
@@ -72,6 +73,71 @@ async def get_matches(
         match_responses.append(resp)
 
     return MatchListResponse(matches=match_responses, attendee_id=attendee_id)
+
+
+@router.get("/m/{token}", response_model=MatchListResponse)
+async def get_matches_by_magic_link(
+    token: str,
+    limit: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get matches via magic link — no login required."""
+    if not token or len(token) < 16:
+        raise HTTPException(status_code=400, detail="Invalid link")
+
+    result = await db.execute(
+        select(Attendee).where(Attendee.magic_access_token == token)
+    )
+    attendee = result.scalars().first()
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+
+    match_result = await db.execute(
+        select(Match)
+        .where(
+            or_(
+                Match.attendee_a_id == attendee.id,
+                Match.attendee_b_id == attendee.id,
+            )
+            & (Match.hidden_by_user.is_(False))
+        )
+        .order_by(Match.overall_score.desc())
+        .limit(limit)
+    )
+    matches = match_result.scalars().all()
+
+    match_responses = []
+    for match in matches:
+        other_id = (
+            match.attendee_b_id
+            if match.attendee_a_id == attendee.id
+            else match.attendee_a_id
+        )
+        matched = await db.get(Attendee, other_id)
+        resp = MatchResponse.model_validate(match)
+        if matched:
+            resp.matched_attendee = AttendeeResponse.model_validate(matched)
+        match_responses.append(resp)
+
+    return MatchListResponse(matches=match_responses, attendee_id=attendee.id)
+
+
+@router.post("/generate-tokens", status_code=200)
+async def generate_magic_tokens(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Generate magic_access_tokens for all attendees that don't have one yet."""
+    result = await db.execute(
+        select(Attendee).where(Attendee.magic_access_token.is_(None))
+    )
+    attendees = result.scalars().all()
+    count = 0
+    for att in attendees:
+        att.magic_access_token = secrets.token_urlsafe(32)
+        count += 1
+    await db.commit()
+    return {"status": "completed", "tokens_generated": count}
 
 
 @router.post("/generate/{attendee_id}")

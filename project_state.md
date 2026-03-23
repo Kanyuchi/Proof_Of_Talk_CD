@@ -1,6 +1,6 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-03-20 (38 attendees, 129 matches, vertical_tags integrated into matching pipeline, concierge markdown rendering)
+**Last updated:** 2026-03-23 (38 attendees, 140 matches, magic link access, architecture + cost docs, deployed to XVentures Netlify)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · PostgreSQL + pgvector on AWS RDS · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES · Netlify (frontend) · Supabase (DB — pending migration from RDS)
 
 ---
@@ -17,6 +17,9 @@
 - **POT brand design** — dark theme, `#E76315` orange, heading font, mobile-responsive (44px targets)
 - **Email service** — AWS SES code shipped: new matches email, mutual match email, meeting confirmation, password reset; fire-and-forget, no-ops gracefully if unconfigured
 - **Password reset** — self-service flow: forgot-password (rate-limited, no email enumeration) → SES email with 15-min JWT token → reset-password page with live validation → auto-redirect to login; no DB migration needed (stateless JWT tokens with `purpose: "reset"` claim)
+- **Magic link access** — `magic_access_token` per attendee, `/m/:token` URL gives 1-click read-only match dashboard (no login required); tokens auto-generated on registration; admin bulk-generate via `POST /matches/generate-tokens`; match intro emails include magic link CTA
+- **Architecture doc** — `docs/architecture-scale.md`: 3-stage pipeline scaling from 38→2,500 with pgvector IVFFlat, infrastructure upgrade path, runtime estimates
+- **Cost analysis** — `docs/cost-analysis.md`: €0.39/attendee (optimised 2×/week refresh), under €0.50 target
 - **Saved shortlist** — bookmark per match card, All/Saved tab filter, persists in localStorage
 - **Action model** — full-width filled "I'd like to meet" as dominant CTA; "Maybe later" as plain text link
 - **Daily match refresh** — cron at 02:00 UTC
@@ -31,7 +34,7 @@
 
 ## Broken / Incomplete
 
-- **SES email pending verification** — IAM policy attached, `AWS_SES_FROM_EMAIL=matches@proofoftalk.io` set on EC2, service restarted; SES identity created in us-east-1 but verification email not yet clicked (needs inbox access or switch to domain verification)
+- **SES email — sandbox mode** — `matches@proofoftalk.io` verified as sender in EU-WEST-1; password reset email confirmed working end-to-end; production access requested (case #177412752700989, awaiting AWS approval); until approved, can only send to individually verified recipients
 - **ML feedback loop not wired** — decline reasons and satisfaction scores are captured in DB but not fed back into future GPT ranking prompts
 - **Supabase DB migration** — Supabase is synced as a mirror of RDS; backend still points to RDS; cutover to Supabase as primary not done yet
 
@@ -47,4 +50,4 @@
 ## Current Focus
 
 - Full end-to-end journey test — accept match, mutual match, messaging, meeting scheduling
-- Activate SES email: verify sender identity, confirm password reset + match notification emails arrive
+- SES production access — awaiting AWS approval (case #177412752700989); password reset email verified working in sandbox

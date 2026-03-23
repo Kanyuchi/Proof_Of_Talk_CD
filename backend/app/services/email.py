@@ -118,6 +118,7 @@ def send_match_intro_email(
     explanation: str,
     match_count: int,
     app_url: str | None = None,
+    magic_token: str | None = None,
 ) -> None:
     """Send the 'we found your top match' email after pipeline completes.
 
@@ -141,6 +142,7 @@ def send_match_intro_email(
 
     first_name = attendee_name.split()[0] if attendee_name else attendee_name
     short_explanation = explanation[:220] + "…" if len(explanation) > 220 else explanation
+    dashboard_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
 
     subject = f"Your Proof of Talk introductions are ready, {first_name}"
     body_html = f"""
@@ -163,7 +165,7 @@ def send_match_intro_email(
     <p style="font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.6; margin: 0;">{short_explanation}</p>
   </div>
 
-  <a href="{app_url}/matches" style="display: block; background: #E76315; color: #fff; text-align: center; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 14px; margin-bottom: 24px;">
+  <a href="{dashboard_url}" style="display: block; background: #E76315; color: #fff; text-align: center; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 14px; margin-bottom: 24px;">
     View all your introductions →
   </a>
 
@@ -179,7 +181,7 @@ def send_match_intro_email(
         f"We found {match_count} connection(s) for you at Proof of Talk Paris.\n\n"
         f"Your #1 introduction: {match_name}, {match_title} at {match_company}\n\n"
         f"{short_explanation}\n\n"
-        f"View all: {app_url}/matches\n\n"
+        f"View all: {dashboard_url}\n\n"
         f"Proof of Talk · Louvre Palace, Paris · June 2–3, 2026"
     )
 

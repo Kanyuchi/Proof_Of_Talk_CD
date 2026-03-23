@@ -1,4 +1,5 @@
 import logging
+import secrets
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,6 +60,7 @@ async def register(
         linkedin_url=data.linkedin_url,
         twitter_handle=data.twitter_handle,
         company_website=data.company_website,
+        magic_access_token=secrets.token_urlsafe(32),
     )
     db.add(attendee)
     await db.flush()  # ensures attendee.id is populated

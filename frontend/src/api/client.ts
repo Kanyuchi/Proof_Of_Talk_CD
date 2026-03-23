@@ -75,6 +75,14 @@ export async function getMatches(
   return data;
 }
 
+export async function getMatchesByMagicLink(
+  token: string,
+  limit = 10
+): Promise<{ matches: Match[]; attendee_id: string }> {
+  const { data } = await api.get(`/matches/m/${token}`, { params: { limit } });
+  return data;
+}
+
 export async function generateMatchesForAttendee(
   attendeeId: string
 ): Promise<{ status: string; matches_generated: number }> {
