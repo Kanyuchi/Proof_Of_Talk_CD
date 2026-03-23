@@ -139,6 +139,20 @@ async def update_profile(
     }
 
 
+@router.get("/my-magic-link")
+async def get_my_magic_link(
+    user: User = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return the current user's magic link token for QR code generation."""
+    if not user.attendee_id:
+        raise HTTPException(status_code=404, detail="No attendee profile linked")
+    attendee = await db.get(Attendee, user.attendee_id)
+    if not attendee or not attendee.magic_access_token:
+        raise HTTPException(status_code=404, detail="No magic link available")
+    return {"magic_token": attendee.magic_access_token}
+
+
 @router.post("/forgot-password")
 @limiter.limit("3/minute")
 async def forgot_password(request: Request, data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):

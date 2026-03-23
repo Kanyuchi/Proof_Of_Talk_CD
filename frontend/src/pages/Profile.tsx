@@ -4,6 +4,7 @@ import { Save, Plus, X, Linkedin, Twitter, Globe, User } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { updateProfile, getAttendee } from "../api/client";
 import AttendeeAvatar from "../components/AttendeeAvatar";
+import QRCard from "../components/QRCard";
 import type { Attendee } from "../types";
 
 const INTEREST_SUGGESTIONS = [
@@ -314,6 +315,11 @@ export default function Profile() {
           </button>
         </div>
       </form>
+
+      {/* QR Business Card */}
+      <div className="mt-8">
+        <QRCard />
+      </div>
     </div>
   );
 }

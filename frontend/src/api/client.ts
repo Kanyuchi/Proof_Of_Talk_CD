@@ -250,6 +250,11 @@ export async function resetPassword(token: string, new_password: string): Promis
   return data;
 }
 
+export async function getMyMagicLink(): Promise<{ magic_token: string }> {
+  const { data } = await api.get("/auth/my-magic-link");
+  return data;
+}
+
 export async function getMe(): Promise<User> {
   const { data } = await api.get("/auth/me");
   return data;
