@@ -2,7 +2,7 @@ import { Navigate, Link, useNavigate } from "react-router-dom";
 import {
   Check, X, Brain, Target, MessageSquare, Sparkles,
   Copy, CheckCheck, Calendar, Clock, Download, Heart, ChevronDown, ChevronUp, Send,
-  Bookmark, BookmarkCheck,
+  Bookmark, BookmarkCheck, Linkedin, Twitter, Globe,
 } from "lucide-react";
 import AttendeeAvatar from "../components/AttendeeAvatar";
 import { useAuth } from "../hooks/useAuth";
@@ -302,6 +302,27 @@ export default function MyMatches() {
                           </div>
                           <div className="text-sm text-white/50">
                             {person.title} &middot; {person.company}
+                          </div>
+                          {/* Social links */}
+                          <div className="flex items-center gap-2 mt-1">
+                            {person.linkedin_url && (
+                              <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
+                                className="text-white/30 hover:text-blue-400 transition-colors">
+                                <Linkedin className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                            {person.twitter_handle && (
+                              <a href={`https://twitter.com/${person.twitter_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
+                                className="text-white/30 hover:text-sky-400 transition-colors">
+                                <Twitter className="w-3.5 h-3.5" />
+                              </a>
+                            )}
+                            {person.company_website && (
+                              <a href={person.company_website} target="_blank" rel="noopener noreferrer"
+                                className="text-white/30 hover:text-[#E76315] transition-colors">
+                                <Globe className="w-3.5 h-3.5" />
+                              </a>
+                            )}
                           </div>
                         </div>
                         {person.deal_readiness_score != null && person.deal_readiness_score > 0 && (

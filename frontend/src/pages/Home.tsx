@@ -1,7 +1,10 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Brain, Zap, Users } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <div className="space-y-20">
       {/* Hero */}
@@ -27,20 +30,41 @@ export default function Home() {
         </p>
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
-          <Link
-            to="/register"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all min-h-[44px]"
-            style={{ background: "var(--pot-orange)" }}
-          >
-            Get your introductions
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 text-white font-semibold rounded-xl border border-white/10 hover:bg-white/10 transition-all min-h-[44px]"
-          >
-            Sign in to view matches
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                to="/matches"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all min-h-[44px]"
+                style={{ background: "var(--pot-orange)" }}
+              >
+                View your matches
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/profile"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 text-white font-semibold rounded-xl border border-white/10 hover:bg-white/10 transition-all min-h-[44px]"
+              >
+                Edit your profile
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/register"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all min-h-[44px]"
+                style={{ background: "var(--pot-orange)" }}
+              >
+                Get your introductions
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-white/5 text-white font-semibold rounded-xl border border-white/10 hover:bg-white/10 transition-all min-h-[44px]"
+              >
+                Sign in to view matches
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
@@ -58,21 +82,21 @@ export default function Home() {
               icon: Users,
               title: "Multi-Source Intelligence",
               description:
-                "We synthesise registration data, LinkedIn profiles, company websites, and funding data to build a full picture of each attendee.",
+                "We go beyond your registration form — pulling from LinkedIn, company pages, and public data to understand what you're really building and what you actually need.",
               color: "from-blue-500 to-blue-600",
             },
             {
               icon: Brain,
               title: "AI Matching Pipeline",
               description:
-                "Semantic embeddings find complementary profiles. GPT-4o re-ranks for non-obvious connections and deal-readiness — not keyword matching.",
+                "Our AI doesn't just match keywords. It finds the people whose goals complement yours — the investor who fits your thesis, the builder who solves your problem, the partner you didn't know you needed.",
               color: "from-[#E76315] to-[#D35400]",
             },
             {
               icon: Zap,
               title: "Private Briefing Dossier",
               description:
-                "Every match comes with a clear reason: why you should meet, what you have in common, and a suggested opener. Not generic introductions.",
+                "Each recommendation comes with a personalised brief: why this person matters to you, what you have in common, and how to start the conversation.",
               color: "from-emerald-400 to-emerald-600",
             },
           ].map(({ icon: Icon, title, description, color }) => (
