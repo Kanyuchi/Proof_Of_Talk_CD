@@ -7,9 +7,9 @@
 ## Now
 
 1. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
-2. **Run Alembic migration + generate tokens** — deploy `magic_access_token` migration to EC2, run `POST /matches/generate-tokens` to create tokens for all 38 existing attendees
-3. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link access
-4. **SES production access** — awaiting AWS approval (case #177412752700989); once approved, all attendees can receive emails without individual verification
+2. **Pre-Event Warm-Up Threads** — last remaining Quick Win from brainstorm; needs Thread model, endpoints, and UI page
+3. **SES production access** — awaiting AWS approval (case #177412752700989); once approved, all attendees can receive emails without individual verification
+4. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code
 
 ## Soon
 
@@ -56,3 +56,8 @@
 - ✓ Magic link (no-login access) — `magic_access_token` on Attendee, `/m/:token` frontend route, `GET /matches/m/{token}` backend endpoint, auto-gen on registration, email CTA updated
 - ✓ Architecture & scale doc — `docs/architecture-scale.md` (KR 3.2)
 - ✓ Cost analysis doc — `docs/cost-analysis.md`, €0.39/attendee optimised (KR 3.3)
+- ✓ Home page auth-aware — logged-in users see "View your matches" / "Edit your profile"
+- ✓ Feature card copy rewrite — non-technical, attendee-facing descriptions
+- ✓ Social links on match cards — LinkedIn, Twitter, website icons on MyMatches
+- ✓ Investor Heatmap — capital activity by sector on Dashboard (brainstorm Quick Win)
+- ✓ QR Business Card Exchange — scannable QR on Profile page linking to magic link (brainstorm Quick Win)
