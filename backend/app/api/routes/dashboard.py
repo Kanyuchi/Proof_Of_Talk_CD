@@ -372,3 +372,50 @@ async def nudge_trigger(
         return {"status": "disabled", "reason": "Set AI_NUDGE_ENABLED=true to enable nudges"}
     from app.services.engagement import trigger_nudges
     return await trigger_nudges(db, dry_run=False)
+
+
+@router.get("/investor-heatmap")
+async def investor_heatmap(db: AsyncSession = Depends(get_db), _user: User = Depends(require_auth)):
+    """Investor activity heatmap: vertical_tags × intent signals for capital deployers."""
+    result = await db.execute(select(Attendee))
+    attendees = result.scalars().all()
+
+    # All 11 verticals
+    ALL_VERTICALS = [
+        "tokenisation_of_finance", "infrastructure_and_scaling", "decentralized_finance",
+        "ai_depin_frontier_tech", "policy_regulation_macro", "ecosystem_and_foundations",
+        "investment_and_capital_markets", "culture_media_gaming", "bitcoin",
+        "prediction_markets", "decentralized_ai",
+    ]
+    CAPITAL_INTENTS = {"deploying_capital", "co_investment", "deal_making"}
+
+    # Build heatmap: for each vertical, count attendees and capital-active attendees
+    heatmap = []
+    for vertical in ALL_VERTICALS:
+        in_vertical = [a for a in attendees if vertical in (a.vertical_tags or [])]
+        capital_active = [a for a in in_vertical if CAPITAL_INTENTS & set(a.intent_tags or [])]
+        avg_deal = (
+            sum(a.deal_readiness_score or 0 for a in in_vertical) / len(in_vertical)
+            if in_vertical else 0.0
+        )
+        heatmap.append({
+            "vertical": vertical,
+            "label": vertical.replace("_", " ").title(),
+            "attendee_count": len(in_vertical),
+            "capital_active": len(capital_active),
+            "avg_deal_readiness": round(avg_deal, 2),
+        })
+
+    # Sort by capital_active descending
+    heatmap.sort(key=lambda x: x["capital_active"], reverse=True)
+
+    # Deal readiness distribution
+    high = sum(1 for a in attendees if (a.deal_readiness_score or 0) >= 0.75)
+    medium = sum(1 for a in attendees if 0.4 <= (a.deal_readiness_score or 0) < 0.75)
+    low = sum(1 for a in attendees if (a.deal_readiness_score or 0) < 0.4)
+
+    return {
+        "heatmap": heatmap,
+        "total_attendees": len(attendees),
+        "deal_readiness_distribution": {"high": high, "medium": medium, "low": low},
+    }

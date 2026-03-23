@@ -174,6 +174,21 @@ export async function getAttendeesBySector(
   return data;
 }
 
+export async function getInvestorHeatmap(): Promise<{
+  heatmap: {
+    vertical: string;
+    label: string;
+    attendee_count: number;
+    capital_active: number;
+    avg_deal_readiness: number;
+  }[];
+  total_attendees: number;
+  deal_readiness_distribution: { high: number; medium: number; low: number };
+}> {
+  const { data } = await api.get("/dashboard/investor-heatmap");
+  return data;
+}
+
 export async function triggerProcessing(): Promise<{ attendees_processed: number }> {
   const { data } = await api.post("/dashboard/trigger-processing");
   return data;

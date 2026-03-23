@@ -9,7 +9,8 @@ import {
   useAttendeesBySector, useTriggerProcessing, useTriggerMatching,
 } from "../hooks/useDashboard";
 import { useAuth } from "../hooks/useAuth";
-import { enrichAll, syncExtasy } from "../api/client";
+import { enrichAll, syncExtasy, getInvestorHeatmap } from "../api/client";
+import { useQuery } from "@tanstack/react-query";
 
 function StatCard({
   icon: Icon,
@@ -76,6 +77,11 @@ export default function Dashboard() {
 
   const { data: typeMatches, isLoading: loadingTypeMatches } = useMatchesByType(drillType);
   const { data: sectorAttendees, isLoading: loadingSector } = useAttendeesBySector(drillSector);
+  const { data: heatmapData } = useQuery({
+    queryKey: ["investor-heatmap"],
+    queryFn: getInvestorHeatmap,
+    staleTime: 60_000,
+  });
   const processMutation = useTriggerProcessing();
   const matchMutation = useTriggerMatching();
 
@@ -309,6 +315,65 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      {/* Investor Heatmap */}
+      {heatmapData && (
+        <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign className="w-5 h-5 text-[#E76315]" />
+            <h2 className="text-lg font-semibold">Investor Heatmap</h2>
+          </div>
+          <p className="text-xs text-white/30 mb-6">Capital activity by sector — darker = more deal-ready attendees</p>
+
+          {/* Deal readiness summary */}
+          <div className="grid grid-cols-3 gap-3 mb-6">
+            {[
+              { label: "High readiness", count: heatmapData.deal_readiness_distribution.high, color: "text-emerald-400" },
+              { label: "Medium readiness", count: heatmapData.deal_readiness_distribution.medium, color: "text-[#E76315]" },
+              { label: "Low readiness", count: heatmapData.deal_readiness_distribution.low, color: "text-white/40" },
+            ].map(({ label, count, color }) => (
+              <div key={label} className="text-center p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                <div className={`text-xl font-bold ${color}`}>{count}</div>
+                <div className="text-[10px] text-white/30 uppercase mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Heatmap grid */}
+          <div className="space-y-2">
+            {heatmapData.heatmap.map((row) => {
+              const maxActive = Math.max(...heatmapData.heatmap.map((r) => r.capital_active), 1);
+              const intensity = row.capital_active / maxActive;
+              return (
+                <div key={row.vertical} className="flex items-center gap-3">
+                  <div className="w-44 text-xs text-white/50 truncate text-right shrink-0">{row.label}</div>
+                  <div className="flex-1 flex items-center gap-2">
+                    <div
+                      className="h-8 rounded-lg transition-all relative overflow-hidden"
+                      style={{
+                        width: `${Math.max(intensity * 100, 8)}%`,
+                        background: `rgba(231, 99, 21, ${0.15 + intensity * 0.7})`,
+                        border: `1px solid rgba(231, 99, 21, ${0.2 + intensity * 0.4})`,
+                      }}
+                    >
+                      {row.capital_active > 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-[10px] font-bold text-white/80">
+                            {row.capital_active} active
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-white/30 shrink-0">
+                      {row.attendee_count} total · {(row.avg_deal_readiness * 100).toFixed(0)}% ready
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Enrichment coverage */}
       <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
