@@ -486,6 +486,7 @@ Return ONLY the JSON array. No markdown, no commentary."""
                         match_company=top_candidate.company or "",
                         explanation=top.explanation or "",
                         match_count=len(matches),
+                        magic_token=attendee.magic_access_token,
                     )
             except Exception as exc:  # noqa: BLE001
                 import logging
