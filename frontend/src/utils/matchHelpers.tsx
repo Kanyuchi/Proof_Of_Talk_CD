@@ -1,5 +1,13 @@
 import { Crown, Mic, Megaphone, User, Handshake, Lightbulb, DollarSign } from "lucide-react";
 
+/** Normalize a twitter_handle field (which may be a handle, @handle, or full URL) to a clickable URL. */
+export function twitterUrl(handle: string): string {
+  const trimmed = handle.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  const clean = trimmed.replace(/^@/, "");
+  return `https://x.com/${clean}`;
+}
+
 // Conference time slots — June 2 & 3, 2026
 export const CONFERENCE_SLOTS = [
   { day: "June 2", label: "Mon 2 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },

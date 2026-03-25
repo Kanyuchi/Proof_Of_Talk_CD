@@ -11,7 +11,7 @@ import { useSendMatchMessage } from "../hooks/useMessages";
 import { useState } from "react";
 import {
   CONFERENCE_SLOTS, slotToISO, formatMeetingTime, downloadICS,
-  matchTypeConfig, ticketIcons, buildIcebreaker,
+  matchTypeConfig, ticketIcons, buildIcebreaker, twitterUrl,
 } from "../utils/matchHelpers";
 
 export default function MyMatches() {
@@ -312,7 +312,7 @@ export default function MyMatches() {
                               </a>
                             )}
                             {person.twitter_handle && (
-                              <a href={`https://twitter.com/${person.twitter_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
+                              <a href={twitterUrl(person.twitter_handle)} target="_blank" rel="noopener noreferrer"
                                 className="text-white/30 hover:text-sky-400 transition-colors">
                                 <Twitter className="w-3.5 h-3.5" />
                               </a>

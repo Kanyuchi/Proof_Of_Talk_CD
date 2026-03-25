@@ -12,7 +12,7 @@ import { enrichAttendee } from "../api/client";
 import { useState } from "react";
 import {
   CONFERENCE_SLOTS, slotToISO, formatMeetingTime, downloadICS,
-  matchTypeConfig, ticketIcons, buildIcebreaker,
+  matchTypeConfig, ticketIcons, buildIcebreaker, twitterUrl,
 } from "../utils/matchHelpers";
 
 export default function AttendeeMatches() {
@@ -179,7 +179,7 @@ export default function AttendeeMatches() {
                 </a>
               )}
               {attendee.twitter_handle && (
-                <a href={`https://twitter.com/${attendee.twitter_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
+                <a href={twitterUrl(attendee.twitter_handle)} target="_blank" rel="noopener noreferrer"
                   className="text-white/30 hover:text-sky-400 transition-colors">
                   <Twitter className="w-4 h-4" />
                 </a>

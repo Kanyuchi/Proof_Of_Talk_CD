@@ -6,7 +6,7 @@ import {
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck,
 } from "lucide-react";
 import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink } from "../api/client";
-import { matchTypeConfig } from "../utils/matchHelpers";
+import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import AttendeeAvatar from "../components/AttendeeAvatar";
 
 export default function MagicMatches() {
@@ -209,7 +209,7 @@ export default function MagicMatches() {
                           </a>
                         )}
                         {person?.twitter_handle && (
-                          <a href={`https://twitter.com/${person.twitter_handle.replace("@", "")}`} target="_blank" rel="noopener noreferrer"
+                          <a href={twitterUrl(person.twitter_handle)} target="_blank" rel="noopener noreferrer"
                             className="text-white/30 hover:text-sky-400 transition-colors">
                             <Twitter className="w-4 h-4" />
                           </a>

@@ -11,21 +11,20 @@ from app.core.config import get_settings
 logger = logging.getLogger(__name__)
 
 
-def _generate_qr_data_uri(url: str) -> str:
-    """Generate a base64 data URI for a QR code PNG."""
+def _generate_qr_png_bytes(url: str) -> bytes | None:
+    """Generate a QR code as raw PNG bytes."""
     try:
         import qrcode
         img = qrcode.make(url, box_size=5, border=2)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
-        b64 = base64.b64encode(buf.getvalue()).decode()
-        return f"data:image/png;base64,{b64}"
+        return buf.getvalue()
     except ImportError:
         logger.warning("qrcode package not installed — skipping QR in email")
-        return ""
+        return None
     except Exception as exc:
         logger.warning("QR code generation failed: %s", exc)
-        return ""
+        return None
 
 
 def _ses_client():
@@ -162,7 +161,7 @@ def send_match_intro_email(
     first_name = attendee_name.split()[0] if attendee_name else attendee_name
     short_explanation = explanation[:220] + "…" if len(explanation) > 220 else explanation
     dashboard_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
-    qr_data_uri = _generate_qr_data_uri(dashboard_url) if magic_token else ""
+    qr_png = _generate_qr_png_bytes(dashboard_url) if magic_token else None
 
     subject = f"Your Proof of Talk introductions are ready, {first_name}"
     body_html = f"""
@@ -175,7 +174,7 @@ def send_match_intro_email(
 
   <h1 style="font-size: 22px; font-weight: 700; color: #fff; margin: 0 0 8px;">{first_name}, we found your connections at the Louvre</h1>
   <p style="color: rgba(255,255,255,0.5); margin: 0 0 28px; font-size: 14px;">
-    The AI has matched you with {match_count} attendee{'' if match_count == 1 else 's'} for Proof of Talk Paris, June 2–3.
+    Our Matchmaker has matched you with {match_count} attendee{'' if match_count == 1 else 's'} for Proof of Talk Paris, June 2–3.
   </p>
 
   <div style="background: rgba(231,99,21,0.08); border: 1px solid rgba(231,99,21,0.2); border-left: 3px solid #E76315; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
@@ -189,7 +188,7 @@ def send_match_intro_email(
     View all your introductions →
   </a>
 
-  {"" if not qr_data_uri else '<div style="text-align: center; margin-bottom: 24px;"><p style="color: rgba(255,255,255,0.35); font-size: 11px; margin: 0 0 8px;">Or scan to open on your phone</p><img src="' + qr_data_uri + '" width="140" height="140" alt="QR Code" style="border-radius: 8px;" /></div>'}
+  {"" if not qr_png else '<div style="text-align: center; margin-bottom: 24px;"><p style="color: rgba(255,255,255,0.35); font-size: 11px; margin: 0 0 8px;">Or scan to open on your phone</p><img src="cid:qrcode" width="140" height="140" alt="QR Code" style="border-radius: 8px;" /></div>'}
 
   <p style="font-size: 11px; color: rgba(255,255,255,0.2); text-align: center; margin: 0;">
     Proof of Talk &middot; Louvre Palace, Paris &middot; June 2–3, 2026
@@ -208,17 +207,44 @@ def send_match_intro_email(
     )
 
     try:
-        client.send_email(
-            Source=settings.AWS_SES_FROM_EMAIL,
-            Destination={"ToAddresses": [to_email]},
-            Message={
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {
-                    "Html": {"Data": body_html, "Charset": "UTF-8"},
-                    "Text": {"Data": body_text, "Charset": "UTF-8"},
+        if qr_png:
+            # Use raw email with CID attachment so QR renders in Gmail
+            from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
+            from email.mime.image import MIMEImage
+
+            msg = MIMEMultipart("related")
+            msg["Subject"] = subject
+            msg["From"] = settings.AWS_SES_FROM_EMAIL
+            msg["To"] = to_email
+
+            alt = MIMEMultipart("alternative")
+            alt.attach(MIMEText(body_text, "plain", "utf-8"))
+            alt.attach(MIMEText(body_html, "html", "utf-8"))
+            msg.attach(alt)
+
+            qr_img = MIMEImage(qr_png, _subtype="png")
+            qr_img.add_header("Content-ID", "<qrcode>")
+            qr_img.add_header("Content-Disposition", "inline", filename="qr.png")
+            msg.attach(qr_img)
+
+            client.send_raw_email(
+                Source=settings.AWS_SES_FROM_EMAIL,
+                Destinations=[to_email],
+                RawMessage={"Data": msg.as_string()},
+            )
+        else:
+            client.send_email(
+                Source=settings.AWS_SES_FROM_EMAIL,
+                Destination={"ToAddresses": [to_email]},
+                Message={
+                    "Subject": {"Data": subject, "Charset": "UTF-8"},
+                    "Body": {
+                        "Html": {"Data": body_html, "Charset": "UTF-8"},
+                        "Text": {"Data": body_text, "Charset": "UTF-8"},
+                    },
                 },
-            },
-        )
+            )
         logger.info("Match intro email sent to %s", to_email)
     except Exception as exc:
         logger.warning("SES send failed for %s: %s", to_email, exc)
