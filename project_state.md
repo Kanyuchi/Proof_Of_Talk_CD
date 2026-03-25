@@ -22,6 +22,9 @@
 - **Cost analysis** — `docs/cost-analysis.md`: €0.39/attendee (optimised 2×/week refresh), under €0.50 target
 - **Investor Heatmap** — `GET /dashboard/investor-heatmap` aggregates capital activity by sector (deploying_capital, co_investment, deal_making); horizontal bar chart + deal readiness summary on Dashboard
 - **QR Business Card Exchange** — scannable QR on Profile page linking to attendee's magic link; copy link + save QR as PNG; uses react-qr-code
+- **QR code in email** — match intro emails now include an inline QR code (base64 PNG) linking to the attendee's magic link dashboard
+- **"Who do you want to meet?"** — new `target_companies` field on Attendee (free text); shown on Profile page + magic link enrichment card; fed into embeddings + GPT-4o ranking with highest priority per Z's direction
+- **Magic link profile enrichment** — `PATCH /matches/m/{token}/profile` allows attendees to update Twitter + target_companies without login; enrichment card shown on MagicMatches page for incomplete profiles
 - **Pre-Event Warm-Up Threads** — 11 auto-created vertical-based group discussion threads (tokenisation, DeFi, infrastructure, etc.); attendee's sectors highlighted and sorted first; "Threads" nav link for all authenticated users; 5s live polling
 - **Social links on match cards** — LinkedIn, Twitter, and website icons on MyMatches so attendees can research their recommendations
 - **Auth-aware home page** — logged-in users see "View your matches" / "Edit your profile"; logo links to /matches when authenticated
