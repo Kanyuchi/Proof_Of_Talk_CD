@@ -1,15 +1,19 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Brain, Target, MessageSquare,
-  Linkedin, Twitter, Globe,
+  Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck,
 } from "lucide-react";
-import { getMatchesByMagicLink, getAttendee } from "../api/client";
+import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink } from "../api/client";
 import { matchTypeConfig } from "../utils/matchHelpers";
 import AttendeeAvatar from "../components/AttendeeAvatar";
 
 export default function MagicMatches() {
   const { token } = useParams<{ token: string }>();
+  const queryClient = useQueryClient();
+  const [enrichForm, setEnrichForm] = useState({ twitter_handle: "", target_companies: "" });
+  const [enrichSaved, setEnrichSaved] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["magic-matches", token],
@@ -23,6 +27,22 @@ export default function MagicMatches() {
     queryFn: () => getAttendee(attendeeId!),
     enabled: !!attendeeId,
   });
+
+  const enrichMutation = useMutation({
+    mutationFn: () => updateProfileViaMagicLink(token!, {
+      twitter_handle: enrichForm.twitter_handle || undefined,
+      target_companies: enrichForm.target_companies || undefined,
+    }),
+    onSuccess: () => {
+      setEnrichSaved(true);
+      queryClient.invalidateQueries({ queryKey: ["attendee", attendeeId] });
+      setTimeout(() => setEnrichSaved(false), 3000);
+    },
+  });
+
+  const showEnrichCard = attendee && (
+    !attendee.twitter_handle && !attendee.target_companies
+  );
 
   const matches = data?.matches ?? [];
 
@@ -67,6 +87,58 @@ export default function MagicMatches() {
           Here are your personalised meeting recommendations for Proof of Talk 2026
         </p>
       </div>
+
+      {/* Profile enrichment card */}
+      {showEnrichCard && !enrichSaved && (
+        <div className="p-5 rounded-2xl border border-[#E76315]/20 bg-[#E76315]/[0.04]">
+          <div className="flex items-center gap-2 mb-3">
+            <UserPlus className="w-5 h-5 text-[#E76315]" />
+            <h3 className="font-semibold">Help us find better matches for you</h3>
+          </div>
+          <p className="text-xs text-white/40 mb-4">
+            The more we know, the better your introductions. This takes 30 seconds.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-white/50 block mb-1">Your Twitter / X handle</label>
+              <input
+                type="text"
+                placeholder="@yourhandle"
+                value={enrichForm.twitter_handle}
+                onChange={(e) => setEnrichForm(prev => ({ ...prev, twitter_handle: e.target.value }))}
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/50 block mb-1">Who do you want to meet at Proof of Talk?</label>
+              <textarea
+                placeholder="e.g., Coinbase, a16z crypto, anyone building L2 infrastructure, Kucoin..."
+                value={enrichForm.target_companies}
+                onChange={(e) => setEnrichForm(prev => ({ ...prev, target_companies: e.target.value }))}
+                rows={3}
+                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30 resize-none"
+              />
+              <p className="text-[10px] text-white/30 mt-1">
+                Name companies, people, or types of organisations. We'll prioritise these in your matches.
+              </p>
+            </div>
+            <button
+              onClick={() => enrichMutation.mutate()}
+              disabled={enrichMutation.isPending || (!enrichForm.twitter_handle && !enrichForm.target_companies)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#E76315] text-white font-medium text-sm disabled:opacity-30 hover:bg-[#D35400] transition-all"
+            >
+              <Send className="w-4 h-4" />
+              Save & improve my matches
+            </button>
+          </div>
+        </div>
+      )}
+      {enrichSaved && (
+        <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] flex items-center gap-3">
+          <CheckCheck className="w-5 h-5 text-emerald-400" />
+          <p className="text-sm text-emerald-300">Saved! Your matches will improve on the next refresh.</p>
+        </div>
+      )}
 
       {/* Match count */}
       <div className="flex items-center gap-3">

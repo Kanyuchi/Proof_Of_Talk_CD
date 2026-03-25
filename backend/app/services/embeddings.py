@@ -35,6 +35,9 @@ def build_composite_text(attendee) -> str:
     if enriched.get("funding_info"):
         parts.append(f"Funding: {enriched['funding_info']}")
 
+    if getattr(attendee, "target_companies", None):
+        parts.append(f"Who they want to meet: {attendee.target_companies}")
+
     if attendee.vertical_tags:
         parts.append(f"Sector Verticals: {', '.join(attendee.vertical_tags)}")
     if attendee.intent_tags:

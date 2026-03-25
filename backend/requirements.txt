@@ -35,10 +35,17 @@ boto3==1.35.86
 # Supabase
 supabase>=2.0.0
 
+# QR Code
+qrcode[pil]>=7.4
+
 # Utils
 structlog==24.4.0
 tenacity==9.0.0
 apscheduler==3.10.4
+
+# Data Export
+pandas>=2.0.0
+xlsxwriter>=3.0.0
 
 # Rate limiting & validation
 slowapi>=0.1.9

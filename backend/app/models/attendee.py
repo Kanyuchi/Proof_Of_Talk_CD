@@ -30,6 +30,7 @@ class Attendee(Base):
     ticket_type: Mapped[TicketType] = mapped_column(SAEnum(TicketType), default=TicketType.DELEGATE)
     interests: Mapped[list] = mapped_column(ARRAY(String), default=list)
     goals: Mapped[str] = mapped_column(Text, nullable=True)  # "What do you want from this event?"
+    target_companies: Mapped[str | None] = mapped_column(Text, nullable=True)  # "Who do you want to meet?" (free text)
     seeking: Mapped[list] = mapped_column(ARRAY(String), default=list)  # target counterpart types
     not_looking_for: Mapped[list] = mapped_column(ARRAY(String), default=list)  # excluded counterpart types
     preferred_geographies: Mapped[list] = mapped_column(ARRAY(String), default=list)

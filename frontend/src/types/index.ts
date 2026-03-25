@@ -7,6 +7,7 @@ export interface Attendee {
   ticket_type: "delegate" | "sponsor" | "speaker" | "vip";
   interests: string[];
   goals: string | null;
+  target_companies: string | null;
   seeking: string[];
   not_looking_for: string[];
   preferred_geographies: string[];

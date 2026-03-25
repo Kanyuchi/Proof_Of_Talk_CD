@@ -255,11 +255,14 @@ Name: {attendee.name}
 Title: {attendee.title}
 Company: {attendee.company}
 Goals: {attendee.goals or 'Not specified'}
+Who they want to meet: {attendee.target_companies or 'Not specified'}
 Interests: {', '.join(attendee.interests) if attendee.interests else 'Not specified'}
 AI Summary: {attendee.ai_summary or 'Not available'}
 Intent Tags: {', '.join(attendee.intent_tags) if attendee.intent_tags else 'Not classified'}
 Vertical Tags: {', '.join(attendee.vertical_tags) if attendee.vertical_tags else 'Not classified'}
 Deal Readiness: {attendee.deal_readiness_score or 0:.2f}
+
+IMPORTANT: If the attendee specified companies/people they want to meet, give HIGHEST PRIORITY to candidates from those companies or similar companies. This is explicit user intent and overrides AI inference.
 
 CANDIDATES:
 {chr(10).join(candidate_descriptions)}

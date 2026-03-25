@@ -3,10 +3,29 @@
 All sends are fire-and-forget — failures are logged but never raise to callers.
 The system works without email; SES is an enhancement layer.
 """
+import base64
+import io
 import logging
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+
+def _generate_qr_data_uri(url: str) -> str:
+    """Generate a base64 data URI for a QR code PNG."""
+    try:
+        import qrcode
+        img = qrcode.make(url, box_size=5, border=2)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return f"data:image/png;base64,{b64}"
+    except ImportError:
+        logger.warning("qrcode package not installed — skipping QR in email")
+        return ""
+    except Exception as exc:
+        logger.warning("QR code generation failed: %s", exc)
+        return ""
 
 
 def _ses_client():
@@ -143,6 +162,7 @@ def send_match_intro_email(
     first_name = attendee_name.split()[0] if attendee_name else attendee_name
     short_explanation = explanation[:220] + "…" if len(explanation) > 220 else explanation
     dashboard_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
+    qr_data_uri = _generate_qr_data_uri(dashboard_url) if magic_token else ""
 
     subject = f"Your Proof of Talk introductions are ready, {first_name}"
     body_html = f"""
@@ -165,9 +185,11 @@ def send_match_intro_email(
     <p style="font-size: 13px; color: rgba(255,255,255,0.7); line-height: 1.6; margin: 0;">{short_explanation}</p>
   </div>
 
-  <a href="{dashboard_url}" style="display: block; background: #E76315; color: #fff; text-align: center; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 14px; margin-bottom: 24px;">
+  <a href="{dashboard_url}" style="display: block; background: #E76315; color: #fff; text-align: center; padding: 14px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 14px; margin-bottom: 16px;">
     View all your introductions →
   </a>
+
+  {"" if not qr_data_uri else '<div style="text-align: center; margin-bottom: 24px;"><p style="color: rgba(255,255,255,0.35); font-size: 11px; margin: 0 0 8px;">Or scan to open on your phone</p><img src="' + qr_data_uri + '" width="140" height="140" alt="QR Code" style="border-radius: 8px;" /></div>'}
 
   <p style="font-size: 11px; color: rgba(255,255,255,0.2); text-align: center; margin: 0;">
     Proof of Talk &middot; Louvre Palace, Paris &middot; June 2–3, 2026

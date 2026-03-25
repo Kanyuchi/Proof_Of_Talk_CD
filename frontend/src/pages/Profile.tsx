@@ -28,6 +28,7 @@ export default function Profile() {
     company: "",
     title: "",
     goals: "",
+    target_companies: "",
     linkedin_url: "",
     twitter_handle: "",
     company_website: "",
@@ -49,6 +50,7 @@ export default function Profile() {
           company: a.company ?? "",
           title: a.title ?? "",
           goals: a.goals ?? "",
+          target_companies: a.target_companies ?? "",
           linkedin_url: a.linkedin_url ?? "",
           twitter_handle: a.twitter_handle ?? "",
           company_website: a.company_website ?? "",
@@ -184,6 +186,18 @@ export default function Profile() {
               placeholder="What are you hoping to achieve at Proof of Talk?"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50 resize-none"
             />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-white/50">Who do you want to meet?</label>
+            <textarea
+              value={form.target_companies}
+              onChange={set("target_companies")}
+              rows={3}
+              placeholder="e.g., Coinbase, a16z crypto, anyone building L2 infrastructure..."
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[#E76315]/50 resize-none"
+            />
+            <p className="text-[10px] text-white/30">Name companies, people, or types of organisations. We'll prioritise these in your matches.</p>
           </div>
         </section>
 

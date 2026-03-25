@@ -1,6 +1,7 @@
 import secrets
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -120,6 +121,41 @@ async def get_matches_by_magic_link(
         match_responses.append(resp)
 
     return MatchListResponse(matches=match_responses, attendee_id=attendee.id)
+
+
+class MagicProfileUpdate(BaseModel):
+    """Lightweight profile update via magic token (no JWT required)."""
+    twitter_handle: str | None = None
+    target_companies: str | None = None
+    photo_url: str | None = None
+
+
+@router.patch("/m/{token}/profile")
+async def update_profile_via_magic_link(
+    token: str,
+    data: MagicProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Update attendee profile fields via magic link — no login required."""
+    if not token or len(token) < 16:
+        raise HTTPException(status_code=400, detail="Invalid link")
+
+    result = await db.execute(
+        select(Attendee).where(Attendee.magic_access_token == token)
+    )
+    attendee = result.scalars().first()
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+
+    if data.twitter_handle is not None:
+        attendee.twitter_handle = data.twitter_handle
+    if data.target_companies is not None:
+        attendee.target_companies = data.target_companies
+    if data.photo_url is not None:
+        attendee.photo_url = data.photo_url
+
+    await db.commit()
+    return {"status": "updated"}
 
 
 @router.post("/generate-tokens", status_code=200)

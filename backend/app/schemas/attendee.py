@@ -11,6 +11,7 @@ class AttendeeCreate(BaseModel):
     ticket_type: str = "delegate"
     interests: list[str] = []
     goals: str | None = None
+    target_companies: str | None = None
     seeking: list[str] = []
     not_looking_for: list[str] = []
     preferred_geographies: list[str] = []
@@ -29,6 +30,7 @@ class AttendeeResponse(BaseModel):
     ticket_type: str
     interests: list[str]
     goals: str | None
+    target_companies: str | None
     seeking: list[str]
     not_looking_for: list[str]
     preferred_geographies: list[str]
