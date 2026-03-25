@@ -7,7 +7,7 @@
 ## Now
 
 1. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
-2. **SES production access** — awaiting AWS approval (case #177412752700989); once approved, all attendees can receive emails without individual verification
+2. **Email provider switch** — AWS SES production access DENIED (case #177412752700989, 2026-03-23). Need to switch to Resend, SendGrid, or Postmark. Requires domain DNS verification for `proofoftalk.io`. Discuss with Victor before proceeding.
 3. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code + warm-up threads
 
 ## Soon

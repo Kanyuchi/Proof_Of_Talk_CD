@@ -39,7 +39,7 @@
 
 ## Broken / Incomplete
 
-- **SES email — sandbox mode** — `matches@proofoftalk.io` verified as sender in EU-WEST-1; password reset email confirmed working end-to-end; production access requested (case #177412752700989, awaiting AWS approval); until approved, can only send to individually verified recipients
+- **SES email — BLOCKED** — AWS denied production access (case #177412752700989, 2026-03-23). Stuck in sandbox — can only send to individually verified emails. Need to switch to Resend/SendGrid/Postmark. Requires Victor approval + domain DNS access for `proofoftalk.io`
 - **ML feedback loop not wired** — decline reasons and satisfaction scores are captured in DB but not fed back into future GPT ranking prompts
 - **Supabase DB migration** — Supabase is synced as a mirror of RDS; backend still points to RDS; cutover to Supabase as primary not done yet
 
@@ -55,4 +55,4 @@
 ## Current Focus
 
 - Full end-to-end journey test — accept match, mutual match, messaging, meeting scheduling
-- SES production access — awaiting AWS approval (case #177412752700989); password reset email verified working in sandbox
+- Email provider switch — SES production denied; switch to Resend/SendGrid/Postmark (needs Victor + DNS access)
