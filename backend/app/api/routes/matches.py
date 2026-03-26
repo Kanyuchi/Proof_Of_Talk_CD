@@ -2,7 +2,7 @@ import secrets
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, or_, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.models.attendee import Attendee, Match
@@ -156,6 +156,30 @@ async def update_profile_via_magic_link(
 
     await db.commit()
     return {"status": "updated"}
+
+
+@router.get("/pending-count")
+async def get_pending_match_count(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Count matches where the other party accepted but the current user hasn't responded yet."""
+    if not user.attendee_id:
+        return {"pending_count": 0}
+
+    aid = user.attendee_id
+    result = await db.execute(
+        select(func.count(Match.id)).where(
+            or_(
+                # I'm attendee_a, other accepted, I haven't responded
+                and_(Match.attendee_a_id == aid, Match.status_a == "pending", Match.status_b == "accepted"),
+                # I'm attendee_b, other accepted, I haven't responded
+                and_(Match.attendee_b_id == aid, Match.status_b == "pending", Match.status_a == "accepted"),
+            )
+        )
+    )
+    count = result.scalar() or 0
+    return {"pending_count": count}
 
 
 @router.post("/generate-tokens", status_code=200)

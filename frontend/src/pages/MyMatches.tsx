@@ -2,7 +2,7 @@ import { Navigate, Link, useNavigate } from "react-router-dom";
 import {
   Check, X, Brain, Target, MessageSquare, Sparkles,
   Copy, CheckCheck, Calendar, Clock, Download, Heart, ChevronDown, ChevronUp, Send,
-  Bookmark, BookmarkCheck, Linkedin, Twitter, Globe,
+  Bookmark, BookmarkCheck, Linkedin, Twitter, Globe, ThumbsUp, ThumbsDown,
 } from "lucide-react";
 import AttendeeAvatar from "../components/AttendeeAvatar";
 import { useAuth } from "../hooks/useAuth";
@@ -400,6 +400,29 @@ export default function MyMatches() {
                             </ul>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {/* Quick feedback */}
+                    {match.status === "pending" && !isAdmin && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            updateStatus.mutate({ matchId: match.id, status: "accepted", decline_reason: "FEEDBACK:more_like_this" });
+                          }}
+                          className="text-[10px] text-white/30 hover:text-emerald-400 transition-colors flex items-center gap-1"
+                        >
+                          <ThumbsUp className="w-3 h-3" /> More like this
+                        </button>
+                        <span className="text-white/10">|</span>
+                        <button
+                          onClick={() => {
+                            updateStatus.mutate({ matchId: match.id, status: "declined", decline_reason: "FEEDBACK:not_relevant" });
+                          }}
+                          className="text-[10px] text-white/30 hover:text-red-400 transition-colors flex items-center gap-1"
+                        >
+                          <ThumbsDown className="w-3 h-3" /> Not relevant
+                        </button>
                       </div>
                     )}
 

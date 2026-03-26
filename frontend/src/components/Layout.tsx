@@ -1,11 +1,21 @@
 import { Link, useLocation } from "react-router-dom";
 import { Users, Sparkles, BarChart3, LogIn, LogOut, UserPlus, UserCog, Heart, MessageSquare, MessageCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getPendingMatchCount } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import ChatWidget from "./chat/ChatWidget";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
+  const { data: pendingData } = useQuery({
+    queryKey: ["pending-match-count"],
+    queryFn: getPendingMatchCount,
+    enabled: isAuthenticated && !user?.is_admin,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+  });
+  const pendingCount = pendingData?.pending_count ?? 0;
 
   const isActive = (to: string) =>
     to === "/" ? location.pathname === to : location.pathname.startsWith(to);
@@ -54,9 +64,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             )}
             {isAuthenticated && (
-              <Link to="/matches" className={linkCls("/matches")}>
+              <Link to="/matches" className={`${linkCls("/matches")} relative`}>
                 <Heart className="w-4 h-4" />
                 <span>My Matches</span>
+                {pendingCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#E76315] text-white text-[10px] font-bold px-1">
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
             )}
             {isAuthenticated && !user?.is_admin && (
@@ -137,12 +152,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <>
             <Link
               to="/matches"
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all ${
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium transition-all relative ${
                 isActive("/matches") ? "text-[#E76315]" : "text-white/40 active:text-white/70"
               }`}
             >
               <Heart className="w-5 h-5" />
               My Matches
+              {pendingCount > 0 && (
+                <span className="absolute top-1 right-1/4 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-[#E76315] text-white text-[9px] font-bold px-0.5">
+                  {pendingCount}
+                </span>
+              )}
             </Link>
             <Link
               to="/threads"

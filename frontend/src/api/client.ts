@@ -91,6 +91,11 @@ export async function getMatchesByMagicLink(
   return data;
 }
 
+export async function getPendingMatchCount(): Promise<{ pending_count: number }> {
+  const { data } = await api.get("/matches/pending-count");
+  return data;
+}
+
 export async function generateMatchesForAttendee(
   attendeeId: string
 ): Promise<{ status: string; matches_generated: number }> {

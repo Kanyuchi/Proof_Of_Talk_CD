@@ -2,7 +2,7 @@ import json
 import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import select, text, delete as sql_delete, or_
+from sqlalchemy import select, text, delete as sql_delete, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
 from app.core.config import get_settings
@@ -225,6 +225,33 @@ class MatchingEngine:
         if not candidates:
             return []
 
+        # Fetch prior decline reasons for feedback loop
+        decline_feedback = ""
+        try:
+            declined = await self.db.execute(
+                select(Match).where(
+                    or_(
+                        and_(Match.attendee_a_id == attendee.id, Match.status_a == "declined"),
+                        and_(Match.attendee_b_id == attendee.id, Match.status_b == "declined"),
+                    ),
+                    Match.decline_reason.isnot(None),
+                )
+            )
+            declined_matches = declined.scalars().all()
+            if declined_matches:
+                reasons = []
+                for dm in declined_matches[:5]:  # cap at 5 to control prompt length
+                    other_id = dm.attendee_b_id if dm.attendee_a_id == attendee.id else dm.attendee_a_id
+                    other = await self.db.get(Attendee, other_id)
+                    name = other.name if other else "Unknown"
+                    reasons.append(f"- Declined {name}: {dm.decline_reason}")
+                decline_feedback = (
+                    "\n\nPRIOR FEEDBACK (matches this attendee declined and why — avoid similar matches):\n"
+                    + "\n".join(reasons)
+                )
+        except Exception:
+            pass  # Non-critical; proceed without feedback
+
         candidate_descriptions = []
         for i, (candidate, sim_score) in enumerate(candidates):
             candidate_descriptions.append(
@@ -263,7 +290,7 @@ Vertical Tags: {', '.join(attendee.vertical_tags) if attendee.vertical_tags else
 Deal Readiness: {attendee.deal_readiness_score or 0:.2f}
 
 IMPORTANT: If the attendee specified companies/people they want to meet, give HIGHEST PRIORITY to candidates from those companies or similar companies. This is explicit user intent and overrides AI inference.
-
+{decline_feedback}
 CANDIDATES:
 {chr(10).join(candidate_descriptions)}
 
