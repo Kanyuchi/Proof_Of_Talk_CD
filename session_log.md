@@ -197,3 +197,4 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Frontend vertical tags surfaced**: purple-styled tags now visible on AttendeeMatches, Attendees list, and MyMatches cards; display name utility in `frontend/src/utils/verticals.ts`
 - **Validation**: GPT-4o responses now filtered against `VALID_VERTICALS` to prevent hallucinated tags
 - Deployed to green EC2 + Netlify
+- **Runa integration spec** (`docs/runa-integration-spec.md`) — API specification for Swerve to integrate matchmaker into Runa. Covers: magic link lookup endpoint, ticket purchased webhook, ticket cancelled webhook, attendee status check. API key auth, user flow diagrams, request/response schemas, discussion points. Draft for review before building.

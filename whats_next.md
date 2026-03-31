@@ -6,9 +6,11 @@
 
 ## Now
 
-1. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
-2. **Email provider switch** — AWS SES production access DENIED (case #177412752700989, 2026-03-23). Need to switch to Resend, SendGrid, or Postmark. Requires domain DNS verification for `proofoftalk.io`. Discuss with Victor before proceeding.
-3. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code + warm-up threads
+1. **Runa integration — build endpoints** — once Swerve reviews `docs/runa-integration-spec.md`, implement the 4 integration endpoints (magic link lookup, ticket webhook, cancellation, status check) + API key auth
+2. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
+3. **Email provider switch** — AWS SES production access DENIED (case #177412752700989, 2026-03-23). Need to switch to Resend, SendGrid, or Postmark. Requires domain DNS verification for `proofoftalk.io`. Discuss with Victor before proceeding.
+4. **Fix DNS** — `meet.proofoftalk.io` CNAME record missing; POT team needs to re-add: `meet → CNAME → pot-matchmaker.netlify.app`
+5. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code + warm-up threads
 
 ## Soon
 
