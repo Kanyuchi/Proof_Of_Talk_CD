@@ -18,17 +18,18 @@ MIN_MATCH_SCORE = 0.60
 
 # Cross-sector verticals that create high-value complementary matches
 COMPLEMENTARY_VERTICALS = {
-    "policy_regulation_macro": ["infrastructure_and_scaling", "tokenisation_of_finance", "decentralized_finance"],
+    "policy_regulation_macro": ["infrastructure_and_scaling", "tokenisation_of_finance", "decentralized_finance", "privacy"],
     "tokenisation_of_finance": ["investment_and_capital_markets", "policy_regulation_macro", "infrastructure_and_scaling"],
-    "infrastructure_and_scaling": ["decentralized_finance", "policy_regulation_macro", "ai_depin_frontier_tech"],
+    "infrastructure_and_scaling": ["decentralized_finance", "policy_regulation_macro", "ai_depin_frontier_tech", "privacy"],
     "investment_and_capital_markets": ["tokenisation_of_finance", "decentralized_finance", "bitcoin"],
-    "decentralized_finance": ["infrastructure_and_scaling", "policy_regulation_macro", "tokenisation_of_finance"],
+    "decentralized_finance": ["infrastructure_and_scaling", "policy_regulation_macro", "tokenisation_of_finance", "privacy"],
     "ai_depin_frontier_tech": ["infrastructure_and_scaling", "decentralized_ai", "ecosystem_and_foundations"],
     "decentralized_ai": ["ai_depin_frontier_tech", "infrastructure_and_scaling"],
     "bitcoin": ["investment_and_capital_markets", "infrastructure_and_scaling"],
     "ecosystem_and_foundations": ["infrastructure_and_scaling", "ai_depin_frontier_tech", "culture_media_gaming"],
     "culture_media_gaming": ["ecosystem_and_foundations", "decentralized_finance"],
     "prediction_markets": ["decentralized_finance", "ai_depin_frontier_tech"],
+    "privacy": ["infrastructure_and_scaling", "decentralized_finance", "policy_regulation_macro"],
 }
 
 

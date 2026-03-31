@@ -6,6 +6,7 @@ import {
 import { useAttendees } from "../hooks/useAttendees";
 import { useMatches } from "../hooks/useMatches";
 import { useAuth } from "../hooks/useAuth";
+import { verticalDisplayName } from "../utils/verticals";
 import EmptyState from "../components/EmptyState";
 
 const ticketIcons: Record<string, React.ReactNode> = {
@@ -199,6 +200,15 @@ export default function Attendees() {
                 {(attendee.intent_tags ?? []).slice(0, 3).map((tag) => (
                   <span key={tag} className="px-2 py-0.5 rounded-full bg-white/5 text-white/40 text-[10px]">
                     {tag.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+
+              {/* Vertical tags */}
+              <div className="hidden md:flex flex-wrap gap-1 max-w-xs">
+                {(attendee.vertical_tags ?? []).slice(0, 2).map((tag) => (
+                  <span key={tag} className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 text-[10px] border border-purple-500/20">
+                    {verticalDisplayName(tag)}
                   </span>
                 ))}
               </div>

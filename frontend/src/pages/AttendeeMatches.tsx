@@ -1,4 +1,5 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { verticalDisplayName } from "../utils/verticals";
 import {
   ArrowLeft, Check, X, Brain,
   Target, MessageSquare, Sparkles,
@@ -254,6 +255,16 @@ export default function AttendeeMatches() {
                 </span>
               ))}
             </div>
+
+            {(attendee.vertical_tags ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {attendee.vertical_tags.map((tag) => (
+                  <span key={tag} className="px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 text-xs border border-purple-500/20">
+                    {verticalDisplayName(tag)}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {/* Interests */}
             {(attendee.interests ?? []).length > 0 && (

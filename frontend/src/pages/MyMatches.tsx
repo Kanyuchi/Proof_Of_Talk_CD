@@ -13,6 +13,7 @@ import {
   CONFERENCE_SLOTS, slotToISO, formatMeetingTime, downloadICS,
   matchTypeConfig, ticketIcons, buildIcebreaker, twitterUrl,
 } from "../utils/matchHelpers";
+import { verticalDisplayName } from "../utils/verticals";
 
 export default function MyMatches() {
   const navigate = useNavigate();
@@ -324,6 +325,16 @@ export default function MyMatches() {
                               </a>
                             )}
                           </div>
+                          {/* Vertical tags */}
+                          {(person.vertical_tags ?? []).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {person.vertical_tags.map((tag) => (
+                                <span key={tag} className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 text-[10px] border border-purple-500/20">
+                                  {verticalDisplayName(tag)}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         {person.deal_readiness_score != null && person.deal_readiness_score > 0 && (
                           <div className="ml-auto text-right">

@@ -1,6 +1,9 @@
+import json
+
 import numpy as np
 from openai import AsyncOpenAI
 from app.core.config import get_settings
+from app.core.constants import VALID_VERTICALS
 
 settings = get_settings()
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
@@ -119,7 +122,6 @@ Return 2-4 most relevant tags as a JSON array. Nothing else."""
         temperature=0.1,
         max_tokens=100,
     )
-    import json
     raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
@@ -150,6 +152,7 @@ Return ONLY a JSON array of vertical tags from this taxonomy:
 - "bitcoin" (Bitcoin L2, mining, ordinals, Bitcoin-native DeFi)
 - "prediction_markets" (prediction markets, information markets, betting protocols)
 - "decentralized_ai" (decentralised AI, federated learning, AI DAOs, AI compute)
+- "privacy" (ZK proofs, confidential computing, privacy protocols, private transactions)
 
 Return 1-3 most relevant verticals as a JSON array. Nothing else."""
 
@@ -159,12 +162,12 @@ Return 1-3 most relevant verticals as a JSON array. Nothing else."""
         temperature=0.1,
         max_tokens=100,
     )
-    import json
     raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
     try:
-        return json.loads(raw)
+        tags = json.loads(raw)
+        return [t for t in tags if t in VALID_VERTICALS]
     except json.JSONDecodeError:
         return []
 

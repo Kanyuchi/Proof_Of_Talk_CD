@@ -18,6 +18,7 @@ export interface Attendee {
   company_website: string | null;
   ai_summary: string | null;
   intent_tags: string[];
+  vertical_tags: string[];
   deal_readiness_score: number | null;
   enriched_profile: Record<string, unknown>;
   created_at: string;
