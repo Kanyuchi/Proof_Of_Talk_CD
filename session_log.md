@@ -197,4 +197,11 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Frontend vertical tags surfaced**: purple-styled tags now visible on AttendeeMatches, Attendees list, and MyMatches cards; display name utility in `frontend/src/utils/verticals.ts`
 - **Validation**: GPT-4o responses now filtered against `VALID_VERTICALS` to prevent hallucinated tags
 - Deployed to green EC2 + Netlify
-- **Runa integration spec** (`docs/runa-integration-spec.md`) — API specification for Swerve to integrate matchmaker into Runa. Covers: magic link lookup endpoint, ticket purchased webhook, ticket cancelled webhook, attendee status check. API key auth, user flow diagrams, request/response schemas, discussion points. Draft for review before building.
+- **Runa integration spec** (`docs/runa-integration-spec.md` + `.docx`) — API specification for Swerve to integrate matchmaker into Runa
+- **Runa integration endpoints built + deployed** — 4 endpoints behind X-API-Key auth:
+  - `GET /integration/magic-link` — lookup or create-on-the-fly by email (returns magic link URL)
+  - `POST /integration/ticket-purchased` — real-time webhook from Runa (idempotent)
+  - `POST /integration/ticket-cancelled` — deactivation webhook
+  - `GET /integration/attendee-status` — match count, mutual matches, profile status
+- Added `INTEGRATION_API_KEY` to config, `require_api_key` dependency, CORS `X-API-Key` header
+- API key set on EC2, all endpoints verified live
