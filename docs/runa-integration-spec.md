@@ -3,7 +3,7 @@
 **For:** Swerve (Runa/Extasy developer)
 **From:** Kanyuchi (POT Matchmaker developer)
 **Date:** March 31, 2026
-**Status:** Draft — for review before implementation
+**Status:** Live — endpoints deployed and ready for integration
 
 ---
 
@@ -35,11 +35,11 @@ Customer lands in their personal matchmaker dashboard
 ## 2. Base URL
 
 ```
-Production:  https://meet.proofoftalk.io/api/v1
-Staging:     http://3.239.218.239/api/v1
+Staging (use now):   http://3.239.218.239/api/v1
+Production (once DNS is fixed):  https://meet.proofoftalk.io/api/v1
 ```
 
-Interactive API docs (Swagger): `{base_url}/docs`
+> **Note:** The `meet.proofoftalk.io` domain is currently down — the CNAME record needs to be re-added (see Section 12 below). In the meantime, build and test against the staging URL. When the DNS is fixed, the only change is swapping the base URL — everything else stays identical.
 
 ---
 
@@ -422,23 +422,25 @@ Please confirm the ticket names in section 4B match what Runa uses. If you have 
 Do you want to show match count or profile status inline in Runa? If yes, use Endpoint D. If you just need a redirect button, Endpoint A alone is sufficient.
 
 ### 9.6 Testing
-We can provide:
-- A staging API key for testing against `http://3.239.218.239`
-- Test email addresses with pre-generated matches
-- Interactive Swagger docs at `/api/v1/docs`
+Ready now:
+- Staging API key — will be shared securely by Kanyuchi
+- Staging URL: `http://3.239.218.239/api/v1/integration/`
+- All 4 endpoints are live and accepting requests
+- Test by calling the magic link endpoint with any email + name — it will create an attendee on-the-fly
 
 ---
 
-## 10. Implementation Timeline
+## 10. Implementation Status
 
-| Step | Owner | Description |
-|------|-------|-------------|
-| 1 | **Swerve** | Review this spec, confirm approach + answer discussion points |
-| 2 | **Kanyuchi** | Build Endpoints A–D, deploy to staging |
-| 3 | **Kanyuchi** | Share staging API key + test data |
-| 4 | **Swerve** | Integrate Endpoint A into Runa (+ optionally B) |
-| 5 | **Both** | End-to-end test: buy ticket → view matches |
-| 6 | **Both** | Ship to production |
+| Step | Owner | Status |
+|------|-------|--------|
+| 1 | **Kanyuchi** | ✅ Done — Endpoints A–D built and deployed to staging (`http://3.239.218.239`) |
+| 2 | **Kanyuchi** | ✅ Done — API key generated and ready to share |
+| 3 | **Swerve** | **Next** — Review this spec, answer discussion points (Section 9) |
+| 4 | **Swerve** | **Next** — Fix `meet.proofoftalk.io` DNS (Section 12) |
+| 5 | **Swerve** | **Next** — Integrate Endpoint A into Runa (+ optionally B) |
+| 6 | **Both** | Pending — End-to-end test: buy ticket → view matches |
+| 7 | **Both** | Pending — Ship to production (swap staging URL for production URL) |
 
 ---
 
@@ -446,17 +448,41 @@ We can provide:
 
 **Minimum integration (15 minutes of work):**
 
-1. Get API key from Kanyuchi
+1. Get API key from Kanyuchi (will be shared securely)
 2. When customer clicks "View Matches":
    ```javascript
+   // Use staging URL for now — swap to production once DNS is fixed
+   const BASE_URL = "http://3.239.218.239/api/v1";
+   // const BASE_URL = "https://meet.proofoftalk.io/api/v1"; // ← production (after DNS fix)
+
    const response = await fetch(
-     `https://meet.proofoftalk.io/api/v1/integration/magic-link?email=${customerEmail}&name=${customerName}&ticket_type=${ticketType}`,
+     `${BASE_URL}/integration/magic-link?email=${customerEmail}&name=${customerName}&ticket_type=${ticketType}`,
      { headers: { "X-API-Key": API_KEY } }
    );
    const { magic_link_url } = await response.json();
    window.location.href = magic_link_url;
    ```
 3. Done. Customer lands in their matchmaker dashboard.
+
+---
+
+## 12. DNS Fix Required — meet.proofoftalk.io
+
+The `meet.proofoftalk.io` subdomain is currently down (NXDOMAIN). The CNAME record has been deleted or expired.
+
+**Action needed:** Re-add this DNS record in the `proofoftalk.io` DNS settings:
+
+```
+Type:   CNAME
+Name:   meet
+Value:  pot-matchmaker.netlify.app
+```
+
+This should propagate within 5 minutes. Once live:
+- The matchmaker frontend will be accessible at `https://meet.proofoftalk.io`
+- The API will be accessible at `https://meet.proofoftalk.io/api/v1`
+- Magic links will use the `meet.proofoftalk.io` domain
+- Swap the `BASE_URL` in your integration code from the staging IP to the production domain
 
 ---
 
