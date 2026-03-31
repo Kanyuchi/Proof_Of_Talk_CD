@@ -61,3 +61,5 @@
 - ✓ Investor Heatmap — capital activity by sector on Dashboard (brainstorm Quick Win)
 - ✓ QR Business Card Exchange — scannable QR on Profile page linking to magic link (brainstorm Quick Win)
 - ✓ Pre-Event Warm-Up Threads — 11 vertical-based group discussion threads, nav link, live polling (brainstorm Quick Win)
+- ✓ Vertical tags aligned with 1000 Minds — 12 verticals (incl. privacy), display names, surfaced in frontend (AttendeeMatches, Attendees, MyMatches)
+- ✓ Directory cleanup — temp files, .DS_Store, reorganised docs/scripts, consolidated node_modules
