@@ -38,6 +38,13 @@ def build_composite_text(attendee) -> str:
     if enriched.get("funding_info"):
         parts.append(f"Funding: {enriched['funding_info']}")
 
+    # The Grid B2B data (verified Web3 company description + sector)
+    grid = enriched.get("grid") or {}
+    if grid.get("grid_description"):
+        parts.append(f"Company (Grid verified): {grid['grid_description']}")
+    if grid.get("grid_sector"):
+        parts.append(f"Grid Sector: {grid['grid_sector']}")
+
     if getattr(attendee, "target_companies", None):
         parts.append(f"Who they want to meet: {attendee.target_companies}")
 

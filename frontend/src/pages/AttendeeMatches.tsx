@@ -266,6 +266,32 @@ export default function AttendeeMatches() {
               </div>
             )}
 
+            {/* Grid B2B data */}
+            {(() => {
+              const grid = (attendee.enriched_profile as Record<string, any>)?.grid;
+              if (!grid?.grid_description) return null;
+              return (
+                <div className="mt-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-[10px] font-medium text-emerald-400 uppercase tracking-wider">Verified by The Grid</span>
+                    {grid.grid_sector && (
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px]">{grid.grid_sector}</span>
+                    )}
+                    {grid.grid_type && (
+                      <span className="px-2 py-0.5 rounded bg-white/5 text-white/30 text-[10px]">{grid.grid_type}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-white/50 leading-relaxed">{grid.grid_description}</p>
+                  {grid.grid_profile_url && (
+                    <a href={grid.grid_profile_url} target="_blank" rel="noopener noreferrer"
+                      className="inline-block mt-1.5 text-[10px] text-emerald-400/60 hover:text-emerald-400 transition-colors">
+                      View on The Grid &rarr;
+                    </a>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Interests */}
             {(attendee.interests ?? []).length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">

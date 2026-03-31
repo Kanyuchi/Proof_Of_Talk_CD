@@ -69,6 +69,14 @@ class EnrichmentService:
                 enriched["crunchbase"] = crunchbase_data
                 enriched["crunchbase_enriched_at"] = datetime.utcnow().isoformat()
 
+        # --- The Grid B2B enrichment (Web3 company database) ---
+        if attendee.company and not enriched.get("grid"):
+            from app.services.grid_enrichment import enrich_from_grid
+            grid_data = await enrich_from_grid(attendee.company)
+            if grid_data:
+                enriched["grid"] = grid_data
+                enriched["grid_enriched_at"] = datetime.utcnow().isoformat()
+
         return enriched
 
     def _voyager_headers(self) -> dict:
