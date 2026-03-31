@@ -1,10 +1,12 @@
+import secrets as _secrets
 from uuid import UUID
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import decode_token
 from app.models.user import User
@@ -46,3 +48,16 @@ async def require_admin(user: User = Depends(require_auth)) -> User:
             detail="Admin access required",
         )
     return user
+
+
+async def require_api_key(request: Request) -> None:
+    """Validate X-API-Key header for integration endpoints."""
+    key = request.headers.get("X-API-Key")
+    if not key:
+        raise HTTPException(status_code=401, detail="Missing X-API-Key header")
+    settings = get_settings()
+    valid_keys = [k for k in [settings.INTEGRATION_API_KEY, settings.INTEGRATION_API_KEY_SECONDARY] if k]
+    if not valid_keys:
+        raise HTTPException(status_code=503, detail="Integration not configured")
+    if not any(_secrets.compare_digest(key, k) for k in valid_keys):
+        raise HTTPException(status_code=401, detail="Invalid API key")

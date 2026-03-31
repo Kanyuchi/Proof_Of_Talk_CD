@@ -10,7 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from app.core.config import get_settings
 from app.core.limiter import limiter
-from app.api.routes import attendees, matches, enrichment, dashboard, auth, chat, messages, threads
+from app.api.routes import attendees, matches, enrichment, dashboard, auth, chat, messages, threads, integration
 
 settings = get_settings()
 
@@ -70,7 +70,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key"],
 )
 
 # ── Security headers ──────────────────────────────────────────────────────────
@@ -102,6 +102,7 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(chat.router, prefix=settings.API_V1_PREFIX)
 app.include_router(messages.router, prefix=settings.API_V1_PREFIX)
 app.include_router(threads.router, prefix=settings.API_V1_PREFIX)
+app.include_router(integration.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health")

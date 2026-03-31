@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # Integration (Runa / third-party)
+    INTEGRATION_API_KEY: str = ""
+    INTEGRATION_API_KEY_SECONDARY: str = ""  # For key rotation
+
     # Enrichment API keys (optional, for Level 3 data enrichment)
     PROXYCURL_API_KEY: str = ""  # LinkedIn enrichment
     TWITTER_BEARER_TOKEN: str = ""
