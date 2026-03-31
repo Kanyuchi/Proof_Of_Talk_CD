@@ -205,3 +205,10 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
   - `GET /integration/attendee-status` — match count, mutual matches, profile status
 - Added `INTEGRATION_API_KEY` to config, `require_api_key` dependency, CORS `X-API-Key` header
 - API key set on EC2, all endpoints verified live
+
+## 2026-03-31 (cont.) — The Grid B2B data integration
+- **New `grid_enrichment.py`** — GraphQL client for thegrid.id public API (no auth needed). Searches `profileInfos` by company name, extracts: verified description, sector, socials (LinkedIn/Twitter/Telegram/YouTube), URLs, founding date, profile type.
+- **Enrichment pipeline** — Grid added as final enrichment source after Crunchbase in `enrichment.py`. Cached in `enriched_profile["grid"]`.
+- **Embeddings** — Grid description + sector included in composite text for vector embeddings (improves match quality for Web3 companies in Grid).
+- **Frontend** — "Verified by The Grid" card (emerald green) on MyMatches, MagicMatches, AttendeeMatches showing company description, sector badge, and link to Grid profile.
+- Deployed to EC2 + Netlify

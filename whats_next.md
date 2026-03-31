@@ -65,3 +65,5 @@
 - ✓ Pre-Event Warm-Up Threads — 11 vertical-based group discussion threads, nav link, live polling (brainstorm Quick Win)
 - ✓ Vertical tags aligned with 1000 Minds — 12 verticals (incl. privacy), display names, surfaced in frontend (AttendeeMatches, Attendees, MyMatches)
 - ✓ Directory cleanup — temp files, .DS_Store, reorganised docs/scripts, consolidated node_modules
+- ✓ Runa integration API — 4 endpoints (magic link lookup, ticket webhooks, status), API key auth, spec doc for Swerve
+- ✓ The Grid B2B integration — GraphQL enrichment from thegrid.id, verified company data on match cards
