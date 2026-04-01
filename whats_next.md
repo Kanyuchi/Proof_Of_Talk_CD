@@ -6,10 +6,10 @@
 
 ## Now
 
-1. **Runa integration — share spec + API key with Swerve** — endpoints live at `/api/v1/integration/*`, spec doc at `docs/runa-integration-spec.docx`; need to share API key securely and get Swerve's feedback on discussion points (webhook vs pull, UI placement, ticket type mapping)
-2. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
-3. **Email provider switch** — AWS SES production access DENIED (case #177412752700989, 2026-03-23). Need to switch to Resend, SendGrid, or Postmark. Requires domain DNS verification for `proofoftalk.io`. Discuss with Victor before proceeding.
-4. **Fix DNS** — `meet.proofoftalk.io` CNAME record missing; POT team needs to re-add: `meet → CNAME → pot-matchmaker.netlify.app`
+1. **Privacy mode (anonymous/pseudonymous profiles)** — `privacy_mode` field on Attendee (`full` / `b2b_only`), conditional field redaction in API responses, reveal-on-mutual-match logic, frontend toggle + conditional rendering, email adjustments. Per Jes's request for Web3 ambassadors who don't doxx.
+2. **Runa integration — share spec + API key with Swerve** — endpoints live at `/api/v1/integration/*`, spec doc at `docs/runa-integration-spec.docx`; need to share API key securely and get Swerve's feedback on discussion points (webhook vs pull, UI placement, ticket type mapping)
+3. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
+4. **Email provider switch** — AWS SES production access DENIED (case #177412752700989, 2026-03-23). Need to switch to Resend, SendGrid, or Postmark. Requires domain DNS verification for `proofoftalk.io`. Discuss with Victor before proceeding.
 5. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code + warm-up threads
 
 ## Soon

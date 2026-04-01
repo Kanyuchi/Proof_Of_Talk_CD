@@ -1,6 +1,6 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-03-23 (41 attendees, 140 matches, magic link + QR + investor heatmap, architecture + cost docs, deployed to XVentures Netlify)
+**Last updated:** 2026-04-01 (vertical tags aligned with 1000 Minds, Grid B2B integration, Runa API endpoints, DNS restored)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · PostgreSQL + pgvector on AWS RDS · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES · Netlify (frontend) · Supabase (DB — pending migration from RDS)
 
 ---
@@ -9,7 +9,9 @@
 
 - **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; **140 matches** across 38 attendees, avg score **0.70**, 36 above 0.75; vertical_tags + intent_tags integrated into embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS boost
 - **Data enrichment** — 38/38 attendees have AI summaries, embeddings, intent_tags, and vertical_tags; enrichment pipeline fully functional on EC2
-- **1000minds vertical_tags** — 11 sector verticals; 38/38 attendees classified by GPT-4o; 9/11 verticals represented; `COMPLEMENTARY_VERTICALS` map drives cross-sector boost in reranking
+- **1000minds vertical_tags** — 12 sector verticals (incl. `privacy`); display names aligned with 1000 Minds format; purple-styled tags visible on AttendeeMatches, Attendees, MyMatches; GPT responses validated against `VALID_VERTICALS`
+- **The Grid B2B integration** — `grid_enrichment.py` queries thegrid.id GraphQL API (public, no auth) by company name; stores verified description, sector, socials in `enriched_profile["grid"]`; "Verified by The Grid" emerald card on match cards + profiles; Grid description included in embedding composite text
+- **Runa integration API** — 4 endpoints behind `X-API-Key` auth at `/api/v1/integration/*`: magic-link lookup (create-on-the-fly), ticket-purchased webhook, ticket-cancelled webhook, attendee-status check; spec doc at `docs/runa-integration-spec.md` + `.docx` for Swerve
 - **AI Concierge markdown rendering** — assistant responses render with styled markdown (bold names, numbered lists, orange headers) via react-markdown; system prompt includes formatting instructions
 - **Supabase synced** — full mirror of RDS: 38 attendees, 129 matches, all AI data; ready for migration cutover
 - **Full attendee journey** — register (1-step form), browse matches, accept/decline with inline reason capture, mutual match confirmation, in-app messaging, meeting scheduling, ICS download, satisfaction rating
@@ -55,7 +57,16 @@
 - **Fire-and-forget email** — SES calls never raise to the caller; the product works without email, email is an enhancement layer; avoids adding failure modes to the match pipeline
 - **localStorage for saved shortlist** — no backend change needed for demo; fast to ship, sufficient for a product demo at this stage
 
+## Deployment
+
+- **Production URL**: `https://meet.proofoftalk.io` (Netlify frontend + proxied API to EC2) — DNS restored 2026-04-01
+- **Green EC2**: `3.239.218.239` — gunicorn + nginx; `APP_PUBLIC_URL=https://meet.proofoftalk.io`
+- **Blue EC2** (fallback): `54.89.55.202` — same RDS DB
+- **Deploy command**: `bash deploy/push.sh 3.239.218.239 ~/Downloads/Credentials_Keys/pot-key.pem`
+- **Integration API key**: set on EC2 in `.env` (`INTEGRATION_API_KEY`)
+
 ## Current Focus
 
-- Full end-to-end journey test — accept match, mutual match, messaging, meeting scheduling
+- Privacy mode for anonymous/pseudonymous Web3 attendees (Jes's request)
+- Share Runa integration spec + API key with Swerve
 - Email provider switch — SES production denied; switch to Resend/SendGrid/Postmark (needs Victor + DNS access)

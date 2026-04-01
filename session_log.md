@@ -212,3 +212,9 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Embeddings** — Grid description + sector included in composite text for vector embeddings (improves match quality for Web3 companies in Grid).
 - **Frontend** — "Verified by The Grid" card (emerald green) on MyMatches, MagicMatches, AttendeeMatches showing company description, sector badge, and link to Grid profile.
 - Deployed to EC2 + Netlify
+
+## 2026-04-01 — DNS restored + production URL fix
+- **`meet.proofoftalk.io` DNS is back** — CNAME record re-added by Swerve, domain resolving and serving correctly via Netlify
+- **`APP_PUBLIC_URL` restored** to `https://meet.proofoftalk.io` on EC2 (was temporarily set to EC2 IP for Swerve testing while DNS was down)
+- Magic links now return production URLs again
+- All features from 2026-03-30/31 (vertical tags, Grid integration, Runa API) confirmed live on production domain
