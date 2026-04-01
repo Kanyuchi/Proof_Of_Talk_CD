@@ -235,3 +235,9 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
   - **Expanded view** (toggle): full description, social links (Twitter, Discord, GitHub, Telegram, etc.), products (name, type, main flag, description), legal entities (name, type, country), founded date, Grid profile link
 - Replaces inline Grid cards in MyMatches, MagicMatches, AttendeeMatches
 - Deployed to EC2 + Netlify
+
+## 2026-04-01 (cont.) — Enrichment data quality fix
+- **Grid matching improved** — company name normalization (split concatenated words like "Cardanofoundation" → "Cardano"), domain-based fallback search, word-boundary validation to reject false positives ("Atos" no longer matches "Satoshigallery"), minimum 4-char search term
+- **Batch re-enrichment** — ran Grid enrichment for all 56 attendees: **15/56 matched** (up from 2). Matches include: Kraken, KuCoin, The Sandbox, Cardano, Proof of Talk, SoftStack, Carbon Ratings, Summ, BABS, XVentures
+- 30 attendees have no Grid match (their companies aren't in The Grid database yet — niche/small Web3 companies)
+- 11 skipped (company name too short or empty)
