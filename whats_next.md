@@ -6,7 +6,7 @@
 
 ## Now
 
-1. **Privacy mode (anonymous/pseudonymous profiles)** — `privacy_mode` field on Attendee (`full` / `b2b_only`), conditional field redaction in API responses, reveal-on-mutual-match logic, frontend toggle + conditional rendering, email adjustments. Per Jes's request for Web3 ambassadors who don't doxx.
+1. **Re-enrich attendees** — run enrichment batch to populate Grid data for existing attendees + re-classify with new privacy vertical
 2. **Runa integration — share spec + API key with Swerve** — endpoints live at `/api/v1/integration/*`, spec doc at `docs/runa-integration-spec.docx`; need to share API key securely and get Swerve's feedback on discussion points (webhook vs pull, UI placement, ticket type mapping)
 3. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
 4. **Email provider switch** — AWS SES production access DENIED (case #177412752700989, 2026-03-23). Need to switch to Resend, SendGrid, or Postmark. Requires domain DNS verification for `proofoftalk.io`. Discuss with Victor before proceeding.
@@ -67,3 +67,4 @@
 - ✓ Directory cleanup — temp files, .DS_Store, reorganised docs/scripts, consolidated node_modules
 - ✓ Runa integration API — 4 endpoints (magic link lookup, ticket webhooks, status), API key auth, spec doc for Swerve
 - ✓ The Grid B2B integration — GraphQL enrichment from thegrid.id, verified company data on match cards
+- ✓ Privacy mode — anonymous/pseudonymous B2B-only profiles with reveal-on-mutual-match, profile toggle, email handling

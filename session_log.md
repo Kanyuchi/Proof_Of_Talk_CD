@@ -218,3 +218,12 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **`APP_PUBLIC_URL` restored** to `https://meet.proofoftalk.io` on EC2 (was temporarily set to EC2 IP for Swerve testing while DNS was down)
 - Magic links now return production URLs again
 - All features from 2026-03-30/31 (vertical tags, Grid integration, Runa API) confirmed live on production domain
+
+## 2026-04-01 (cont.) — Privacy mode for anonymous/pseudonymous profiles
+- **`privacy_mode` field** on Attendee model — `"full"` (default) or `"b2b_only"`; migration adds column with server_default
+- **Backend redaction** — `redact_for_privacy()` in schemas strips name, email, photo, title, LinkedIn, Twitter from API responses for b2b_only attendees; shows company name as identifier instead
+- **Mutual-match reveal** — personal info automatically revealed when both parties accept the match (checked in match API response layer)
+- **Settable everywhere** — registration, profile update (PUT /auth/profile), magic link profile (PATCH /matches/m/{token}/profile)
+- **Frontend** — "B2B Profile" badge on MyMatches + MagicMatches cards; title displays company-only when null; Profile page has toggle switch with explanation
+- **Email** — match intro emails use company name instead of personal name for b2b_only attendees; mutual match emails reveal names (both consented)
+- Deployed to EC2 + Netlify
