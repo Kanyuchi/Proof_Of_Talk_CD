@@ -14,6 +14,7 @@ import {
   matchTypeConfig, ticketIcons, buildIcebreaker, twitterUrl,
 } from "../utils/matchHelpers";
 import { verticalDisplayName } from "../utils/verticals";
+import GridOrgCard from "../components/GridOrgCard";
 
 export default function MyMatches() {
   const navigate = useNavigate();
@@ -339,21 +340,11 @@ export default function MyMatches() {
                             </div>
                           )}
                           {/* Grid B2B data */}
-                          {(() => {
-                            const grid = (person.enriched_profile as Record<string, any>)?.grid;
-                            if (!grid?.grid_description) return null;
-                            return (
-                              <div className="mt-2 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
-                                <div className="flex items-center gap-1.5 mb-1">
-                                  <span className="text-[9px] font-medium text-emerald-400 uppercase tracking-wider">Verified by The Grid</span>
-                                  {grid.grid_sector && (
-                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px]">{grid.grid_sector}</span>
-                                  )}
-                                </div>
-                                <p className="text-[11px] text-white/50 line-clamp-2">{grid.grid_description}</p>
-                              </div>
-                            );
-                          })()}
+                          {(person.enriched_profile as Record<string, any>)?.grid?.grid_description && (
+                            <div className="mt-2">
+                              <GridOrgCard grid={(person.enriched_profile as Record<string, any>).grid} />
+                            </div>
+                          )}
                         </div>
                         {person.deal_readiness_score != null && person.deal_readiness_score > 0 && (
                           <div className="ml-auto text-right">
