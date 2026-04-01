@@ -227,3 +227,11 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Frontend** — "B2B Profile" badge on MyMatches + MagicMatches cards; title displays company-only when null; Profile page has toggle switch with explanation
 - **Email** — match intro emails use company name instead of personal name for b2b_only attendees; mutual match emails reveal names (both consented)
 - Deployed to EC2 + Netlify
+
+## 2026-04-01 (cont.) — Full Grid org card widget
+- **Expanded Grid enrichment** — 2-stage GraphQL query: stage 1 fetches profile (media/logos, tagLine, descriptionLong), stage 2 fetches products + legal entities via rootId
+- **GridOrgCard component** (`frontend/src/components/GridOrgCard.tsx`) — reusable widget replacing inline compact cards:
+  - **Compact view** (always visible): company logo, "Verified by The Grid" badge, sector badge, type badge, tagline, short description
+  - **Expanded view** (toggle): full description, social links (Twitter, Discord, GitHub, Telegram, etc.), products (name, type, main flag, description), legal entities (name, type, country), founded date, Grid profile link
+- Replaces inline Grid cards in MyMatches, MagicMatches, AttendeeMatches
+- Deployed to EC2 + Netlify
