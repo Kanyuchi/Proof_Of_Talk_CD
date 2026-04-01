@@ -159,35 +159,111 @@ def _build_grid_data(profile: dict, products: list[dict], entities: list[dict]) 
     }
 
 
-async def enrich_from_grid(company_name: str) -> dict | None:
+import re as _re
+
+
+def _normalize_company_name(name: str) -> list[str]:
+    """
+    Generate search variants for domain-derived company names.
+    E.g. "Cardanofoundation" → ["Cardanofoundation", "Cardano Foundation", "Cardano"]
+    """
+    clean = name.strip()
+    if not clean:
+        return []
+    variants = [clean]
+
+    # Split concatenated words: "CardanoFoundation" → "Cardano Foundation"
+    # Insert space before uppercase letters that follow lowercase
+    spaced = _re.sub(r"([a-z])([A-Z])", r"\1 \2", clean)
+    if spaced != clean:
+        variants.append(spaced)
+
+    # Also try splitting all-lowercase concatenated names by known suffixes
+    lower = clean.lower()
+    for suffix in ("foundation", "digital", "labs", "protocol", "network", "finance", "capital", "ventures", "assets", "global", "exchange", "laboratory"):
+        if lower.endswith(suffix) and len(lower) > len(suffix) + 2:
+            prefix = clean[:len(clean) - len(suffix)]
+            spaced_suffix = f"{prefix} {clean[len(prefix):]}"
+            if spaced_suffix not in variants:
+                variants.append(spaced_suffix)
+            # Also try just the prefix (e.g., "Cardano" from "Cardanofoundation")
+            if prefix.strip() not in variants and len(prefix.strip()) > 2:
+                variants.append(prefix.strip())
+
+    return variants
+
+
+def _domain_to_search_term(website: str) -> str | None:
+    """Extract a search-friendly name from a company website domain."""
+    if not website:
+        return None
+    # Strip protocol and www
+    domain = website.lower().replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
+    # Get the main part (before TLD)
+    parts = domain.split(".")
+    if len(parts) >= 2:
+        name = parts[0]
+        if name and len(name) > 2 and name not in ("com", "org", "net", "io", "ai", "co", "de"):
+            return name.title()
+    return None
+
+
+async def _search_grid(client: httpx.AsyncClient, search_term: str) -> list[dict]:
+    """Run a single Grid search query."""
+    resp = await client.post(
+        GRID_GRAPHQL_URL,
+        json={"query": PROFILE_QUERY, "variables": {"name": f"%{search_term}%"}},
+        headers={"Content-Type": "application/json"},
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if data.get("errors"):
+        return []
+    return (data.get("data") or {}).get("profileInfos") or []
+
+
+async def enrich_from_grid(company_name: str, company_website: str | None = None) -> dict | None:
     """
     Search The Grid for a company by name and return full org data:
     profile info, media/logos, products, and legal entities.
+
+    Tries multiple search strategies:
+    1. Exact company name
+    2. Normalized variants (split concatenated words, strip suffixes)
+    3. Domain-based search from company_website
 
     Returns None if no match found or API is unreachable.
     """
     if not company_name or len(company_name.strip()) < 2:
         return None
 
-    search_term = f"%{company_name.strip()}%"
+    # Build search variants
+    search_variants = _normalize_company_name(company_name)
+
+    # Add domain-based variant as fallback
+    domain_name = _domain_to_search_term(company_website)
+    if domain_name and domain_name.lower() != company_name.lower().strip():
+        search_variants.append(domain_name)
+
+    # Deduplicate while preserving order
+    seen = set()
+    unique_variants = []
+    for v in search_variants:
+        vl = v.lower()
+        if vl not in seen:
+            seen.add(vl)
+            unique_variants.append(v)
 
     try:
+        profile = None
         async with httpx.AsyncClient(timeout=20) as client:
-            # Stage 1: Find profile
-            resp = await client.post(
-                GRID_GRAPHQL_URL,
-                json={"query": PROFILE_QUERY, "variables": {"name": search_term}},
-                headers={"Content-Type": "application/json"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        if data.get("errors"):
-            logger.warning("grid_enrichment: GraphQL errors for '%s': %s", company_name, data["errors"])
-            return None
-
-        results = (data.get("data") or {}).get("profileInfos") or []
-        profile = _best_match(results, company_name)
+            # Try each variant until we get a match
+            for variant in unique_variants:
+                results = await _search_grid(client, variant)
+                profile = _best_match(results, company_name)
+                if profile:
+                    logger.info("grid_enrichment: matched '%s' via search '%s'", company_name, variant)
+                    break
         if not profile:
             logger.info("grid_enrichment: no match for '%s'", company_name)
             return None

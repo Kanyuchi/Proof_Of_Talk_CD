@@ -72,7 +72,7 @@ class EnrichmentService:
         # --- The Grid B2B enrichment (Web3 company database) ---
         if attendee.company and not enriched.get("grid"):
             from app.services.grid_enrichment import enrich_from_grid
-            grid_data = await enrich_from_grid(attendee.company)
+            grid_data = await enrich_from_grid(attendee.company, attendee.company_website)
             if grid_data:
                 enriched["grid"] = grid_data
                 enriched["grid_enriched_at"] = datetime.utcnow().isoformat()
