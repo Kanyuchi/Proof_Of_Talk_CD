@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {
-  Search, Crown, Mic, Megaphone, User, ChevronRight, Brain, ShieldOff,
+  Search, Crown, Mic, Megaphone, User, ChevronRight, Brain,
 } from "lucide-react";
 import { useAttendees } from "../hooks/useAttendees";
 import { useMatches } from "../hooks/useMatches";
@@ -53,18 +53,7 @@ export default function Attendees() {
   const [filters, setFilters] = useState<string[]>([]);
 
   if (!user?.is_admin) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 gap-4 text-center">
-        <ShieldOff className="w-10 h-10 text-white/20" />
-        <div>
-          <p className="text-white/50 font-medium">Admin access required</p>
-          <p className="text-white/30 text-sm mt-1">The attendee directory is restricted to organisers.</p>
-        </div>
-        <Link to="/matches" className="text-sm text-[#E76315] hover:underline">
-          Go to your matches →
-        </Link>
-      </div>
-    );
+    return <Navigate to="/matches" replace />;
   }
 
   const toggleFilter = (type: string) =>

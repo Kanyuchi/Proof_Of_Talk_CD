@@ -51,7 +51,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 <span>Home</span>
               </Link>
             )}
-            {isAuthenticated && (
+            {user?.is_admin && (
               <Link to="/attendees" className={linkCls("/attendees")}>
                 <Users className="w-4 h-4" />
                 <span>Attendees</span>
