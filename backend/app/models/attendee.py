@@ -39,6 +39,9 @@ class Attendee(Base):
     # Magic link — unique token for no-login dashboard access
     magic_access_token: Mapped[str | None] = mapped_column(String(64), unique=True, index=True, nullable=True)
 
+    # Privacy — "full" (show everything) or "b2b_only" (hide personal data, show company/verticals/Grid)
+    privacy_mode: Mapped[str] = mapped_column(String(20), default="full")
+
     # Profile photo (user-set URL; falls back to enriched data / Gravatar in frontend)
     photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 

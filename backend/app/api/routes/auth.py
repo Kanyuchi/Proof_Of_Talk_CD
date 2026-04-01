@@ -61,6 +61,7 @@ async def register(
         twitter_handle=data.twitter_handle,
         company_website=data.company_website,
         magic_access_token=secrets.token_urlsafe(32),
+        privacy_mode=data.privacy_mode if data.privacy_mode in ("full", "b2b_only") else "full",
     )
     db.add(attendee)
     await db.flush()  # ensures attendee.id is populated
@@ -117,9 +118,12 @@ async def update_profile(
         "name", "company", "title", "goals", "interests",
         "seeking", "not_looking_for", "preferred_geographies", "deal_stage",
         "linkedin_url", "twitter_handle", "company_website", "photo_url",
+        "privacy_mode",
     }
     for field, value in data.items():
         if field in allowed:
+            if field == "privacy_mode" and value not in ("full", "b2b_only"):
+                continue
             setattr(attendee, field, value)
 
     # Update display name on User too if name changed

@@ -300,9 +300,12 @@ export default function MyMatches() {
                           <div className="flex items-center gap-2">
                             <span className="font-semibold">{person.name}</span>
                             <span className="text-white/30">{ticketIcons[person.ticket_type]}</span>
+                            {person.privacy_mode === "b2b_only" && (
+                              <span className="px-1.5 py-0.5 rounded bg-white/5 text-white/30 text-[9px] uppercase tracking-wider">B2B Profile</span>
+                            )}
                           </div>
                           <div className="text-sm text-white/50">
-                            {person.title} &middot; {person.company}
+                            {person.title ? `${person.title} · ${person.company}` : person.company}
                           </div>
                           {/* Social links */}
                           <div className="flex items-center gap-2 mt-1">

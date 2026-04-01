@@ -20,6 +20,7 @@ export interface Attendee {
   intent_tags: string[];
   vertical_tags: string[];
   deal_readiness_score: number | null;
+  privacy_mode: string;
   enriched_profile: Record<string, unknown>;
   created_at: string;
 }

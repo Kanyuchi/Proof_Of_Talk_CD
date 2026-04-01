@@ -44,9 +44,32 @@ class AttendeeResponse(BaseModel):
     vertical_tags: list[str]
     deal_readiness_score: float | None
     enriched_profile: dict
+    privacy_mode: str = "full"
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+def redact_for_privacy(attendee_dict: dict, is_mutual_match: bool = False) -> dict:
+    """
+    Redact personal fields for b2b_only attendees.
+    If is_mutual_match is True, reveal everything (both parties consented).
+    """
+    if attendee_dict.get("privacy_mode") != "b2b_only" or is_mutual_match:
+        return attendee_dict
+
+    company = attendee_dict.get("company") or "Anonymous"
+    # Keep only B2B data — hide personal identity
+    attendee_dict["name"] = company
+    attendee_dict["email"] = None
+    attendee_dict["title"] = None
+    attendee_dict["photo_url"] = None
+    attendee_dict["linkedin_url"] = None
+    attendee_dict["twitter_handle"] = None
+    attendee_dict["ai_summary"] = None
+    # Keep: company, vertical_tags, intent_tags, deal_readiness_score, company_website,
+    #        enriched_profile (Grid data), interests, goals
+    return attendee_dict
 
 
 class AttendeeListResponse(BaseModel):

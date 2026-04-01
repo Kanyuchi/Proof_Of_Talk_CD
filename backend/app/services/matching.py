@@ -509,11 +509,18 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 )
                 top_candidate = await self.db.get(Attendee, top_candidate_id)
                 if top_candidate and attendee.email:
+                    # Respect privacy mode — show company name instead of personal name for b2b_only
+                    if getattr(top_candidate, "privacy_mode", "full") == "b2b_only":
+                        display_name = top_candidate.company or "Anonymous"
+                        display_title = ""
+                    else:
+                        display_name = top_candidate.name
+                        display_title = top_candidate.title or ""
                     send_match_intro_email(
                         to_email=attendee.email,
                         attendee_name=attendee.name,
-                        match_name=top_candidate.name,
-                        match_title=top_candidate.title or "",
+                        match_name=display_name,
+                        match_title=display_title,
                         match_company=top_candidate.company or "",
                         explanation=top.explanation or "",
                         match_count=len(matches),

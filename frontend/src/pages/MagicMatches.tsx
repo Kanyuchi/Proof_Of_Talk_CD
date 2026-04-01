@@ -194,11 +194,16 @@ export default function MagicMatches() {
                       </div>
                     )}
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-bold truncate">
-                        {person?.name ?? "Matched Attendee"}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-bold truncate">
+                          {person?.name ?? "Matched Attendee"}
+                        </h3>
+                        {person?.privacy_mode === "b2b_only" && (
+                          <span className="px-1.5 py-0.5 rounded bg-white/5 text-white/30 text-[9px] uppercase tracking-wider shrink-0">B2B Profile</span>
+                        )}
+                      </div>
                       <p className="text-white/50 text-sm">
-                        {person?.title} · {person?.company}
+                        {person?.title ? `${person.title} · ${person.company}` : person?.company}
                       </p>
                       {/* Social links */}
                       <div className="flex items-center gap-3 mt-2">

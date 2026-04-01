@@ -26,6 +26,7 @@ class RegisterRequest(BaseModel):
     linkedin_url: str | None = None
     twitter_handle: str | None = None
     company_website: str | None = None
+    privacy_mode: str = "full"  # "full" or "b2b_only"
 
     @field_validator("password")
     @classmethod

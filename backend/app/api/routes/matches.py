@@ -13,6 +13,7 @@ from app.schemas.attendee import (
     ScheduleMeetingRequest,
     MatchFeedbackUpdate,
     AttendeeResponse,
+    redact_for_privacy,
 )
 from app.services.matching import MatchingEngine
 from app.core.deps import require_auth, require_admin
@@ -70,7 +71,9 @@ async def get_matches(
         matched = await db.get(Attendee, other_id)
         resp = MatchResponse.model_validate(match)
         if matched:
-            resp.matched_attendee = AttendeeResponse.model_validate(matched)
+            is_mutual = match.status_a == "accepted" and match.status_b == "accepted"
+            att_dict = AttendeeResponse.model_validate(matched).model_dump()
+            resp.matched_attendee = AttendeeResponse(**redact_for_privacy(att_dict, is_mutual_match=is_mutual))
         match_responses.append(resp)
 
     return MatchListResponse(matches=match_responses, attendee_id=attendee_id)
@@ -117,7 +120,9 @@ async def get_matches_by_magic_link(
         matched = await db.get(Attendee, other_id)
         resp = MatchResponse.model_validate(match)
         if matched:
-            resp.matched_attendee = AttendeeResponse.model_validate(matched)
+            is_mutual = match.status_a == "accepted" and match.status_b == "accepted"
+            att_dict = AttendeeResponse.model_validate(matched).model_dump()
+            resp.matched_attendee = AttendeeResponse(**redact_for_privacy(att_dict, is_mutual_match=is_mutual))
         match_responses.append(resp)
 
     return MatchListResponse(matches=match_responses, attendee_id=attendee.id)
@@ -128,6 +133,7 @@ class MagicProfileUpdate(BaseModel):
     twitter_handle: str | None = None
     target_companies: str | None = None
     photo_url: str | None = None
+    privacy_mode: str | None = None
 
 
 @router.patch("/m/{token}/profile")
@@ -153,6 +159,8 @@ async def update_profile_via_magic_link(
         attendee.target_companies = data.target_companies
     if data.photo_url is not None:
         attendee.photo_url = data.photo_url
+    if data.privacy_mode is not None and data.privacy_mode in ("full", "b2b_only"):
+        attendee.privacy_mode = data.privacy_mode
 
     await db.commit()
     return {"status": "updated"}

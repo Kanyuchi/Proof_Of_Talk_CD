@@ -33,6 +33,7 @@ export default function Profile() {
     twitter_handle: "",
     company_website: "",
     interests: [] as string[],
+    privacy_mode: "full",
   });
 
   const [interestInput, setInterestInput] = useState("");
@@ -55,6 +56,7 @@ export default function Profile() {
           twitter_handle: a.twitter_handle ?? "",
           company_website: a.company_website ?? "",
           interests: a.interests ?? [],
+          privacy_mode: a.privacy_mode ?? "full",
         });
       })
       .catch(() => setError("Could not load your profile."))
@@ -300,6 +302,36 @@ export default function Profile() {
             <p className="text-[11px] text-white/20">Auto-generated · updates after each enrichment run</p>
           </section>
         )}
+
+        {/* Privacy mode toggle */}
+        <section className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-3">
+          <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">Profile Visibility</h2>
+          <div className="flex items-start gap-4">
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, privacy_mode: f.privacy_mode === "full" ? "b2b_only" : "full" }))}
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 mt-0.5 ${
+                form.privacy_mode === "b2b_only" ? "bg-[#E76315]" : "bg-white/10"
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${
+                  form.privacy_mode === "b2b_only" ? "translate-x-5" : ""
+                }`}
+              />
+            </button>
+            <div>
+              <p className="text-sm text-white/80 font-medium">
+                {form.privacy_mode === "b2b_only" ? "B2B Only mode" : "Full profile visible"}
+              </p>
+              <p className="text-xs text-white/40 mt-0.5">
+                {form.privacy_mode === "b2b_only"
+                  ? "Your matches see only your company, verticals, and Grid data. Your name, photo, and social links are hidden until you both accept a match."
+                  : "Your full profile (name, photo, social links) is visible to your matches."}
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* Actions */}
         {error && (
