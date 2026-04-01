@@ -62,13 +62,26 @@ query OrgDetails($rootId: String!) {
 def _best_match(results: list[dict], company_name: str) -> dict | None:
     if not results:
         return None
-    if len(results) == 1:
-        return results[0]
     lower = company_name.lower().strip()
+    # Exact match (case-insensitive)
     for r in results:
         if r["name"].lower().strip() == lower:
             return r
-    return results[0]
+    # Word-boundary match — majority of query words must appear in Grid name
+    for r in results:
+        grid_lower = r["name"].lower().strip()
+        grid_words = set(grid_lower.split())
+        query_words = set(lower.split())
+        # Ignore single-char words like "X" in overlap
+        meaningful_query = {w for w in query_words if len(w) > 1}
+        overlap = grid_words & meaningful_query
+        if overlap and len(overlap) >= max(1, len(meaningful_query) * 0.5):
+            return r
+    # If only 1 result and query was specific enough (4+ chars), accept it
+    if len(results) == 1 and len(lower) >= 4:
+        return results[0]
+    # Multiple results, no substring match — too ambiguous, skip
+    return None
 
 
 def _extract_socials(socials: list[dict]) -> dict[str, str]:
@@ -234,7 +247,7 @@ async def enrich_from_grid(company_name: str, company_website: str | None = None
 
     Returns None if no match found or API is unreachable.
     """
-    if not company_name or len(company_name.strip()) < 2:
+    if not company_name or len(company_name.strip()) < 4:
         return None
 
     # Build search variants
