@@ -36,14 +36,24 @@ async def _daily_extasy_sync():
     except Exception as exc:
         logger.error("scheduler: daily extasy sync failed", error=str(exc))
 
+async def _daily_speakers_sync():
+    try:
+        from app.services.speakers_sync import sync_and_enrich
+        result = await sync_and_enrich()
+        logger.info("scheduler: daily speakers sync complete", **result)
+    except Exception as exc:
+        logger.error("scheduler: daily speakers sync failed", error=str(exc))
+
 scheduler = AsyncIOScheduler()
 # Run every day at 02:00 UTC — after midnight registrations settle
 scheduler.add_job(_daily_extasy_sync, CronTrigger(hour=2, minute=0, timezone="UTC"))
+# Speakers sync at 02:15 UTC — after Extasy sync completes
+scheduler.add_job(_daily_speakers_sync, CronTrigger(hour=2, minute=15, timezone="UTC"))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
-    logger.info("scheduler: started — extasy sync runs daily at 02:00 UTC")
+    logger.info("scheduler: started — extasy sync 02:00 UTC, speakers sync 02:15 UTC")
     yield
     scheduler.shutdown(wait=False)
     logger.info("scheduler: stopped")

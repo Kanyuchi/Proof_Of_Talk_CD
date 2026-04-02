@@ -350,6 +350,17 @@ async def sync_extasy(
     return {"status": "completed", **result}
 
 
+@router.post("/sync-speakers")
+async def sync_speakers(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Admin: pull speakers from 1000 Minds table and upsert into attendees for matching."""
+    from app.services.speakers_sync import sync_speakers_to_attendees
+    result = await sync_speakers_to_attendees(db)
+    return {"status": "completed", **result}
+
+
 @router.get("/engagement/nudges/dry-run")
 async def nudge_dry_run(
     db: AsyncSession = Depends(get_db),
