@@ -61,7 +61,8 @@
 
 - **Production URL**: `https://meet.proofoftalk.io` (Netlify frontend + proxied API to EC2) — DNS restored 2026-04-01
 - **Green EC2**: `3.239.218.239` — gunicorn + nginx; `APP_PUBLIC_URL=https://meet.proofoftalk.io`
-- **Blue EC2** (fallback): `54.89.55.202` — same RDS DB
+- **Blue EC2** (fallback): `54.89.55.202` — old RDS connection (not updated)
+- **Database**: **Supabase PostgreSQL** (`db.mkcememoueziibbpqhfk.supabase.co:5432/postgres`) — XLabs Ext Pro plan, IPv4 add-on enabled, shared project with 1000 Minds (`speakers` table). RDS backup saved as `.env.rds-backup` on EC2
 - **Deploy command**: `bash deploy/push.sh 3.239.218.239 ~/Downloads/Credentials_Keys/pot-key.pem`
 - **Integration API key**: set on EC2 in `.env` (`INTEGRATION_API_KEY`)
 
