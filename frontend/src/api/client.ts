@@ -187,6 +187,17 @@ export async function getAttendeesBySector(
   return data;
 }
 
+export async function getRevenueStats(): Promise<{
+  funnel: { total_orders: number; paid: number; redeemed: number; failed: number; refunded: number; pending: number; valid: number; conversion_rate: number };
+  revenue: { total: number; avg_ticket_price: number; paid_tickets: number; comp_tickets: number; by_type: { type: string; count: number; revenue: number }[] };
+  growth: { week: string; registrations: number }[];
+  source_breakdown: { extasy: number; speakers_1000minds: number; seed: number; other: number; total: number };
+  profile_completeness: { total: number; with_goals: number; with_linkedin: number; with_twitter: number; with_website: number; with_grid: number; with_photo: number; with_targets: number };
+}> {
+  const { data } = await api.get("/dashboard/revenue");
+  return data;
+}
+
 export async function getInvestorHeatmap(): Promise<{
   heatmap: {
     vertical: string;

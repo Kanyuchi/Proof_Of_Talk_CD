@@ -9,7 +9,7 @@ import {
   useAttendeesBySector, useTriggerProcessing, useTriggerMatching,
 } from "../hooks/useDashboard";
 import { useAuth } from "../hooks/useAuth";
-import { enrichAll, syncExtasy, getInvestorHeatmap } from "../api/client";
+import { enrichAll, syncExtasy, getInvestorHeatmap, getRevenueStats } from "../api/client";
 import { useQuery } from "@tanstack/react-query";
 
 function StatCard({
@@ -80,6 +80,11 @@ export default function Dashboard() {
   const { data: heatmapData } = useQuery({
     queryKey: ["investor-heatmap"],
     queryFn: getInvestorHeatmap,
+    staleTime: 60_000,
+  });
+  const { data: revenueData } = useQuery({
+    queryKey: ["revenue-stats"],
+    queryFn: getRevenueStats,
     staleTime: 60_000,
   });
   const processMutation = useTriggerProcessing();
@@ -188,7 +193,152 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Top stats */}
+      {/* Revenue & Registration */}
+      {revenueData && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard icon={DollarSign} label="Total Revenue" value={`€${revenueData.revenue.total.toLocaleString()}`} color="bg-emerald-500" />
+            <StatCard icon={Users} label="Valid Tickets" value={revenueData.funnel.valid} color="bg-blue-500" />
+            <StatCard icon={TrendingUp} label="Conversion Rate" value={`${(revenueData.funnel.conversion_rate * 100).toFixed(1)}%`} color="bg-purple-500" />
+            <StatCard icon={DollarSign} label="Avg Ticket Price" value={`€${revenueData.revenue.avg_ticket_price.toFixed(0)}`} color="bg-[#D35400]" />
+          </div>
+
+          {/* Registration funnel */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 mb-4">
+                <Activity className="w-5 h-5 text-[#E76315]" />
+                <h2 className="text-lg font-semibold">Registration Funnel</h2>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { label: "Total Orders", value: revenueData.funnel.total_orders, color: "bg-white/20" },
+                  { label: "Paid", value: revenueData.funnel.paid, color: "bg-emerald-500" },
+                  { label: "Redeemed (comp)", value: revenueData.funnel.redeemed, color: "bg-blue-500" },
+                  { label: "Failed", value: revenueData.funnel.failed, color: "bg-red-500" },
+                  { label: "Pending", value: revenueData.funnel.pending, color: "bg-yellow-500" },
+                  { label: "Refunded", value: revenueData.funnel.refunded, color: "bg-white/30" },
+                ].map(({ label, value, color }) => {
+                  const pct = revenueData.funnel.total_orders ? (value / revenueData.funnel.total_orders) * 100 : 0;
+                  return (
+                    <div key={label} className="flex items-center gap-3">
+                      <span className="w-32 text-xs text-white/50 text-right shrink-0">{label}</span>
+                      <div className="flex-1 h-6 bg-white/5 rounded-full overflow-hidden relative">
+                        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${Math.max(pct, 2)}%` }} />
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/80">{value}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Revenue by ticket type */}
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 mb-4">
+                <DollarSign className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-lg font-semibold">Revenue by Ticket Type</h2>
+              </div>
+              <div className="space-y-3">
+                {revenueData.revenue.by_type.map(({ type, count, revenue }) => (
+                  <div key={type} className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{type}</div>
+                      <div className="text-[10px] text-white/30">{count} ticket{count !== 1 ? "s" : ""}</div>
+                    </div>
+                    <span className="text-sm font-mono text-emerald-400 shrink-0">€{revenue.toLocaleString()}</span>
+                  </div>
+                ))}
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                  <span className="text-xs text-white/40">Paid: {revenueData.revenue.paid_tickets} · Comp: {revenueData.revenue.comp_tickets}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Attendee growth + source breakdown + profile completeness */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Weekly growth */}
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="w-5 h-5 text-[#E76315]" />
+                <h2 className="text-lg font-semibold">Weekly Growth</h2>
+              </div>
+              <div className="space-y-2">
+                {revenueData.growth.map(({ week, registrations }) => {
+                  const maxReg = Math.max(...revenueData.growth.map(g => g.registrations), 1);
+                  return (
+                    <div key={week} className="flex items-center gap-2">
+                      <span className="w-16 text-[10px] text-white/40 text-right shrink-0">{week}</span>
+                      <div className="flex-1 h-5 bg-white/5 rounded overflow-hidden relative">
+                        <div className="h-full bg-[#E76315] rounded transition-all" style={{ width: `${(registrations / maxReg) * 100}%` }} />
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/70">{registrations}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Source breakdown */}
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="w-5 h-5 text-blue-400" />
+                <h2 className="text-lg font-semibold">Attendee Sources</h2>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { label: "Rhuna / Extasy", value: revenueData.source_breakdown.extasy, color: "text-[#E76315]" },
+                  { label: "1000 Minds Speakers", value: revenueData.source_breakdown.speakers_1000minds, color: "text-purple-400" },
+                  { label: "Seed / Test", value: revenueData.source_breakdown.seed, color: "text-white/30" },
+                  { label: "Other / Manual", value: revenueData.source_breakdown.other, color: "text-blue-400" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-sm text-white/60">{label}</span>
+                    <span className={`text-lg font-bold ${color}`}>{value}</span>
+                  </div>
+                ))}
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                  <span className="text-xs text-white/40">Total in DB</span>
+                  <span className="text-lg font-bold">{revenueData.source_breakdown.total}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Profile completeness */}
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 mb-4">
+                <Lightbulb className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-lg font-semibold">Profile Quality</h2>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { label: "Has Goals", value: revenueData.profile_completeness.with_goals, color: "bg-emerald-500" },
+                  { label: "LinkedIn", value: revenueData.profile_completeness.with_linkedin, color: "bg-blue-500" },
+                  { label: "Twitter / X", value: revenueData.profile_completeness.with_twitter, color: "bg-sky-500" },
+                  { label: "Website", value: revenueData.profile_completeness.with_website, color: "bg-[#E76315]" },
+                  { label: "Grid Verified", value: revenueData.profile_completeness.with_grid, color: "bg-purple-500" },
+                  { label: "Photo", value: revenueData.profile_completeness.with_photo, color: "bg-pink-500" },
+                  { label: "Meeting Targets", value: revenueData.profile_completeness.with_targets, color: "bg-yellow-500" },
+                ].map(({ label, value, color }) => {
+                  const pct = revenueData.profile_completeness.total ? (value / revenueData.profile_completeness.total) * 100 : 0;
+                  return (
+                    <div key={label} className="flex items-center gap-2">
+                      <span className="w-24 text-[10px] text-white/50 text-right shrink-0">{label}</span>
+                      <div className="flex-1 h-4 bg-white/5 rounded-full overflow-hidden">
+                        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-[10px] text-white/40 w-12 text-right">{value}/{revenueData.profile_completeness.total}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Matchmaking stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard icon={Users} label="Total Attendees" value={stats.total_attendees.toLocaleString()} color="bg-blue-500" />
         <StatCard icon={Handshake} label="Matches Generated" value={stats.matches_generated.toLocaleString()} color="bg-[#D35400]" />

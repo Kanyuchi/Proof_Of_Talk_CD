@@ -1,3 +1,8 @@
+import csv
+import io
+from collections import defaultdict
+
+import httpx
 import structlog
 logger = structlog.get_logger(__name__)
 from fastapi import APIRouter, Depends, Query, BackgroundTasks
@@ -429,4 +434,145 @@ async def investor_heatmap(db: AsyncSession = Depends(get_db), _user: User = Dep
         "heatmap": heatmap,
         "total_attendees": len(attendees),
         "deal_readiness_distribution": {"high": high, "medium": medium, "low": low},
+    }
+
+
+EXTASY_EVENT_ID = "32b1b684-0e87-4633-92ef-b47272aa3fce"
+EXTASY_ORDERS_URL = f"https://api.b2b.extasy.com/operations/reports/orders/{EXTASY_EVENT_ID}"
+TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
+
+
+@router.get("/revenue")
+async def revenue_stats(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Revenue tracking, registration funnel, and attendee growth from Extasy."""
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(EXTASY_ORDERS_URL)
+            resp.raise_for_status()
+            text = resp.content.decode("iso-8859-1", errors="replace")
+            orders = list(csv.DictReader(io.StringIO(text)))
+    except Exception as exc:
+        return {"error": f"Extasy API unavailable: {exc}"}
+
+    # ── Registration funnel ───────────────────────────────────────────────
+    funnel = defaultdict(int)
+    for o in orders:
+        funnel[o.get("status", "UNKNOWN")] += 1
+    total_orders = len(orders)
+    paid = funnel.get("PAID", 0)
+    redeemed = funnel.get("REDEEMED", 0)
+    failed = funnel.get("FAILED", 0)
+    refunded = funnel.get("REFUNDED", 0)
+    pending = funnel.get("PAYMENT_PENDING", 0)
+    valid = paid + redeemed
+    conversion_rate = valid / total_orders if total_orders else 0
+
+    # ── Revenue ───────────────────────────────────────────────────────────
+    valid_orders = [o for o in orders if o.get("status") in {"PAID", "REDEEMED"}]
+    total_revenue = 0.0
+    revenue_by_type = defaultdict(lambda: {"count": 0, "revenue": 0.0})
+    paid_count = 0
+    comp_count = 0
+
+    for o in valid_orders:
+        ticket_name = (o.get("ticketNames") or "").split(",")[0].strip()
+        if ticket_name.lower() in TEST_TICKET_NAMES:
+            continue
+
+        amount = 0.0
+        try:
+            amount = float(o.get("paymentsAmount") or o.get("fullPrice") or "0")
+        except (ValueError, TypeError):
+            pass
+
+        total_revenue += amount
+        revenue_by_type[ticket_name]["count"] += 1
+        revenue_by_type[ticket_name]["revenue"] += amount
+
+        if amount > 0:
+            paid_count += 1
+        else:
+            comp_count += 1
+
+    real_valid = sum(t["count"] for t in revenue_by_type.values())
+    avg_ticket = total_revenue / paid_count if paid_count else 0
+
+    # ── Growth over time (weekly buckets) ─────────────────────────────────
+    from datetime import datetime
+    weekly = defaultdict(int)
+    for o in valid_orders:
+        ticket_name = (o.get("ticketNames") or "").split(",")[0].strip()
+        if ticket_name.lower() in TEST_TICKET_NAMES:
+            continue
+        created = o.get("createdAtUtc", "")
+        if created:
+            try:
+                dt = datetime.strptime(created[:10], "%Y-%m-%d")
+                # ISO week label
+                week = dt.strftime("%Y-W%V")
+                weekly[week] += 1
+            except ValueError:
+                pass
+    growth = [{"week": w, "registrations": c} for w, c in sorted(weekly.items())]
+
+    # ── Profile completeness from DB ──────────────────────────────────────
+    result = await db.execute(select(Attendee))
+    attendees = result.scalars().all()
+    total_db = len(attendees)
+    with_goals = sum(1 for a in attendees if a.goals)
+    with_linkedin = sum(1 for a in attendees if a.linkedin_url)
+    with_twitter = sum(1 for a in attendees if a.twitter_handle)
+    with_website = sum(1 for a in attendees if a.company_website)
+    with_grid = sum(1 for a in attendees if (a.enriched_profile or {}).get("grid", {}).get("grid_name"))
+    with_photo = sum(1 for a in attendees if a.photo_url)
+    with_targets = sum(1 for a in attendees if a.target_companies)
+
+    # ── Source breakdown ──────────────────────────────────────────────────
+    from_extasy = sum(1 for a in attendees if "extasy" in str(a.enriched_profile or ""))
+    from_speakers = sum(1 for a in attendees if a.email and "speaker.proofoftalk.io" in a.email)
+    from_seed = sum(1 for a in attendees if a.email and "@example.com" in a.email)
+    from_other = total_db - from_extasy - from_speakers - from_seed
+
+    return {
+        "funnel": {
+            "total_orders": total_orders,
+            "paid": paid,
+            "redeemed": redeemed,
+            "failed": failed,
+            "refunded": refunded,
+            "pending": pending,
+            "valid": valid,
+            "conversion_rate": round(conversion_rate, 3),
+        },
+        "revenue": {
+            "total": round(total_revenue, 2),
+            "avg_ticket_price": round(avg_ticket, 2),
+            "paid_tickets": paid_count,
+            "comp_tickets": comp_count,
+            "by_type": [
+                {"type": k, "count": v["count"], "revenue": round(v["revenue"], 2)}
+                for k, v in sorted(revenue_by_type.items(), key=lambda x: -x[1]["revenue"])
+            ],
+        },
+        "growth": growth,
+        "source_breakdown": {
+            "extasy": from_extasy,
+            "speakers_1000minds": from_speakers,
+            "seed": from_seed,
+            "other": from_other,
+            "total": total_db,
+        },
+        "profile_completeness": {
+            "total": total_db,
+            "with_goals": with_goals,
+            "with_linkedin": with_linkedin,
+            "with_twitter": with_twitter,
+            "with_website": with_website,
+            "with_grid": with_grid,
+            "with_photo": with_photo,
+            "with_targets": with_targets,
+        },
     }
