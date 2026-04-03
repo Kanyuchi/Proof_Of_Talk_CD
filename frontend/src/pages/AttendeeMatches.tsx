@@ -384,6 +384,27 @@ export default function AttendeeMatches() {
                       <div className="text-sm text-white/50">
                         {person.title} &middot; {person.company}
                       </div>
+                      {/* Social links */}
+                      <div className="flex items-center gap-2 mt-1">
+                        {person.linkedin_url && (
+                          <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
+                            className="text-white/30 hover:text-blue-400 transition-colors">
+                            <Linkedin className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {person.twitter_handle && (
+                          <a href={twitterUrl(person.twitter_handle)} target="_blank" rel="noopener noreferrer"
+                            className="text-white/30 hover:text-sky-400 transition-colors">
+                            <Twitter className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {person.company_website && (
+                          <a href={person.company_website} target="_blank" rel="noopener noreferrer"
+                            className="text-white/30 hover:text-[#E76315] transition-colors">
+                            <Globe className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                     {person.deal_readiness_score != null && person.deal_readiness_score > 0 && (
                       <div className="ml-auto text-right">
@@ -394,6 +415,22 @@ export default function AttendeeMatches() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {/* Vertical tags */}
+                {person && (person.vertical_tags ?? []).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {person.vertical_tags.map((tag: string) => (
+                      <span key={tag} className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 text-xs border border-purple-500/20">
+                        {tag.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Grid card */}
+                {person && (person.enriched_profile as Record<string, any>)?.grid?.grid_description && (
+                  <GridOrgCard grid={(person.enriched_profile as Record<string, any>).grid} />
                 )}
 
                 {/* AI Explanation */}
