@@ -9,7 +9,7 @@ import {
   useAttendeesBySector, useTriggerProcessing, useTriggerMatching,
 } from "../hooks/useDashboard";
 import { useAuth } from "../hooks/useAuth";
-import { enrichAll, syncExtasy, getInvestorHeatmap, getRevenueStats } from "../api/client";
+import { enrichAll, syncExtasy, syncSpeakers, getInvestorHeatmap, getRevenueStats } from "../api/client";
 import { useQuery } from "@tanstack/react-query";
 
 function StatCard({
@@ -73,6 +73,7 @@ export default function Dashboard() {
   const [drillSector, setDrillSector] = useState<string | null>(null);
   const [enrichingAll, setEnrichingAll] = useState(false);
   const [syncingExtasy, setSyncingExtasy] = useState(false);
+  const [syncingSpeakers, setSyncingSpeakers] = useState(false);
   const [actionResult, setActionResult] = useState<string | null>(null);
 
   const { data: typeMatches, isLoading: loadingTypeMatches } = useMatchesByType(drillType);
@@ -123,6 +124,20 @@ export default function Dashboard() {
       setActionResult(`Extasy sync error: ${msg}`);
     } finally {
       setSyncingExtasy(false);
+    }
+  };
+
+  const handleSyncSpeakers = async () => {
+    setSyncingSpeakers(true);
+    setActionResult(null);
+    try {
+      const result = await syncSpeakers();
+      setActionResult(`Speakers sync — ${result.inserted} inserted, ${result.updated} updated, ${result.skipped} skipped`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Sync failed";
+      setActionResult(`Speakers sync error: ${msg}`);
+    } finally {
+      setSyncingSpeakers(false);
     }
   };
 
@@ -184,6 +199,14 @@ export default function Dashboard() {
               <RefreshCw className={`w-4 h-4 ${syncingExtasy ? "animate-spin" : ""}`} />
               {syncingExtasy ? "Syncing…" : "Sync from Extasy"}
             </button>
+            <button
+              onClick={handleSyncSpeakers}
+              disabled={syncingSpeakers}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 text-sm text-purple-400 hover:bg-purple-500/20 hover:border-purple-500/50 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncingSpeakers ? "animate-spin" : ""}`} />
+              {syncingSpeakers ? "Syncing…" : "Sync Speakers"}
+            </button>
           </div>
           {actionResult && (
             <div className="mt-3 text-sm text-emerald-400 flex items-center gap-1.5">
@@ -241,12 +264,12 @@ export default function Dashboard() {
               </div>
               <div className="space-y-3">
                 {revenueData.revenue.by_type.map(({ type, count, revenue }) => (
-                  <div key={type} className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{type}</div>
+                  <div key={type} className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium truncate">{type}</div>
                       <div className="text-[10px] text-white/30">{count} ticket{count !== 1 ? "s" : ""}</div>
                     </div>
-                    <span className="text-sm font-mono text-emerald-400 shrink-0">€{revenue.toLocaleString()}</span>
+                    <span className="text-xs font-mono text-emerald-400 shrink-0 whitespace-nowrap">€{revenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                   </div>
                 ))}
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between">
@@ -267,9 +290,18 @@ export default function Dashboard() {
               <div className="space-y-2">
                 {revenueData.growth.map(({ week, registrations }) => {
                   const maxReg = Math.max(...revenueData.growth.map(g => g.registrations), 1);
+                  // Convert "2026-W11" to "Mar 10" style
+                  const weekLabel = (() => {
+                    try {
+                      const [y, w] = week.split("-W");
+                      const jan1 = new Date(parseInt(y), 0, 1);
+                      const d = new Date(jan1.getTime() + ((parseInt(w) - 1) * 7 - jan1.getDay() + 1) * 86400000);
+                      return d.toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+                    } catch { return week; }
+                  })();
                   return (
                     <div key={week} className="flex items-center gap-2">
-                      <span className="w-16 text-[10px] text-white/40 text-right shrink-0">{week}</span>
+                      <span className="w-16 text-[10px] text-white/40 text-right shrink-0">{weekLabel}</span>
                       <div className="flex-1 h-5 bg-white/5 rounded overflow-hidden relative">
                         <div className="h-full bg-[#E76315] rounded transition-all" style={{ width: `${(registrations / maxReg) * 100}%` }} />
                         <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/70">{registrations}</span>
@@ -291,7 +323,7 @@ export default function Dashboard() {
                   { label: "Rhuna / Extasy", value: revenueData.source_breakdown.extasy, color: "text-[#E76315]" },
                   { label: "1000 Minds Speakers", value: revenueData.source_breakdown.speakers_1000minds, color: "text-purple-400" },
                   { label: "Seed / Test", value: revenueData.source_breakdown.seed, color: "text-white/30" },
-                  { label: "Other / Manual", value: revenueData.source_breakdown.other, color: "text-blue-400" },
+                  { label: "Self-registered", value: revenueData.source_breakdown.other, color: "text-blue-400" },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-sm text-white/60">{label}</span>
@@ -313,22 +345,25 @@ export default function Dashboard() {
               </div>
               <div className="space-y-2">
                 {[
-                  { label: "Has Goals", value: revenueData.profile_completeness.with_goals, color: "bg-emerald-500" },
+                  { label: "Goals", value: revenueData.profile_completeness.with_goals, color: "bg-emerald-500" },
                   { label: "LinkedIn", value: revenueData.profile_completeness.with_linkedin, color: "bg-blue-500" },
-                  { label: "Twitter / X", value: revenueData.profile_completeness.with_twitter, color: "bg-sky-500" },
+                  { label: "Twitter", value: revenueData.profile_completeness.with_twitter, color: "bg-sky-500" },
                   { label: "Website", value: revenueData.profile_completeness.with_website, color: "bg-[#E76315]" },
-                  { label: "Grid Verified", value: revenueData.profile_completeness.with_grid, color: "bg-purple-500" },
+                  { label: "Grid", value: revenueData.profile_completeness.with_grid, color: "bg-purple-500" },
                   { label: "Photo", value: revenueData.profile_completeness.with_photo, color: "bg-pink-500" },
-                  { label: "Meeting Targets", value: revenueData.profile_completeness.with_targets, color: "bg-yellow-500" },
+                  { label: "Targets", value: revenueData.profile_completeness.with_targets, color: "bg-yellow-500" },
                 ].map(({ label, value, color }) => {
                   const pct = revenueData.profile_completeness.total ? (value / revenueData.profile_completeness.total) * 100 : 0;
                   return (
                     <div key={label} className="flex items-center gap-2">
-                      <span className="w-24 text-[10px] text-white/50 text-right shrink-0">{label}</span>
-                      <div className="flex-1 h-4 bg-white/5 rounded-full overflow-hidden">
-                        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+                      <span className="w-16 text-xs text-white/50 text-right shrink-0">{label}</span>
+                      <div className="flex-1 h-5 bg-white/5 rounded-full overflow-hidden relative">
+                        <div className={`h-full ${color} rounded-full`} style={{ width: `${Math.max(pct, 3)}%` }} />
+                        {value > 0 && (
+                          <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/70">{Math.round(pct)}%</span>
+                        )}
                       </div>
-                      <span className="text-[10px] text-white/40 w-12 text-right">{value}/{revenueData.profile_completeness.total}</span>
+                      <span className="text-xs text-white/40 w-10 text-right">{value}</span>
                     </div>
                   );
                 })}

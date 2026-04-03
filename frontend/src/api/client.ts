@@ -223,6 +223,13 @@ export async function triggerMatching(): Promise<{ total_matches: number }> {
   return data;
 }
 
+export async function syncSpeakers(): Promise<{
+  status: string; total_speakers: number; inserted: number; updated: number; skipped: number; errors: number;
+}> {
+  const { data } = await api.post("/dashboard/sync-speakers");
+  return data;
+}
+
 export async function syncExtasy(): Promise<{
   status: string;
   total_fetched: number;
