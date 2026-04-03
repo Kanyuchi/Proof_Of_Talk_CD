@@ -1,14 +1,16 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-04-01 (vertical tags aligned with 1000 Minds, Grid B2B integration, Runa API endpoints, DNS restored)
-**Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · PostgreSQL + pgvector on AWS RDS · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES · Netlify (frontend) · Supabase (DB — pending migration from RDS)
+**Last updated:** 2026-04-03 (Supabase migration complete, 73 attendees, 317 matches, enhanced dashboard with revenue tracking, speakers sync live)
+**Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES (sandbox) · Netlify (frontend)
 
 ---
 
 ## What's Working
 
-- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; **140 matches** across 38 attendees, avg score **0.70**, 36 above 0.75; vertical_tags + intent_tags integrated into embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS boost
-- **Data enrichment** — 38/38 attendees have AI summaries, embeddings, intent_tags, and vertical_tags; enrichment pipeline fully functional on EC2
+- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; **317 matches** across 73 attendees, avg score **0.704**; vertical_tags + intent_tags + target_companies integrated into embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS boost; ML feedback loop feeds decline reasons into GPT prompt
+- **Data enrichment** — 73/73 attendees have AI summaries, embeddings, intent_tags, and vertical_tags; enrichment pipeline fully functional on EC2
+- **1000 Minds speakers sync** — `speakers_sync.py` reads from `speakers` table (Jessica's curated list), upserts into `attendees` for matching; maps seniority→ticket_type, verticals→slugs, bio→goals; daily cron at 02:15 UTC; admin button on dashboard
+- **Enhanced dashboard** — revenue tracking (€42.5k total, ticket breakdown), registration funnel (paid/failed/pending), weekly growth chart, attendee sources (Extasy/1000 Minds/self-registered), profile quality bars; live data from Extasy API
 - **1000minds vertical_tags** — 12 sector verticals (incl. `privacy`); display names aligned with 1000 Minds format; purple-styled tags visible on AttendeeMatches, Attendees, MyMatches; GPT responses validated against `VALID_VERTICALS`
 - **The Grid B2B integration** — `grid_enrichment.py` queries thegrid.id GraphQL API (public, no auth) by company name; stores verified description, sector, socials in `enriched_profile["grid"]`; "Verified by The Grid" emerald card on match cards + profiles; Grid description included in embedding composite text
 - **Runa integration API** — 4 endpoints behind `X-API-Key` auth at `/api/v1/integration/*`: magic-link lookup (create-on-the-fly), ticket-purchased webhook, ticket-cancelled webhook, attendee-status check; spec doc at `docs/runa-integration-spec.md` + `.docx` for Swerve
@@ -39,14 +41,12 @@
 
 - **Production URL**: `https://meet.proofoftalk.io` (Netlify, live)
 - **Backend**: green EC2 `3.239.218.239` — gunicorn + nginx; proxied via `netlify.toml`
-- **Blue EC2** (`54.89.55.202`): still running as fallback; same RDS DB
-- **Database**: AWS RDS PostgreSQL + pgvector (`eu-west-1`) — 38 attendees, 140 matches; Supabase synced (140 matches)
+- **Blue EC2** (`54.89.55.202`): fallback only — still points to old RDS (not updated)
+- **Database**: **Supabase PostgreSQL** (`db.mkcememoueziibbpqhfk.supabase.co:5432/postgres`) — XLabs Ext Pro plan, IPv4 add-on, shared with 1000 Minds (`speakers` table); 73 attendees, 317 matches. RDS backup on EC2 as `.env.rds-backup`
 
 ## Broken / Incomplete
 
-- **SES email — BLOCKED** — AWS denied production access (case #177412752700989, 2026-03-23). Stuck in sandbox — can only send to individually verified emails. Need to switch to Resend/SendGrid/Postmark. Requires Victor approval + domain DNS access for `proofoftalk.io`
-- **ML feedback loop not wired** — decline reasons and satisfaction scores are captured in DB but not fed back into future GPT ranking prompts
-- **Supabase DB migration** — Supabase is synced as a mirror of RDS; backend still points to RDS; cutover to Supabase as primary not done yet
+- **SES email — BLOCKED** — AWS denied production access (case #177412752700989, 2026-03-23). Stuck in sandbox — can only send to individually verified emails. Need new company AWS account or switch to Resend/SendGrid/Postmark. Requires domain DNS access for `proofoftalk.io`
 
 ## Key Decisions Made
 

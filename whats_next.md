@@ -6,17 +6,16 @@
 
 ## Now
 
-1. **Re-enrich attendees** — run enrichment batch to populate Grid data for existing attendees + re-classify with new privacy vertical
-2. **Runa integration — share spec + API key with Swerve** — endpoints live at `/api/v1/integration/*`, spec doc at `docs/runa-integration-spec.docx`; need to share API key securely and get Swerve's feedback on discussion points (webhook vs pull, UI placement, ticket type mapping)
-3. **Scale test to 50 profiles** — awaiting accurate data from Chiara; once confirmed, load 12+ more profiles to hit KR 1.3 target
-4. **Email provider switch** — AWS SES production access DENIED (case #177412752700989, 2026-03-23). Need to switch to Resend, SendGrid, or Postmark. Requires domain DNS verification for `proofoftalk.io`. Discuss with Victor before proceeding.
-5. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code + warm-up threads
+1. **Email provider** — get DNS access for `proofoftalk.io` to set up Resend or new company AWS SES; currently blocked (sandbox only)
+2. **Runa integration — share spec + API key with Swerve** — endpoints live at `/api/v1/integration/*`, spec doc at `docs/runa-integration-spec.docx`
+3. **AI-inferred customer matching** — Z's vision: GPT-4o infers likely customers/partners per attendee, matches against attending companies, company similarity fallback when target isn't attending
+4. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code + warm-up threads
 
 ## Soon
 
-- **Mutual match nav badge** — show pending count on `/matches` nav item so attendees know when someone accepted them without checking manually
-- **Wire ML feedback loop** — pass prior decline reasons as negative examples into GPT re-ranking prompt; satisfaction scores are already captured in DB, just not fed back
-- **Match card transparency cues (item #19 remainder)** — inline "Why this match" context on each card ("Based on your stated goal + public profile"); lightweight "Show me more like this" / "Not relevant" feedback buttons next to each match card
+- **AI Meeting Prep Briefs** — generate formal briefing doc per scheduled meeting (partially done via concierge chat)
+- **Session Matchmaking** — match attendees to conference sessions based on goals/intent
+- **Matchmaking Lunch Algorithm** — group attendees into optimised lunch tables
 
 ## Later / Backlog
 
@@ -68,3 +67,13 @@
 - ✓ Runa integration API — 4 endpoints (magic link lookup, ticket webhooks, status), API key auth, spec doc for Swerve
 - ✓ The Grid B2B integration — GraphQL enrichment from thegrid.id, verified company data on match cards
 - ✓ Privacy mode — anonymous/pseudonymous B2B-only profiles with reveal-on-mutual-match, profile toggle, email handling
+- ✓ Supabase migration — full cutover from RDS to Supabase PostgreSQL; 73 attendees, 317 matches, all tables migrated; IPv4 add-on enabled
+- ✓ 1000 Minds speakers sync — speakers_sync.py reads from speakers table, upserts into attendees; daily cron 02:15 UTC; admin dashboard button
+- ✓ Mutual match nav badge — orange count badge on My Matches nav when someone accepted you
+- ✓ ML feedback loop — GPT-4o ranking prompt includes prior decline reasons as negative examples
+- ✓ Match card feedback buttons — ThumbsUp/ThumbsDown for lightweight quality signals
+- ✓ Admin match card parity — social links, vertical tags, Grid card now show on admin view too
+- ✓ Enhanced dashboard — revenue tracking (€42.5k), registration funnel, weekly growth, attendee sources, profile quality bars
+- ✓ QR code in email — CID attachment renders in Gmail; match intro email copy updated
+- ✓ "Who do you want to meet?" — target_companies field on Profile + magic link enrichment card
+- ✓ Twitter URL fix — handles full URLs (x.com/handle) not just @handle

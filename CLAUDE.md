@@ -50,10 +50,10 @@ docs/                  Product concept, business case, architecture diagrams
 
 - **Backend**: Python 3.11+, FastAPI, SQLAlchemy 2.0 (async), Alembic
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, React Query, React Router v7
-- **Database**: PostgreSQL on AWS RDS with pgvector extension for embedding similarity search
+- **Database**: Supabase PostgreSQL with pgvector extension for embedding similarity search (migrated from AWS RDS 2026-04-02)
 - **AI**: OpenAI API — `text-embedding-3-small` for embeddings (1536 dim), `gpt-4o` for match reasoning/explanations
 - **Data Enrichment**: Proxycurl (LinkedIn), Twitter API, httpx + BeautifulSoup for web scraping
-- **Infrastructure**: AWS (RDS, optionally S3, EC2/ECS for deployment)
+- **Infrastructure**: AWS EC2 (backend), Netlify (frontend), Supabase (database — shared with 1000 Minds app)
 
 ## Commands
 
@@ -118,7 +118,7 @@ The embedding is generated from a composite text blob combining: name, title, co
 ## Environment Variables
 
 Copy `backend/.env.example` to `backend/.env` and fill in:
-- `DATABASE_URL` — AWS RDS PostgreSQL connection string (must have pgvector extension)
+- `DATABASE_URL` — Supabase PostgreSQL connection string (pgvector enabled); format: `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres`
 - `OPENAI_API_KEY` — required for embeddings and match explanations
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — AWS credentials
 - `PROXYCURL_API_KEY` — optional, for LinkedIn enrichment
