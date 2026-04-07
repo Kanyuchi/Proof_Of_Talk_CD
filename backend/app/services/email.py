@@ -191,7 +191,7 @@ def send_match_intro_email(
     View all your introductions →
   </a>
 
-  {"" if not qr_png else '<div style="text-align: center; margin-bottom: 24px;"><p style="color: rgba(255,255,255,0.35); font-size: 11px; margin: 0 0 8px;">Or scan to open on your phone</p><img src="cid:qrcode" width="140" height="140" alt="QR Code" style="border-radius: 8px;" /></div>'}
+  {"" if not qr_png else '<div style="text-align: center; margin-bottom: 24px;"><p style="color: rgba(255,255,255,0.35); font-size: 11px; margin: 0 0 8px;">Or scan to open on your phone</p><img src="data:image/png;base64,' + base64.b64encode(qr_png).decode() + '" width="140" height="140" alt="QR Code" style="border-radius: 8px;" /></div>'}
 
   <p style="font-size: 11px; color: rgba(255,255,255,0.2); text-align: center; margin: 0;">
     Proof of Talk &middot; Louvre Palace, Paris &middot; June 2–3, 2026
@@ -209,12 +209,7 @@ def send_match_intro_email(
         f"Proof of Talk · Louvre Palace, Paris · June 2–3, 2026"
     )
 
-    attachments = None
-    if qr_png:
-        qr_b64 = base64.b64encode(qr_png).decode()
-        attachments = [{"filename": "qr.png", "content": qr_b64, "content_type": "image/png"}]
-
-    _send_email(to_email, subject, body_html, body_text, attachments)
+    _send_email(to_email, subject, body_html, body_text)
 
 
 def send_mutual_match_email(
