@@ -53,7 +53,7 @@ docs/                  Product concept, business case, architecture diagrams
 - **Database**: Supabase PostgreSQL with pgvector extension for embedding similarity search (migrated from AWS RDS 2026-04-02)
 - **AI**: OpenAI API — `text-embedding-3-small` for embeddings (1536 dim), `gpt-4o` for match reasoning/explanations
 - **Data Enrichment**: Proxycurl (LinkedIn), Twitter API, httpx + BeautifulSoup for web scraping
-- **Infrastructure**: AWS EC2 (backend), Netlify (frontend), Supabase (database — shared with 1000 Minds app)
+- **Infrastructure**: Railway (backend), Netlify (frontend), Supabase (database — shared with 1000 Minds app), Resend (email)
 
 ## Commands
 
@@ -118,11 +118,15 @@ The embedding is generated from a composite text blob combining: name, title, co
 ## Environment Variables
 
 Copy `backend/.env.example` to `backend/.env` and fill in:
-- `DATABASE_URL` — Supabase PostgreSQL connection string (pgvector enabled); format: `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres`
+- `DATABASE_URL` — Supabase PostgreSQL connection string; format: `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres`
 - `OPENAI_API_KEY` — required for embeddings and match explanations
-- `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — AWS credentials
+- `RESEND_API_KEY` — Resend email delivery (production, no sandbox)
+- `RESEND_FROM_EMAIL` — sender address (`matches@proofoftalk.io`)
+- `SECRET_KEY` — JWT signing key
+- `APP_PUBLIC_URL` — public URL (`https://meet.proofoftalk.io`)
+- `INTEGRATION_API_KEY` — Runa integration auth
 - `PROXYCURL_API_KEY` — optional, for LinkedIn enrichment
-- `TWITTER_BEARER_TOKEN` — optional, for Twitter enrichment
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — Supabase REST API (for data ingestion scripts)
 
 ## Test Profiles
 

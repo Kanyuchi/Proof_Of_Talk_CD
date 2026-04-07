@@ -6,10 +6,10 @@
 
 ## Now
 
-1. **Fix match generation on Railway** — GPT-4o calls timing out; investigate Railway request timeout settings or add async background processing
-2. **Commercial strategy execution** — build "See Who's Attending" public page, VIP match limits, sponsor match reports (see `docs/matchmaking-commercial-strategy.md`)
-3. **Post-purchase email sequence** — Resend is live; build the 4-email sequence (welcome, first matches, weekly digest, final briefing)
-4. **AI-inferred customer matching** — Z's vision: GPT-4o infers likely customers/partners per attendee, company similarity fallback
+1. **Commercial strategy execution** — build "See Who's Attending" public page, VIP match limits, sponsor match reports (see `docs/matchmaking-commercial-strategy.md`)
+2. **Post-purchase email sequence** — Resend is live; build the 4-email sequence (welcome, first matches, weekly digest, final briefing)
+3. **AI-inferred customer matching** — Z's vision: GPT-4o infers likely customers/partners per attendee, company similarity fallback
+4. **Email template design** — refine match intro email body layout, branding, content for production use
 
 ## Soon
 

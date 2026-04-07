@@ -48,7 +48,8 @@
 
 ## Broken / Incomplete
 
-- **Match generation on Railway** — GPT-4o calls may timeout; needs investigation (read endpoints work fine)
+- **Email template design** — match intro email is functional but needs design polish for production use (layout, branding, content)
+- **generate-all HTTP timeout** — full match regeneration for all 80 attendees exceeds HTTP timeout; runs successfully in background but returns no response to caller; needs async job pattern for long-running operations
 
 ## Key Decisions Made
 
