@@ -1,7 +1,7 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-04-03 (Supabase migration complete, 73 attendees, 317 matches, enhanced dashboard with revenue tracking, speakers sync live)
-**Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · AWS EC2 + SES (sandbox) · Netlify (frontend)
+**Last updated:** 2026-04-07 (Railway migration complete, Resend email live, no more personal AWS)
+**Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · **Railway** (backend) · **Resend** (email) · Netlify (frontend)
 
 ---
 
@@ -39,14 +39,16 @@
 
 ## Infrastructure
 
-- **Production URL**: `https://meet.proofoftalk.io` (Netlify, live)
-- **Backend**: green EC2 `3.239.218.239` — gunicorn + nginx; proxied via `netlify.toml`
-- **Blue EC2** (`54.89.55.202`): fallback only — still points to old RDS (not updated)
-- **Database**: **Supabase PostgreSQL** (`db.mkcememoueziibbpqhfk.supabase.co:5432/postgres`) — XLabs Ext Pro plan, IPv4 add-on, shared with 1000 Minds (`speakers` table); 73 attendees, 317 matches. RDS backup on EC2 as `.env.rds-backup`
+- **Production URL**: `https://meet.proofoftalk.io` (Netlify frontend → Railway backend)
+- **Backend**: **Railway** (`proofoftalkcd-production.up.railway.app`) — x-ventures Pro plan, auto-deploys from GitHub `main` branch, root dir `backend`
+- **Database**: **Supabase PostgreSQL** (`db.mkcememoueziibbpqhfk.supabase.co:5432/postgres`) — XLabs Ext Pro plan, IPv4 add-on, shared with 1000 Minds (`speakers` table)
+- **Email**: **Resend** — `matches@proofoftalk.io`, `proofoftalk.io` domain verified, production sending enabled, no sandbox restrictions
+- **EC2 decommissioned**: was on personal AWS account; no longer in use
+- **Deploy**: push to `main` → Railway auto-deploys backend; `npx netlify deploy --prod --dir=frontend/dist` for frontend
 
 ## Broken / Incomplete
 
-- **SES email — BLOCKED** — AWS denied production access (case #177412752700989, 2026-03-23). Stuck in sandbox — can only send to individually verified emails. Need new company AWS account or switch to Resend/SendGrid/Postmark. Requires domain DNS access for `proofoftalk.io`
+- **Match generation on Railway** — GPT-4o calls may timeout; needs investigation (read endpoints work fine)
 
 ## Key Decisions Made
 

@@ -6,10 +6,10 @@
 
 ## Now
 
-1. **Email provider** — get DNS access for `proofoftalk.io` to set up Resend or new company AWS SES; currently blocked (sandbox only)
-2. **Runa integration — share spec + API key with Swerve** — endpoints live at `/api/v1/integration/*`, spec doc at `docs/runa-integration-spec.docx`
-3. **AI-inferred customer matching** — Z's vision: GPT-4o infers likely customers/partners per attendee, matches against attending companies, company similarity fallback when target isn't attending
-4. **Full end-to-end journey test** — accept a match (both sides), verify mutual match flow, schedule a meeting, download ICS, test magic link + QR code + warm-up threads
+1. **Fix match generation on Railway** — GPT-4o calls timing out; investigate Railway request timeout settings or add async background processing
+2. **Commercial strategy execution** — build "See Who's Attending" public page, VIP match limits, sponsor match reports (see `docs/matchmaking-commercial-strategy.md`)
+3. **Post-purchase email sequence** — Resend is live; build the 4-email sequence (welcome, first matches, weekly digest, final briefing)
+4. **AI-inferred customer matching** — Z's vision: GPT-4o infers likely customers/partners per attendee, company similarity fallback
 
 ## Soon
 
