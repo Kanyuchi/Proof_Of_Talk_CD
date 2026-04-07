@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     # Resend (primary email provider)
     RESEND_API_KEY: str = ""
-    RESEND_FROM_EMAIL: str = "matches@proofoftalk.io"
+    RESEND_FROM_EMAIL: str = "Proof of Talk <matches@proofoftalk.io>"
 
     # Auth
     SECRET_KEY: str = "change-me-in-production"
