@@ -275,3 +275,12 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **OpenAI API key fixed on Railway** — original key was rejected (401); new key set in Railway variables; match generation confirmed working (4 matches generated for test attendee)
 - **Match pipeline on Railway verified** — process-all (5 attendees processed), generate single attendee (4 matches), Extasy sync (4 new inserted, 75 valid total); all working
 - **Email confirmed delivered** — match intro email with QR code, "Our Matchmaker" copy, and magic link CTA received at shaun@proofoftalk.io via Resend; no more SES sandbox restrictions
+
+## 2026-04-07 21:30 — Email deliverability feedback (Yannik/Softstack)
+- **Issue**: Microsoft flagging match emails as junk — domain alignment mismatch (From: proofoftalk.io but Return-Path/bounce goes to amazonses.com)
+- **Root cause**: Missing DMARC record on proofoftalk.io DNS
+- **DNS fix needed** (by domain manager): add TXT record `_dmarc.proofoftalk.io` → `v=DMARC1; p=quarantine; rua=mailto:dmarc@proofoftalk.io; pct=100; adkim=r; aspf=r`
+- **DKIM and SPF already verified** via Resend (send.proofoftalk.io subdomain)
+- **From name updated** to `Proof of Talk <matches@proofoftalk.io>` for better trust signals
+- **Domain warm-up**: gradual sending (not mass blast) to build reputation — already following this approach
+- **Positive feedback**: Yannik said "really cool idea with the matchmaking"
