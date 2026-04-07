@@ -216,6 +216,8 @@ async def generate_matches_for_attendee(
     _admin: User = Depends(require_admin),
 ):
     """Generate match recommendations for a single attendee."""
+    import logging
+    logger = logging.getLogger(__name__)
     engine = MatchingEngine(db)
     try:
         matches = await engine.generate_matches_for_attendee(attendee_id, top_k)
@@ -226,6 +228,9 @@ async def generate_matches_for_attendee(
         }
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("Match generation failed for %s: %s", attendee_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Match generation error: {type(e).__name__}: {str(e)[:200]}")
 
 
 @router.post("/generate-all")
@@ -235,17 +240,29 @@ async def generate_all_matches(
     _admin: User = Depends(require_admin),
 ):
     """Trigger match generation for all attendees."""
+    import logging
+    logger = logging.getLogger(__name__)
     engine = MatchingEngine(db)
-    total = await engine.generate_all_matches(top_k)
-    return {"status": "completed", "total_matches": total}
+    try:
+        total = await engine.generate_all_matches(top_k)
+        return {"status": "completed", "total_matches": total}
+    except Exception as e:
+        logger.error("generate-all failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Match generation error: {type(e).__name__}: {str(e)[:200]}")
 
 
 @router.post("/process-all")
 async def process_all_attendees(db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)):
     """Process all attendees: generate AI summaries, intents, and embeddings."""
+    import logging
+    logger = logging.getLogger(__name__)
     engine = MatchingEngine(db)
-    count = await engine.process_all_attendees()
-    return {"status": "completed", "attendees_processed": count}
+    try:
+        count = await engine.process_all_attendees()
+        return {"status": "completed", "attendees_processed": count}
+    except Exception as e:
+        logger.error("process-all failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Processing error: {type(e).__name__}: {str(e)[:200]}")
 
 
 @router.patch("/{match_id}/status", response_model=MatchResponse)
