@@ -260,3 +260,7 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Extasy sync ran** — 0 new inserts, all 50 real Extasy attendees already in DB
 - **Match generation** — 317 matches across 73 attendees, avg score 0.704, all on Supabase
 - **Grid card on admin view** — confirmed working for attendees with Grid data (19/73); Martin Quensel has no Grid data because Centrifuge isn't in The Grid database
+
+## 2026-04-07 — Commercial strategy: matchmaking as revenue driver
+- **Strategy research** — deep analysis of how matchmaking/Grid can drive ticket sales (pre-purchase preview, VIP upsell, referral QR), multiply sponsorship value (Intelligence Packages €5-50k/sponsor, priority matching, sponsored intros, ROI reports), and lock post-event retention
+- **Revenue pitch HTML** (`docs/matchmaking-revenue-pitch.html`) — concise internal strategy brief for marketing team; covers 3 revenue levers, sponsor tier pricing (€225k potential at 15 sponsors), unfair advantages (Grid + AI + intent data), and action items per team member
