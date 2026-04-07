@@ -11,20 +11,19 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# ── API proxy — forward all /api/* and /health to the EC2 backend ──────────
-# Update the `to` URLs when you switch backends (green EC2, Render, Railway, etc.)
-# Current backend: green EC2 at 3.239.218.239
-# To change: update the IP below and redeploy on Netlify
+# ── API proxy — forward all /api/* and /health to Railway backend ──────────
+# Backend: Railway (x-ventures Pro plan)
+# Previous: EC2 at 3.239.218.239 (personal AWS, decommissioned)
 
 [[redirects]]
   from   = "/api/*"
-  to     = "http://3.239.218.239/api/:splat"
+  to     = "https://proofoftalkcd-production.up.railway.app/api/:splat"
   status = 200
   force  = true
 
 [[redirects]]
   from   = "/health"
-  to     = "http://3.239.218.239/health"
+  to     = "https://proofoftalkcd-production.up.railway.app/health"
   status = 200
   force  = true
 
