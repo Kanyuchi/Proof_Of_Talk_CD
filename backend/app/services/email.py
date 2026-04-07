@@ -1,14 +1,18 @@
-"""AWS SES email delivery for POT Matchmaker.
+"""Email delivery for POT Matchmaker — powered by Resend.
 
 All sends are fire-and-forget — failures are logged but never raise to callers.
-The system works without email; SES is an enhancement layer.
+The system works without email; email is an enhancement layer.
 """
 import base64
 import io
 import logging
+
+import httpx
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+RESEND_API_URL = "https://api.resend.com/emails"
 
 
 def _generate_qr_png_bytes(url: str) -> bytes | None:
@@ -27,25 +31,46 @@ def _generate_qr_png_bytes(url: str) -> bytes | None:
         return None
 
 
-def _ses_client():
-    """Return a boto3 SES client, or None if credentials are not configured."""
+def _send_email(
+    to_email: str,
+    subject: str,
+    html: str,
+    text: str | None = None,
+    attachments: list[dict] | None = None,
+) -> bool:
+    """Send an email via Resend. Returns True on success, False on failure."""
     settings = get_settings()
-    if not all([settings.AWS_ACCESS_KEY_ID, settings.AWS_SECRET_ACCESS_KEY, settings.AWS_SES_FROM_EMAIL]):
-        return None
+    if not settings.RESEND_API_KEY:
+        logger.debug("RESEND_API_KEY not set — email skipped")
+        return False
+
+    payload: dict = {
+        "from": settings.RESEND_FROM_EMAIL,
+        "to": [to_email],
+        "subject": subject,
+        "html": html,
+    }
+    if text:
+        payload["text"] = text
+    if attachments:
+        payload["attachments"] = attachments
+
     try:
-        import boto3
-        return boto3.client(
-            "ses",
-            region_name=settings.AWS_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        resp = httpx.post(
+            RESEND_API_URL,
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+            json=payload,
+            timeout=15,
         )
-    except ImportError:
-        logger.warning("boto3 not installed — email delivery disabled")
-        return None
+        if resp.status_code in (200, 201):
+            logger.info("Email sent to %s via Resend (subject: %s)", to_email, subject[:50])
+            return True
+        else:
+            logger.warning("Resend error %s for %s: %s", resp.status_code, to_email, resp.text[:200])
+            return False
     except Exception as exc:
-        logger.warning("SES client init failed: %s", exc)
-        return None
+        logger.warning("Email send failed for %s: %s", to_email, exc)
+        return False
 
 
 def send_password_reset_email(
@@ -63,10 +88,6 @@ def send_password_reset_email(
         app_url: Base URL of the app for the reset link.
     """
     settings = get_settings()
-    client = _ses_client()
-    if not client:
-        return
-
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
 
@@ -110,21 +131,7 @@ def send_password_reset_email(
         f"Proof of Talk · Louvre Palace, Paris · June 2–3, 2026"
     )
 
-    try:
-        client.send_email(
-            Source=settings.AWS_SES_FROM_EMAIL,
-            Destination={"ToAddresses": [to_email]},
-            Message={
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {
-                    "Html": {"Data": body_html, "Charset": "UTF-8"},
-                    "Text": {"Data": body_text, "Charset": "UTF-8"},
-                },
-            },
-        )
-        logger.info("Password reset email sent to %s", to_email)
-    except Exception as exc:
-        logger.warning("SES send failed for %s: %s", to_email, exc)
+    _send_email(to_email, subject, body_html, body_text)
 
 
 def send_match_intro_email(
@@ -151,10 +158,6 @@ def send_match_intro_email(
         app_url: Base URL of the app for the CTA link.
     """
     settings = get_settings()
-    client = _ses_client()
-    if not client:
-        return
-
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
 
@@ -206,48 +209,12 @@ def send_match_intro_email(
         f"Proof of Talk · Louvre Palace, Paris · June 2–3, 2026"
     )
 
-    try:
-        if qr_png:
-            # Use raw email with CID attachment so QR renders in Gmail
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-            from email.mime.image import MIMEImage
+    attachments = None
+    if qr_png:
+        qr_b64 = base64.b64encode(qr_png).decode()
+        attachments = [{"filename": "qr.png", "content": qr_b64, "content_type": "image/png"}]
 
-            msg = MIMEMultipart("related")
-            msg["Subject"] = subject
-            msg["From"] = settings.AWS_SES_FROM_EMAIL
-            msg["To"] = to_email
-
-            alt = MIMEMultipart("alternative")
-            alt.attach(MIMEText(body_text, "plain", "utf-8"))
-            alt.attach(MIMEText(body_html, "html", "utf-8"))
-            msg.attach(alt)
-
-            qr_img = MIMEImage(qr_png, _subtype="png")
-            qr_img.add_header("Content-ID", "<qrcode>")
-            qr_img.add_header("Content-Disposition", "inline", filename="qr.png")
-            msg.attach(qr_img)
-
-            client.send_raw_email(
-                Source=settings.AWS_SES_FROM_EMAIL,
-                Destinations=[to_email],
-                RawMessage={"Data": msg.as_string()},
-            )
-        else:
-            client.send_email(
-                Source=settings.AWS_SES_FROM_EMAIL,
-                Destination={"ToAddresses": [to_email]},
-                Message={
-                    "Subject": {"Data": subject, "Charset": "UTF-8"},
-                    "Body": {
-                        "Html": {"Data": body_html, "Charset": "UTF-8"},
-                        "Text": {"Data": body_text, "Charset": "UTF-8"},
-                    },
-                },
-            )
-        logger.info("Match intro email sent to %s", to_email)
-    except Exception as exc:
-        logger.warning("SES send failed for %s: %s", to_email, exc)
+    _send_email(to_email, subject, body_html, body_text, attachments)
 
 
 def send_mutual_match_email(
@@ -269,10 +236,6 @@ def send_mutual_match_email(
         app_url: Base URL of the app for the CTA link.
     """
     settings = get_settings()
-    client = _ses_client()
-    if not client:
-        return
-
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
 
@@ -319,21 +282,7 @@ def send_mutual_match_email(
         f"Proof of Talk · Louvre Palace, Paris · June 2–3, 2026"
     )
 
-    try:
-        client.send_email(
-            Source=settings.AWS_SES_FROM_EMAIL,
-            Destination={"ToAddresses": [to_email]},
-            Message={
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {
-                    "Html": {"Data": body_html, "Charset": "UTF-8"},
-                    "Text": {"Data": body_text, "Charset": "UTF-8"},
-                },
-            },
-        )
-        logger.info("Mutual match email sent to %s", to_email)
-    except Exception as exc:
-        logger.warning("SES send failed for %s: %s", to_email, exc)
+    _send_email(to_email, subject, body_html, body_text)
 
 
 def send_meeting_confirmation_email(
@@ -357,10 +306,6 @@ def send_meeting_confirmation_email(
         app_url: Base URL of the app.
     """
     settings = get_settings()
-    client = _ses_client()
-    if not client:
-        return
-
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
 
@@ -414,18 +359,4 @@ def send_meeting_confirmation_email(
         f"Proof of Talk · Louvre Palace, Paris · June 2–3, 2026"
     )
 
-    try:
-        client.send_email(
-            Source=settings.AWS_SES_FROM_EMAIL,
-            Destination={"ToAddresses": [to_email]},
-            Message={
-                "Subject": {"Data": subject, "Charset": "UTF-8"},
-                "Body": {
-                    "Html": {"Data": body_html, "Charset": "UTF-8"},
-                    "Text": {"Data": body_text, "Charset": "UTF-8"},
-                },
-            },
-        )
-        logger.info("Meeting confirmation email sent to %s", to_email)
-    except Exception as exc:
-        logger.warning("SES send failed for %s: %s", to_email, exc)
+    _send_email(to_email, subject, body_html, body_text)

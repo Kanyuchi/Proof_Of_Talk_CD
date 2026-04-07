@@ -31,8 +31,12 @@ class Settings(BaseSettings):
     AWS_REGION: str = "eu-west-1"
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
-    AWS_SES_FROM_EMAIL: str = ""  # Verified SES sender address
+    AWS_SES_FROM_EMAIL: str = ""  # Verified SES sender address (legacy, use Resend)
     APP_PUBLIC_URL: str = "http://54.89.55.202"  # Override when frontend moves
+
+    # Resend (primary email provider)
+    RESEND_API_KEY: str = ""
+    RESEND_FROM_EMAIL: str = "matches@proofoftalk.io"
 
     # Auth
     SECRET_KEY: str = "change-me-in-production"
