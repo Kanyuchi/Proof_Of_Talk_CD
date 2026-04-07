@@ -284,3 +284,4 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **From name updated** to `Proof of Talk <matches@proofoftalk.io>` for better trust signals
 - **Domain warm-up**: gradual sending (not mass blast) to build reputation — already following this approach
 - **Positive feedback**: Yannik said "really cool idea with the matchmaking"
+- **DMARC record live** — Victor added TXT record to proofoftalk.io DNS; verified propagated; Microsoft junk flagging should resolve
