@@ -15,20 +15,10 @@ logger = logging.getLogger(__name__)
 RESEND_API_URL = "https://api.resend.com/emails"
 
 
-def _generate_qr_png_bytes(url: str) -> bytes | None:
-    """Generate a QR code as raw PNG bytes."""
-    try:
-        import qrcode
-        img = qrcode.make(url, box_size=5, border=2)
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return buf.getvalue()
-    except ImportError:
-        logger.warning("qrcode package not installed — skipping QR in email")
-        return None
-    except Exception as exc:
-        logger.warning("QR code generation failed: %s", exc)
-        return None
+def _qr_image_url(data: str, size: int = 200) -> str:
+    """Return a publicly hosted QR code image URL using quickchart.io API."""
+    from urllib.parse import quote
+    return f"https://quickchart.io/qr?text={quote(data)}&size={size}&margin=1"
 
 
 def _send_email(
@@ -164,7 +154,7 @@ def send_match_intro_email(
     first_name = attendee_name.split()[0] if attendee_name else attendee_name
     short_explanation = explanation[:220] + "…" if len(explanation) > 220 else explanation
     dashboard_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
-    qr_png = _generate_qr_png_bytes(dashboard_url) if magic_token else None
+    qr_url = _qr_image_url(dashboard_url) if magic_token else ""
 
     subject = f"Your Proof of Talk introductions are ready, {first_name}"
     body_html = f"""
@@ -191,7 +181,7 @@ def send_match_intro_email(
     View all your introductions →
   </a>
 
-  {"" if not qr_png else '<div style="text-align: center; margin-bottom: 24px;"><p style="color: rgba(255,255,255,0.35); font-size: 11px; margin: 0 0 8px;">Or scan to open on your phone</p><img src="data:image/png;base64,' + base64.b64encode(qr_png).decode() + '" width="140" height="140" alt="QR Code" style="border-radius: 8px;" /></div>'}
+  {"" if not qr_url else '<div style="text-align: center; margin-bottom: 24px;"><p style="color: rgba(255,255,255,0.35); font-size: 11px; margin: 0 0 8px;">Or scan to open on your phone</p><img src="' + qr_url + '" width="140" height="140" alt="QR Code" style="border-radius: 8px; background: #fff; padding: 4px;" /></div>'}
 
   <p style="font-size: 11px; color: rgba(255,255,255,0.2); text-align: center; margin: 0;">
     Proof of Talk &middot; Louvre Palace, Paris &middot; June 2–3, 2026
