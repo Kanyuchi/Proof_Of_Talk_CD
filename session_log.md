@@ -307,3 +307,8 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
   - `matching.py`: GPT-4o prompt instructs treating Grid data as most authoritative source; product-level supply/demand matching
   - `matching.py`: deterministic reranking merges Grid-derived verticals with explicit tags; extra +0.02 boost when both sides have verified Grid products
 - **Sponsor Grid coverage**: 9/24 sponsors found in The Grid (Zircuit, CertiK, Taostats, BitGo, BitMEX, Paxos, ChangeNOW, Teroxx, Morph Network)
+
+## 2026-04-08 — Sponsor Intelligence System brief
+- Created `docs/sponsor-intelligence-brief.md` — team-facing document explaining the sponsor intelligence report system
+- Covers: what sponsors get (personalised 20-target report), how it works technically, three pricing tiers (€5-10k / €15-25k / €50k+), what each team member needs to do, revenue projections (€40k-€325k), and timeline
+- Key ask: generate 3 pilot reports for Zircuit, BitGo, CertiK so Victor can start pitching this week
