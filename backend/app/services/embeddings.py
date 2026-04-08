@@ -38,12 +38,21 @@ def build_composite_text(attendee) -> str:
     if enriched.get("funding_info"):
         parts.append(f"Funding: {enriched['funding_info']}")
 
-    # The Grid B2B data (verified Web3 company description + sector)
+    # The Grid B2B data — verified Web3 company intelligence
     grid = enriched.get("grid") or {}
     if grid.get("grid_description"):
         parts.append(f"Company (Grid verified): {grid['grid_description']}")
     if grid.get("grid_sector"):
         parts.append(f"Grid Sector: {grid['grid_sector']}")
+    if grid.get("grid_type"):
+        parts.append(f"Company Type: {grid['grid_type']}")
+    grid_products = grid.get("grid_products") or []
+    if grid_products:
+        product_lines = [
+            f"{p['name']}: {p.get('description', '')}" for p in grid_products[:3] if p.get("name")
+        ]
+        if product_lines:
+            parts.append(f"Products/Services: {'; '.join(product_lines)}")
 
     if getattr(attendee, "target_companies", None):
         parts.append(f"Who they want to meet: {attendee.target_companies}")

@@ -32,6 +32,60 @@ COMPLEMENTARY_VERTICALS = {
     "privacy": ["infrastructure_and_scaling", "decentralized_finance", "policy_regulation_macro"],
 }
 
+# Map Grid B2B sectors → our vertical taxonomy so Grid intelligence feeds into
+# complementarity scoring.  Grid sector names come from thegrid.id/profiles.
+GRID_SECTOR_TO_VERTICALS: dict[str, list[str]] = {
+    "blockchain platforms":        ["infrastructure_and_scaling"],
+    "infrastructure":              ["infrastructure_and_scaling"],
+    "finance":                     ["decentralized_finance", "investment_and_capital_markets"],
+    "custody and wallets":         ["infrastructure_and_scaling", "tokenisation_of_finance"],
+    "payments":                    ["tokenisation_of_finance", "decentralized_finance"],
+    "security":                    ["infrastructure_and_scaling", "privacy"],
+    "data & analytics":            ["ai_depin_frontier_tech", "infrastructure_and_scaling"],
+    "gaming":                      ["culture_media_gaming"],
+    "nft":                         ["culture_media_gaming"],
+    "defi":                        ["decentralized_finance"],
+    "dao":                         ["ecosystem_and_foundations"],
+    "identity":                    ["privacy", "infrastructure_and_scaling"],
+    "social":                      ["culture_media_gaming", "ecosystem_and_foundations"],
+    "exchange":                    ["decentralized_finance", "investment_and_capital_markets"],
+    "stablecoin":                  ["tokenisation_of_finance", "decentralized_finance"],
+    "lending":                     ["decentralized_finance"],
+    "mining":                      ["bitcoin"],
+    "ai":                          ["decentralized_ai", "ai_depin_frontier_tech"],
+    "regulation":                  ["policy_regulation_macro"],
+}
+
+
+def _grid_verticals(attendee: Attendee) -> set[str]:
+    """Extract our vertical tags from an attendee's Grid sector data."""
+    grid = (attendee.enriched_profile or {}).get("grid") or {}
+    sector = (grid.get("grid_sector") or "").strip().lower()
+    if not sector:
+        return set()
+    return set(GRID_SECTOR_TO_VERTICALS.get(sector, []))
+
+
+def _grid_context(attendee: Attendee) -> str:
+    """Build a concise Grid intelligence summary for GPT-4o candidate descriptions."""
+    grid = (attendee.enriched_profile or {}).get("grid") or {}
+    if not grid.get("grid_name"):
+        return ""
+    parts = []
+    if grid.get("grid_description"):
+        parts.append(f"Grid Verified: {grid['grid_description']}")
+    if grid.get("grid_sector"):
+        parts.append(f"Grid Sector: {grid['grid_sector']}")
+    if grid.get("grid_type"):
+        parts.append(f"Company Type: {grid['grid_type']}")
+    products = grid.get("grid_products") or []
+    main_products = [p for p in products if p.get("is_main")] or products[:2]
+    if main_products:
+        names = [p["name"] for p in main_products if p.get("name")]
+        if names:
+            parts.append(f"Key Products: {', '.join(names)}")
+    return "\n  ".join(parts)
+
 
 class MatchingEngine:
     """3-stage AI matchmaking pipeline: Embed -> Retrieve -> Rank & Explain."""
@@ -255,6 +309,7 @@ class MatchingEngine:
 
         candidate_descriptions = []
         for i, (candidate, sim_score) in enumerate(candidates):
+            grid_info = _grid_context(candidate)
             candidate_descriptions.append(
                 f"Candidate {i+1}:\n"
                 f"  Name: {candidate.name}\n"
@@ -267,6 +322,7 @@ class MatchingEngine:
                 f"  Vertical Tags: {', '.join(candidate.vertical_tags) if candidate.vertical_tags else 'Not classified'}\n"
                 f"  Deal Readiness: {candidate.deal_readiness_score or 0:.2f}\n"
                 f"  Vector Similarity: {sim_score:.3f}"
+                + (f"\n  {grid_info}" if grid_info else "")
             )
 
         prompt = f"""You are the AI matchmaking engine for Proof of Talk 2026, an exclusive Web3 conference at the Louvre Palace with 2,500 decision-makers controlling $18 trillion in assets.
@@ -277,6 +333,8 @@ Your task: Re-rank and explain match recommendations for the attendee below. Go 
 3. **Deal-ready pairs** — both parties have explicit, active deal signals (deploying_capital + raising_capital; seeking_customers + has_product). Must be transactable at this event, not just networking.
 
 Consider sector verticals when assessing complementarity. Cross-sector matches between complementary verticals (e.g., policy + infrastructure, tokenisation + investment) often create higher value than same-sector matches.
+
+When "Grid Verified" company data is present, treat it as the most authoritative source for what a company does, its products, and its sector. Use Grid products to identify concrete supply/demand fits (e.g., a custody product matches an investor needing custody; a compliance module matches a regulated entity). Grid sector alignment or complementarity should boost match confidence.
 
 TARGET ATTENDEE:
 Name: {attendee.name}
@@ -289,6 +347,7 @@ AI Summary: {attendee.ai_summary or 'Not available'}
 Intent Tags: {', '.join(attendee.intent_tags) if attendee.intent_tags else 'Not classified'}
 Vertical Tags: {', '.join(attendee.vertical_tags) if attendee.vertical_tags else 'Not classified'}
 Deal Readiness: {attendee.deal_readiness_score or 0:.2f}
+{_grid_context(attendee)}
 
 IMPORTANT: If the attendee specified companies/people they want to meet, give HIGHEST PRIORITY to candidates from those companies or similar companies. This is explicit user intent and overrides AI inference.
 {decline_feedback}
@@ -379,12 +438,13 @@ Return ONLY the JSON array. No markdown, no commentary."""
             else:
                 seen_topics.add(topic)
 
-            # Vertical affinity boost
+            # Vertical affinity boost — combine explicit tags + Grid sector intelligence
             idx = entry.get("candidate_index", 0) - 1
             if 0 <= idx < len(candidates):
                 candidate = candidates[idx][0]
-                a_verts = set(attendee.vertical_tags or [])
-                c_verts = set(candidate.vertical_tags or [])
+                # Merge explicit vertical_tags with Grid-derived verticals
+                a_verts = set(attendee.vertical_tags or []) | _grid_verticals(attendee)
+                c_verts = set(candidate.vertical_tags or []) | _grid_verticals(candidate)
                 complementary_hit = any(
                     v in COMPLEMENTARY_VERTICALS.get(av, [])
                     for av in a_verts for v in c_verts
@@ -393,6 +453,12 @@ Return ONLY the JSON array. No markdown, no commentary."""
                     score += 0.04
                 elif a_verts & c_verts:
                     score += 0.02
+
+                # Extra boost when Grid products suggest supply/demand fit
+                a_grid = (attendee.enriched_profile or {}).get("grid") or {}
+                c_grid = (candidate.enriched_profile or {}).get("grid") or {}
+                if a_grid.get("grid_products") and c_grid.get("grid_products"):
+                    score += 0.02  # both have verified product data = higher confidence
 
             entry["overall_score"] = max(0.0, min(1.0, score))
             adjusted.append(entry)

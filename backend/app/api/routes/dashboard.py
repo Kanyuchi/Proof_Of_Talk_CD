@@ -437,6 +437,15 @@ async def investor_heatmap(db: AsyncSession = Depends(get_db), _user: User = Dep
     }
 
 
+@router.get("/grid-health")
+async def grid_health_check(
+    _admin: User = Depends(require_admin),
+):
+    """Check if The Grid B2B API is reachable and working correctly."""
+    from app.services.grid_enrichment import health_check
+    return await health_check()
+
+
 EXTASY_EVENT_ID = "32b1b684-0e87-4633-92ef-b47272aa3fce"
 EXTASY_ORDERS_URL = f"https://api.b2b.extasy.com/operations/reports/orders/{EXTASY_EVENT_ID}"
 TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
@@ -471,7 +480,22 @@ async def revenue_stats(
     conversion_rate = valid / total_orders if total_orders else 0
 
     # ── Revenue ───────────────────────────────────────────────────────────
-    valid_orders = [o for o in orders if o.get("status") in {"PAID", "REDEEMED"}]
+    # Deduplicate true duplicate orders: same email + same ticket + same
+    # amount (e.g. accidental re-purchase).  Keeps legitimate multi-ticket
+    # purchases where the same email bought different ticket types.
+    _valid_raw = [o for o in orders if o.get("status") in {"PAID", "REDEEMED"}]
+    _dedup_seen: set[tuple[str, str, str]] = set()
+    valid_orders: list[dict] = []
+    for o in _valid_raw:
+        email = (o.get("email") or "").strip().lower()
+        ticket = (o.get("ticketNames") or "").split(",")[0].strip().lower()
+        amount = (o.get("paymentsAmount") or "0").strip()
+        key = (email, ticket, amount)
+        if key in _dedup_seen:
+            continue
+        _dedup_seen.add(key)
+        valid_orders.append(o)
+
     total_revenue = 0.0
     revenue_by_type = defaultdict(lambda: {"count": 0, "revenue": 0.0})
     paid_count = 0

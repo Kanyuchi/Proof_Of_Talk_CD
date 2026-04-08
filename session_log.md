@@ -285,3 +285,25 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Domain warm-up**: gradual sending (not mass blast) to build reputation — already following this approach
 - **Positive feedback**: Yannik said "really cool idea with the matchmaking"
 - **DMARC record live** — Victor added TXT record to proofoftalk.io DNS; verified propagated; Microsoft junk flagging should resolve
+
+## 2026-04-08 — Fix revenue double-counting in dashboard + update pitch figures
+- **Bug**: Dashboard revenue endpoint (`/api/v1/dashboard/revenue`) was summing raw Extasy API orders without deduplication — same email + same ticket + same amount counted multiple times (e.g. Tommi Vuorenmaa's duplicate Startup Pass = €599 overcounted)
+- **Fix**: Added deduplication in `backend/app/api/routes/dashboard.py` — key on `(email, ticket_name, amount)`, keeps first occurrence, drops true duplicates while preserving legitimate multi-ticket purchases (e.g. Francisco/Yaroslav on same email with different ticket types)
+- **Result**: Revenue now matches Google Sheets: €47,590.75 (was €48,189.75 before dedup; Google Sheets = €47,591)
+- **Pitch updated**: `docs/matchmaking-revenue-pitch.html` — revenue €42.5k → €47.6k, conversion 54.8% → 55.7%, failed orders 46 → 52
+- **project_state.md**: revenue figure updated to €47.6k
+
+## 2026-04-08 — Active Grid B2B matching + Grid API hardening
+- **Grid API hardening** (`grid_enrichment.py`):
+  - Case-insensitive search workaround — `_ilike` was silently removed from Grid API; now tries 4 case variants (original, Title, UPPER, lower) with `_like`
+  - Retry with backoff (2 retries, 1s/3s) on transient failures (timeout, 5xx)
+  - GraphQL errors logged explicitly instead of silently swallowed
+  - `health_check()` function verifies API reachability + filter syntax before the event
+  - New admin endpoint: `GET /dashboard/grid-health`
+- **Active Grid B2B matching** — Grid data now feeds into matching pipeline actively, not just passively through embedding text:
+  - `embeddings.py`: Grid products + company type added to composite text (was only description + sector)
+  - `matching.py`: 19-entry `GRID_SECTOR_TO_VERTICALS` map converts Grid sectors (e.g. "Custody and Wallets") into our vertical tags for COMPLEMENTARY_VERTICALS scoring
+  - `matching.py`: `_grid_context()` feeds Grid-verified description, sector, type, and key products into GPT-4o candidate descriptions
+  - `matching.py`: GPT-4o prompt instructs treating Grid data as most authoritative source; product-level supply/demand matching
+  - `matching.py`: deterministic reranking merges Grid-derived verticals with explicit tags; extra +0.02 boost when both sides have verified Grid products
+- **Sponsor Grid coverage**: 9/24 sponsors found in The Grid (Zircuit, CertiK, Taostats, BitGo, BitMEX, Paxos, ChangeNOW, Teroxx, Morph Network)

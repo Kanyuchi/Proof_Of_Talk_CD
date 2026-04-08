@@ -65,7 +65,7 @@
 - ✓ Vertical tags aligned with 1000 Minds — 12 verticals (incl. privacy), display names, surfaced in frontend (AttendeeMatches, Attendees, MyMatches)
 - ✓ Directory cleanup — temp files, .DS_Store, reorganised docs/scripts, consolidated node_modules
 - ✓ Runa integration API — 4 endpoints (magic link lookup, ticket webhooks, status), API key auth, spec doc for Swerve
-- ✓ The Grid B2B integration — GraphQL enrichment from thegrid.id, verified company data on match cards
+- ✓ The Grid B2B integration — GraphQL enrichment from thegrid.id, verified company data on match cards; active matching via sector→vertical mapping, Grid products in GPT-4o scoring, health check endpoint; API hardened with retries + case-insensitive search
 - ✓ Privacy mode — anonymous/pseudonymous B2B-only profiles with reveal-on-mutual-match, profile toggle, email handling
 - ✓ Supabase migration — full cutover from RDS to Supabase PostgreSQL; 73 attendees, 317 matches, all tables migrated; IPv4 add-on enabled
 - ✓ 1000 Minds speakers sync — speakers_sync.py reads from speakers table, upserts into attendees; daily cron 02:15 UTC; admin dashboard button
@@ -73,7 +73,7 @@
 - ✓ ML feedback loop — GPT-4o ranking prompt includes prior decline reasons as negative examples
 - ✓ Match card feedback buttons — ThumbsUp/ThumbsDown for lightweight quality signals
 - ✓ Admin match card parity — social links, vertical tags, Grid card now show on admin view too
-- ✓ Enhanced dashboard — revenue tracking (€42.5k), registration funnel, weekly growth, attendee sources, profile quality bars
+- ✓ Enhanced dashboard — revenue tracking (€47.6k), registration funnel, weekly growth, attendee sources, profile quality bars; Extasy order deduplication fix
 - ✓ QR code in email — CID attachment renders in Gmail; match intro email copy updated
 - ✓ "Who do you want to meet?" — target_companies field on Profile + magic link enrichment card
 - ✓ Twitter URL fix — handles full URLs (x.com/handle) not just @handle
