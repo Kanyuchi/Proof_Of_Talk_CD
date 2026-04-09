@@ -235,31 +235,69 @@ import re as _re
 
 def _normalize_company_name(name: str) -> list[str]:
     """
-    Generate search variants for domain-derived company names.
-    E.g. "Cardanofoundation" → ["Cardanofoundation", "Cardano Foundation", "Cardano"]
+    Generate search variants for domain-derived and concatenated company names.
+
+    Examples:
+      "Dragonflydigitalassets" → ["Dragonflydigitalassets", "Dragonfly Digital Assets", "Dragonfly"]
+      "Proofoftalk"           → ["Proofoftalk", "Proof Of Talk", "Proof"]
+      "CardanoFoundation"     → ["CardanoFoundation", "Cardano Foundation", "Cardano"]
+      "clearstreet"           → ["clearstreet", "Clear Street", "Clear"]
     """
     clean = name.strip()
     if not clean:
         return []
     variants = [clean]
 
-    # Split concatenated words: "CardanoFoundation" → "Cardano Foundation"
-    # Insert space before uppercase letters that follow lowercase
+    # 1. Split camelCase: "CardanoFoundation" → "Cardano Foundation"
     spaced = _re.sub(r"([a-z])([A-Z])", r"\1 \2", clean)
     if spaced != clean:
         variants.append(spaced)
 
-    # Also try splitting all-lowercase concatenated names by known suffixes
+    # 2. Known compound suffixes — split before them (case-insensitive)
     lower = clean.lower()
-    for suffix in ("foundation", "digital", "labs", "protocol", "network", "finance", "capital", "ventures", "assets", "global", "exchange", "laboratory"):
+    _SUFFIXES = (
+        "foundation", "digital", "labs", "protocol", "network", "finance",
+        "capital", "ventures", "assets", "global", "exchange", "laboratory",
+        "technology", "technologies", "solutions", "group", "holdings",
+        "wealth", "aligned", "ratings", "studio", "bar", "bit",
+    )
+    for suffix in _SUFFIXES:
         if lower.endswith(suffix) and len(lower) > len(suffix) + 2:
             prefix = clean[:len(clean) - len(suffix)]
-            spaced_suffix = f"{prefix} {clean[len(prefix):]}"
+            suffix_part = clean[len(prefix):]
+            spaced_suffix = f"{prefix} {suffix_part}"
             if spaced_suffix not in variants:
                 variants.append(spaced_suffix)
-            # Also try just the prefix (e.g., "Cardano" from "Cardanofoundation")
             if prefix.strip() not in variants and len(prefix.strip()) > 2:
                 variants.append(prefix.strip())
+
+    # 3. Known connecting words — split "proofoftalk" → "proof of talk"
+    # Try ALL positions of each connector to find best split (not just first)
+    _CONNECTORS = ("of", "and", "the", "for")
+    for conn in _CONNECTORS:
+        start = 0
+        while True:
+            idx = lower.find(conn, start)
+            if idx < 0:
+                break
+            start = idx + 1
+            # Both halves must be ≥ 4 chars to avoid false splits like "pro|of|talk"
+            before = clean[:idx]
+            after = clean[idx + len(conn):]
+            if len(before.strip()) >= 4 and len(after.strip()) >= 3:
+                spaced_conn = f"{before} {conn} {after}"
+                if spaced_conn not in variants:
+                    variants.append(spaced_conn)
+                no_conn = f"{before} {after}"
+                if no_conn not in variants:
+                    variants.append(no_conn)
+
+    # 4. Strip common domain-like suffixes that aren't real company names
+    for strip_suffix in ("io", "ai", "co", "xyz", "fi", "me"):
+        if lower.endswith(strip_suffix) and len(lower) > len(strip_suffix) + 3:
+            stripped = clean[:len(clean) - len(strip_suffix)].rstrip(".")
+            if stripped and stripped not in variants and len(stripped) > 2:
+                variants.append(stripped)
 
     return variants
 

@@ -9,7 +9,7 @@ import {
   useAttendeesBySector, useTriggerProcessing, useTriggerMatching,
 } from "../hooks/useDashboard";
 import { useAuth } from "../hooks/useAuth";
-import { enrichAll, syncExtasy, syncSpeakers, getInvestorHeatmap, getRevenueStats, getSponsors, generateSponsorReport } from "../api/client";
+import { enrichAll, syncExtasy, syncSpeakers, getInvestorHeatmap, getRevenueStats, getSponsors, generateSponsorReport, reEnrichGrid } from "../api/client";
 import { useQuery } from "@tanstack/react-query";
 
 function StatCard({
@@ -75,6 +75,7 @@ export default function Dashboard() {
   const [syncingExtasy, setSyncingExtasy] = useState(false);
   const [syncingSpeakers, setSyncingSpeakers] = useState(false);
   const [actionResult, setActionResult] = useState<string | null>(null);
+  const [reEnrichingGrid, setReEnrichingGrid] = useState(false);
   const [selectedSponsor, setSelectedSponsor] = useState("");
   const [sponsorReport, setSponsorReport] = useState<Record<string, unknown> | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -290,6 +291,22 @@ export default function Dashboard() {
             >
               <RefreshCw className={`w-4 h-4 ${syncingSpeakers ? "animate-spin" : ""}`} />
               {syncingSpeakers ? "Syncing…" : "Sync Speakers"}
+            </button>
+            <button
+              onClick={async () => {
+                setReEnrichingGrid(true); setActionResult(null);
+                try {
+                  const r = await reEnrichGrid();
+                  setActionResult(`Grid re-enrichment: ${r.newly_enriched} new, ${r.already_enriched} already had Grid, ${r.not_found} not found in Grid`);
+                } catch (err: unknown) {
+                  setActionResult(`Grid re-enrichment error: ${err instanceof Error ? err.message : "failed"}`);
+                } finally { setReEnrichingGrid(false); }
+              }}
+              disabled={reEnrichingGrid}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${reEnrichingGrid ? "animate-spin" : ""}`} />
+              {reEnrichingGrid ? "Re-enriching Grid…" : "Re-enrich Grid B2B"}
             </button>
           </div>
           {actionResult && (

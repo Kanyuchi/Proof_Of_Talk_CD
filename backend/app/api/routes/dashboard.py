@@ -446,6 +446,51 @@ async def grid_health_check(
     return await health_check()
 
 
+@router.post("/re-enrich-grid")
+async def re_enrich_grid(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Re-run Grid enrichment for all attendees missing Grid data."""
+    from app.services.grid_enrichment import enrich_from_grid
+    import json as _json
+
+    result = await db.execute(select(Attendee).where(Attendee.company.isnot(None)))
+    attendees = result.scalars().all()
+
+    enriched_count = 0
+    skipped = 0
+    failed = 0
+
+    for attendee in attendees:
+        enriched = attendee.enriched_profile or {}
+        if enriched.get("grid", {}).get("grid_name"):
+            skipped += 1
+            continue
+        try:
+            grid_data = await enrich_from_grid(attendee.company, attendee.company_website)
+            if grid_data:
+                enriched["grid"] = grid_data
+                enriched["grid_enriched_at"] = __import__("datetime").datetime.utcnow().isoformat()
+                attendee.enriched_profile = enriched
+                enriched_count += 1
+            else:
+                enriched["grid_attempted_at"] = __import__("datetime").datetime.utcnow().isoformat()
+                attendee.enriched_profile = enriched
+                failed += 1
+        except Exception:
+            failed += 1
+
+    await db.commit()
+    return {
+        "status": "done",
+        "total": len(attendees),
+        "already_enriched": skipped,
+        "newly_enriched": enriched_count,
+        "not_found": failed,
+    }
+
+
 EXTASY_EVENT_ID = "32b1b684-0e87-4633-92ef-b47272aa3fce"
 EXTASY_ORDERS_URL = f"https://api.b2b.extasy.com/operations/reports/orders/{EXTASY_EVENT_ID}"
 TEST_TICKET_NAMES = {"test ticket", "test ticket card"}

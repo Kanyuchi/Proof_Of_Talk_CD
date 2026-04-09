@@ -250,6 +250,13 @@ export async function getSponsors(): Promise<{ sponsors: { name: string; value: 
   return data;
 }
 
+export async function reEnrichGrid(): Promise<{
+  status: string; total: number; already_enriched: number; newly_enriched: number; not_found: number;
+}> {
+  const { data } = await api.post("/dashboard/re-enrich-grid", {}, { timeout: 120000 });
+  return data;
+}
+
 export async function generateSponsorReport(companyName: string): Promise<Record<string, unknown>> {
   const { data } = await api.post("/dashboard/sponsor-report", {
     company_name: companyName,

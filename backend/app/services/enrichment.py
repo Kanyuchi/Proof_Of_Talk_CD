@@ -70,12 +70,28 @@ class EnrichmentService:
                 enriched["crunchbase_enriched_at"] = datetime.utcnow().isoformat()
 
         # --- The Grid B2B enrichment (Web3 company database) ---
-        if attendee.company and not enriched.get("grid"):
+        # Retry if: never attempted, or last attempt was >7 days ago and failed
+        grid_stale = False
+        if enriched.get("grid"):
+            pass  # Already have Grid data, skip
+        elif enriched.get("grid_attempted_at"):
+            from datetime import timedelta
+            try:
+                attempted = datetime.fromisoformat(enriched["grid_attempted_at"])
+                grid_stale = (datetime.utcnow() - attempted) > timedelta(days=7)
+            except (ValueError, TypeError):
+                grid_stale = True
+        else:
+            grid_stale = True  # Never attempted
+
+        if attendee.company and grid_stale:
             from app.services.grid_enrichment import enrich_from_grid
             grid_data = await enrich_from_grid(attendee.company, attendee.company_website)
             if grid_data:
                 enriched["grid"] = grid_data
                 enriched["grid_enriched_at"] = datetime.utcnow().isoformat()
+            # Mark attempt time so we don't hammer the API on every enrichment run
+            enriched["grid_attempted_at"] = datetime.utcnow().isoformat()
 
         return enriched
 
