@@ -137,6 +137,12 @@ def send_match_intro_email(
 ) -> None:
     """Send the 'we found your top match' email after pipeline completes.
 
+    TEMPORARILY DISABLED — emails going out before platform is ready for
+    attendees to sign in. Re-enable when registration flow is live.
+    """
+    return  # BLOCKED: attendees receiving emails but can't access platform yet
+
+    """
     Args:
         to_email: Recipient email address.
         attendee_name: First name (or full name) of the recipient.
