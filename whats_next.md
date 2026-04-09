@@ -6,7 +6,7 @@
 
 ## Now
 
-1. **Commercial strategy execution** — build "See Who's Attending" public page, VIP match limits, sponsor match reports (see `docs/matchmaking-commercial-strategy.md`)
+1. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors
 2. **Post-purchase email sequence** — Resend is live; build the 4-email sequence (welcome, first matches, weekly digest, final briefing)
 3. **AI-inferred customer matching** — Z's vision: GPT-4o infers likely customers/partners per attendee, company similarity fallback
 4. **Email template design** — refine match intro email body layout, branding, content for production use

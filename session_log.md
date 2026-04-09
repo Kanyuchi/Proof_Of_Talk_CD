@@ -312,3 +312,12 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - Created `docs/sponsor-intelligence-brief.md` — team-facing document explaining the sponsor intelligence report system
 - Covers: what sponsors get (personalised 20-target report), how it works technically, three pricing tiers (€5-10k / €15-25k / €50k+), what each team member needs to do, revenue projections (€40k-€325k), and timeline
 - Key ask: generate 3 pilot reports for Zircuit, BitGo, CertiK so Victor can start pitching this week
+
+## 2026-04-09 — Sponsor Intelligence Report Generator built
+- Created `backend/scripts/sponsor_intelligence.py` — full pipeline for generating sponsor intelligence reports
+- Pipeline: sponsor name → Grid API (reuses hardened `enrich_from_grid`) → composite text → OpenAI embedding → pgvector similarity vs all attendees → GPT-4o generates sponsor-specific explanations → branded HTML report
+- Includes `--identify-team` flag to find sponsor team members already in the attendee pool
+- 24 sponsors hardcoded from Google Sheet data; supports `--sponsor "Name"` for single runs
+- Generated 3 pilot reports: Zircuit (2 HIGH, 3 MEDIUM), BitGo (2 HIGH, 3 MEDIUM), CertiK (1 HIGH, 3 MEDIUM)
+- All 3 sponsors found in The Grid with verified sector/products data
+- Reports saved as branded HTML with POT dark theme, relevance badges, conversation openers, deal potential
