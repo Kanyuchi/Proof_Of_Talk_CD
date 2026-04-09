@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Users, Handshake, Check, TrendingUp, BarChart3, Brain,
-  Lightbulb, DollarSign, Activity, Zap, RefreshCw, X, Sparkles,
+  Lightbulb, DollarSign, Activity, Zap, RefreshCw, X, Sparkles, Download,
 } from "lucide-react";
 import type { Attendee, Match } from "../types";
 import {
@@ -151,6 +151,61 @@ export default function Dashboard() {
     }
   };
 
+  const handleDownloadReport = () => {
+    if (!sponsorReport) return;
+    const sponsor = sponsorReport.sponsor as Record<string, unknown>;
+    const grid = sponsorReport.grid_data as Record<string, unknown>;
+    const explanations = sponsorReport.explanations as Record<string, unknown>[];
+    const attendees = sponsorReport.attendees as Record<string, unknown>[];
+    const team = sponsorReport.team_members as Record<string, unknown>[];
+    const summary = sponsorReport.summary as Record<string, number>;
+    const meta = sponsorReport.meta as Record<string, string>;
+
+    const rows = (explanations || []).map((exp, i) => {
+      const idx = (exp.attendee_index as number) - 1;
+      const a = attendees?.[idx] || {};
+      const conf = exp.confidence as Record<string, unknown> | undefined;
+      const confColor = (conf?.label as string) === "high" ? "#34d399" : (conf?.label as string) === "medium" ? "#fbbf24" : "#94a3b8";
+      return `
+        <div style="background:#13131f;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:20px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <div><span style="color:#E76315;font-family:'Instrument Serif',serif;font-size:18px;margin-right:8px;">#${i+1}</span><strong style="color:#e8e8f0">${a.name || ""}</strong><span style="color:rgba(255,255,255,0.4);font-size:13px;margin-left:8px;">${a.title || ""}${a.company ? " · " + a.company : ""}</span></div>
+            <div><span style="padding:2px 10px;border-radius:100px;font-size:11px;font-weight:600;background:${exp.relevance === "HIGH" ? "rgba(52,211,153,0.2)" : exp.relevance === "MEDIUM" ? "rgba(251,191,36,0.2)" : "rgba(255,255,255,0.1)"};color:${exp.relevance === "HIGH" ? "#34d399" : exp.relevance === "MEDIUM" ? "#fbbf24" : "rgba(255,255,255,0.4)"}">${exp.relevance}</span><span style="width:8px;height:8px;border-radius:50%;background:${confColor};display:inline-block;margin-left:8px;" title="Confidence: ${conf?.label || "low"}"></span></div>
+          </div>
+          <p style="font-size:14px;color:rgba(255,255,255,0.7);margin-bottom:8px;">${exp.why_they_matter || ""}</p>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);"><strong style="color:#E76315">Open with:</strong> ${exp.conversation_opener || ""}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.5);"><strong style="color:#a78bfa">Deal potential:</strong> ${exp.deal_potential || ""}</div>
+          ${(exp.caveats as string) ? `<div style="margin-top:6px;padding:4px 8px;border-radius:6px;background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.1);font-size:11px;color:rgba(251,191,36,0.7);">⚠ ${exp.caveats}</div>` : ""}
+          ${(exp.key_evidence as string[])?.length ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;">${(exp.key_evidence as string[]).map(ev => `<span style="padding:2px 6px;border-radius:4px;font-size:10px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.3)">${ev}</span>`).join("")}</div>` : ""}
+        </div>`;
+    }).join("");
+
+    const gridSection = grid?.found ? `
+      <div style="margin:12px 0;">
+        <span style="background:rgba(16,185,129,0.1);color:#34d399;padding:4px 12px;border-radius:100px;font-size:12px;font-weight:600;">✓ Verified by The Grid</span>
+        <span style="background:rgba(167,139,250,0.1);color:#a78bfa;padding:4px 12px;border-radius:100px;font-size:12px;margin-left:8px;">${grid.sector || ""}</span>
+      </div>
+      <p style="color:rgba(255,255,255,0.4);font-size:14px;">${grid.description || ""}</p>
+      ${(grid.products as string[])?.length ? `<p style="font-size:13px;color:rgba(255,255,255,0.6);"><strong>Products:</strong> ${(grid.products as string[]).join(", ")}</p>` : ""}
+    ` : `<p style="color:rgba(255,255,255,0.3);font-size:13px;">Grid data not available — report based on company name only</p>`;
+
+    const teamSection = (team?.length) ? `
+      <div style="margin:32px 0;">
+        <h2 style="font-family:'Instrument Serif',serif;font-size:24px;font-weight:400;margin-bottom:12px;color:#e8e8f0;">Your Team at POT 2026</h2>
+        <ul style="padding-left:20px;">${team.map(t => `<li style="margin:4px 0;font-size:14px;color:rgba(255,255,255,0.7);"><strong>${t.name}</strong> — ${t.title} (${t.ticket_type})</li>`).join("")}</ul>
+      </div>` : "";
+
+    const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${sponsor.name} — POT 2026 Intelligence Briefing</title><link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#0d0d1a;color:#e8e8f0;font-family:'DM Sans',sans-serif;line-height:1.6}.page{max-width:900px;margin:0 auto;padding:60px 32px 80px}.hero{text-align:center;padding:60px 0 40px}.hero h1{font-family:'Instrument Serif',serif;font-size:42px;font-weight:400}.hero h1 em{color:#E76315;font-style:italic}.badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:#E76315;border:1px solid rgba(231,99,21,0.3);padding:6px 16px;border-radius:100px;margin-bottom:24px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(255,255,255,0.06);border-radius:12px;overflow:hidden;margin:24px 0}.stat{background:#13131f;padding:20px;text-align:center}.stat .num{font-family:'Instrument Serif',serif;font-size:28px;color:#E76315}.stat .label{font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.06em;margin-top:4px}.disclaimer{margin:16px 0;padding:12px;border-radius:8px;background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.1);font-size:12px;color:rgba(251,191,36,0.6)}.footer{text-align:center;margin-top:48px;font-size:12px;color:rgba(255,255,255,0.2)}</style></head><body><div class="page"><div class="hero"><div class="badge">${sponsor.tier} Sponsor · Confidential</div><h1>${sponsor.name} — <em>Intelligence Briefing</em></h1><p style="color:rgba(255,255,255,0.4);font-size:15px;">Proof of Talk 2026 · Louvre Palace, Paris · June 2–3</p>${gridSection}</div><div class="stats"><div class="stat"><div class="num">${summary?.total_targets || 0}</div><div class="label">Target attendees</div></div><div class="stat"><div class="num">${summary?.high_relevance || 0}</div><div class="label">High relevance</div></div><div class="stat"><div class="num">${summary?.medium_relevance || 0}</div><div class="label">Medium</div></div><div class="stat"><div class="num">${summary?.team_attending || 0}</div><div class="label">Your team</div></div></div><div class="disclaimer">⚠ ${meta?.disclaimer || "This report combines verified data and AI-generated analysis. Fields marked [AI-INFERRED] should be verified."}<br>Average data confidence: ${((summary?.avg_confidence || 0) * 100).toFixed(0)}%</div>${teamSection}<div style="margin:32px 0;"><h2 style="font-family:'Instrument Serif',serif;font-size:28px;font-weight:400;margin-bottom:16px;color:#e8e8f0;">Your Top ${summary?.total_targets || 0} Targets</h2>${rows}</div><div class="footer">Proof of Talk 2026 · Sponsor Intelligence Report · Generated ${new Date().toLocaleDateString("en-GB", {day:"numeric",month:"long",year:"numeric"})} · Confidential</div></div></body></html>`;
+
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(sponsor.name as string).toLowerCase().replace(/\s+/g, "-")}-intelligence-report.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleGenerateSponsorReport = async () => {
     if (!selectedSponsor) return;
     setGeneratingReport(true);
@@ -276,6 +331,15 @@ export default function Dashboard() {
               <Sparkles className={`w-4 h-4 ${generatingReport ? "animate-pulse" : ""}`} />
               {generatingReport ? "Generating (15-30s)…" : "Generate Report"}
             </button>
+            {sponsorReport && (
+              <button
+                onClick={handleDownloadReport}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-sm text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+              >
+                <Download className="w-4 h-4" />
+                Download Report
+              </button>
+            )}
           </div>
 
           {reportError && (
