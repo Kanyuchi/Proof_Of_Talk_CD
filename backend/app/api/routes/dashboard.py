@@ -600,3 +600,35 @@ async def revenue_stats(
             "with_targets": with_targets,
         },
     }
+
+
+# ── Sponsor Intelligence ──────────────────────────────────────────────────
+
+@router.get("/sponsors")
+async def list_sponsors(
+    _admin: User = Depends(require_admin),
+):
+    """List all 24 POT 2026 sponsors."""
+    from app.services.sponsor_intelligence import SPONSORS
+    return {"sponsors": SPONSORS}
+
+
+@router.post("/sponsor-report")
+async def generate_sponsor_report(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Generate a personalised intelligence report for a sponsor company."""
+    company_name = body.get("company_name")
+    if not company_name:
+        return {"error": "company_name is required"}
+
+    from app.services.sponsor_intelligence import run_sponsor_report
+    report = await run_sponsor_report(
+        sponsor_name=company_name,
+        db=db,
+        top_k=body.get("top_k", 20),
+        identify_team=body.get("identify_team", True),
+    )
+    return report

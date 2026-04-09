@@ -9,7 +9,7 @@ import {
   useAttendeesBySector, useTriggerProcessing, useTriggerMatching,
 } from "../hooks/useDashboard";
 import { useAuth } from "../hooks/useAuth";
-import { enrichAll, syncExtasy, syncSpeakers, getInvestorHeatmap, getRevenueStats } from "../api/client";
+import { enrichAll, syncExtasy, syncSpeakers, getInvestorHeatmap, getRevenueStats, getSponsors, generateSponsorReport } from "../api/client";
 import { useQuery } from "@tanstack/react-query";
 
 function StatCard({
@@ -75,6 +75,10 @@ export default function Dashboard() {
   const [syncingExtasy, setSyncingExtasy] = useState(false);
   const [syncingSpeakers, setSyncingSpeakers] = useState(false);
   const [actionResult, setActionResult] = useState<string | null>(null);
+  const [selectedSponsor, setSelectedSponsor] = useState("");
+  const [sponsorReport, setSponsorReport] = useState<Record<string, unknown> | null>(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const { data: typeMatches, isLoading: loadingTypeMatches } = useMatchesByType(drillType);
   const { data: sectorAttendees, isLoading: loadingSector } = useAttendeesBySector(drillSector);
@@ -87,6 +91,12 @@ export default function Dashboard() {
     queryKey: ["revenue-stats"],
     queryFn: getRevenueStats,
     staleTime: 60_000,
+  });
+  const { data: sponsorsData } = useQuery({
+    queryKey: ["sponsors"],
+    queryFn: getSponsors,
+    staleTime: 300_000,
+    enabled: isAdmin,
   });
   const processMutation = useTriggerProcessing();
   const matchMutation = useTriggerMatching();
@@ -138,6 +148,25 @@ export default function Dashboard() {
       setActionResult(`Speakers sync error: ${msg}`);
     } finally {
       setSyncingSpeakers(false);
+    }
+  };
+
+  const handleGenerateSponsorReport = async () => {
+    if (!selectedSponsor) return;
+    setGeneratingReport(true);
+    setSponsorReport(null);
+    setReportError(null);
+    try {
+      const report = await generateSponsorReport(selectedSponsor);
+      if (report.error) {
+        setReportError(String(report.error));
+      } else {
+        setSponsorReport(report);
+      }
+    } catch (err: unknown) {
+      setReportError(err instanceof Error ? err.message : "Failed to generate report");
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
@@ -211,6 +240,131 @@ export default function Dashboard() {
           {actionResult && (
             <div className="mt-3 text-sm text-emerald-400 flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5" /> {actionResult}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Sponsor Intelligence */}
+      {isAdmin && sponsorsData && (
+        <div className="p-5 rounded-2xl bg-purple-500/5 border border-purple-500/20">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-purple-400" />
+            <h2 className="font-semibold text-purple-400">Sponsor Intelligence Reports</h2>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="block text-xs text-white/40 mb-1">Select Sponsor</label>
+              <select
+                value={selectedSponsor}
+                onChange={(e) => { setSelectedSponsor(e.target.value); setSponsorReport(null); setReportError(null); }}
+                className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white/80 min-w-[220px]"
+              >
+                <option value="">Choose a sponsor…</option>
+                {sponsorsData.sponsors.map((s) => (
+                  <option key={s.name} value={s.name}>
+                    {s.name} ({s.tier}, €{s.value.toLocaleString()})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleGenerateSponsorReport}
+              disabled={!selectedSponsor || generatingReport}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 text-sm text-purple-400 hover:bg-purple-500/20 hover:border-purple-500/50 transition-all disabled:opacity-50"
+            >
+              <Sparkles className={`w-4 h-4 ${generatingReport ? "animate-pulse" : ""}`} />
+              {generatingReport ? "Generating (15-30s)…" : "Generate Report"}
+            </button>
+          </div>
+
+          {reportError && (
+            <div className="mt-3 text-sm text-red-400">{reportError}</div>
+          )}
+
+          {sponsorReport && (
+            <div className="mt-4 space-y-4">
+              {/* Summary stats */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                {[
+                  { label: "Targets", value: (sponsorReport.summary as Record<string, number>)?.total_targets || 0 },
+                  { label: "High", value: (sponsorReport.summary as Record<string, number>)?.high_relevance || 0, color: "text-emerald-400" },
+                  { label: "Medium", value: (sponsorReport.summary as Record<string, number>)?.medium_relevance || 0, color: "text-yellow-400" },
+                  { label: "Low", value: (sponsorReport.summary as Record<string, number>)?.low_relevance || 0, color: "text-white/40" },
+                  { label: "Team", value: (sponsorReport.summary as Record<string, number>)?.team_attending || 0, color: "text-blue-400" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="p-3 rounded-lg bg-white/5 text-center">
+                    <div className={`text-lg font-bold ${color || "text-white"}`}>{value}</div>
+                    <div className="text-[10px] text-white/40 uppercase">{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Grid status */}
+              {(sponsorReport.grid_data as Record<string, unknown>)?.found ? (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400">✓ Grid Verified</span>
+                  <span className="text-white/40">{(sponsorReport.grid_data as Record<string, unknown>)?.sector as string} · {((sponsorReport.grid_data as Record<string, unknown>)?.products as string[])?.join(", ")}</span>
+                </div>
+              ) : (
+                <div className="text-xs text-white/30">Grid data not available for this sponsor — report based on name only</div>
+              )}
+
+              {/* Avg confidence */}
+              <div className="text-xs text-white/40">
+                Avg data confidence: <span className={`font-semibold ${(sponsorReport.summary as Record<string, number>)?.avg_confidence >= 0.7 ? "text-emerald-400" : (sponsorReport.summary as Record<string, number>)?.avg_confidence >= 0.4 ? "text-yellow-400" : "text-red-400"}`}>
+                  {((sponsorReport.summary as Record<string, number>)?.avg_confidence * 100).toFixed(0)}%
+                </span>
+                {" · "}
+                <span className="text-white/30">{(sponsorReport.meta as Record<string, string>)?.disclaimer}</span>
+              </div>
+
+              {/* Explanation cards */}
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {((sponsorReport.explanations as Record<string, unknown>[]) || []).map((exp, i) => {
+                  const attendees = sponsorReport.attendees as Record<string, unknown>[];
+                  const idx = (exp.attendee_index as number) - 1;
+                  const attendee = attendees?.[idx];
+                  const confidence = exp.confidence as Record<string, unknown> | undefined;
+                  const confLabel = (confidence?.label as string) || "low";
+                  const confColor = confLabel === "high" ? "bg-emerald-500" : confLabel === "medium" ? "bg-yellow-500" : "bg-white/20";
+
+                  return (
+                    <div key={i} className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <span className="text-[#E76315] font-serif text-lg mr-2">#{i + 1}</span>
+                          <strong className="text-white/90">{attendee?.name as string}</strong>
+                          <span className="text-white/40 text-sm ml-2">{attendee?.title as string}{attendee?.company ? ` · ${attendee.company}` : ""}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${exp.relevance === "HIGH" ? "bg-emerald-500/20 text-emerald-400" : exp.relevance === "MEDIUM" ? "bg-yellow-500/20 text-yellow-400" : "bg-white/10 text-white/40"}`}>
+                            {exp.relevance as string}
+                          </span>
+                          <span className={`w-2 h-2 rounded-full ${confColor}`} title={`Data confidence: ${confLabel}`} />
+                        </div>
+                      </div>
+                      <p className="text-sm text-white/70 mb-2">{exp.why_they_matter as string}</p>
+                      <div className="text-xs text-white/50 space-y-1">
+                        <div><strong className="text-[#E76315]">Open with:</strong> {exp.conversation_opener as string}</div>
+                        <div><strong className="text-purple-400">Deal potential:</strong> {exp.deal_potential as string}</div>
+                        {(exp.caveats as string) && (
+                          <div className="mt-1 px-2 py-1 rounded bg-yellow-500/5 border border-yellow-500/10 text-yellow-400/70">
+                            ⚠ {exp.caveats as string}
+                          </div>
+                        )}
+                        {(exp.key_evidence as string[])?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {(exp.key_evidence as string[]).map((ev, j) => (
+                              <span key={j} className="px-1.5 py-0.5 rounded text-[10px] bg-white/5 text-white/30">{ev}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

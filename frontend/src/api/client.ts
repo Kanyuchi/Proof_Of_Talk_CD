@@ -243,6 +243,22 @@ export async function syncExtasy(): Promise<{
   return data;
 }
 
+// ── Sponsor Intelligence ─────────────────────────────────────────────
+
+export async function getSponsors(): Promise<{ sponsors: { name: string; value: number; tier: string; lead: string }[] }> {
+  const { data } = await api.get("/dashboard/sponsors");
+  return data;
+}
+
+export async function generateSponsorReport(companyName: string): Promise<Record<string, unknown>> {
+  const { data } = await api.post("/dashboard/sponsor-report", {
+    company_name: companyName,
+    identify_team: true,
+    top_k: 20,
+  }, { timeout: 90000 }); // GPT call can take 30s+
+  return data;
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────
 
 export async function loginUser(email: string, password: string): Promise<Token> {
