@@ -62,6 +62,26 @@ def build_composite_text(attendee) -> str:
     if attendee.intent_tags:
         parts.append(f"Intent Tags: {', '.join(attendee.intent_tags)}")
 
+    icp = getattr(attendee, "inferred_customer_profile", None) or {}
+    if icp.get("offers"):
+        parts.append(f"Offers: {icp['offers']}")
+    customer_lines = []
+    for c in (icp.get("ideal_customers") or [])[:3]:
+        who = c.get("who", "")
+        kws = ", ".join(c.get("signal_keywords") or [])
+        if who:
+            customer_lines.append(f"{who} ({kws})" if kws else who)
+    if customer_lines:
+        parts.append(f"Ideal Customers: {'; '.join(customer_lines)}")
+    partner_lines = []
+    for p in (icp.get("ideal_partners") or [])[:2]:
+        who = p.get("who", "")
+        kws = ", ".join(p.get("signal_keywords") or [])
+        if who:
+            partner_lines.append(f"{who} ({kws})" if kws else who)
+    if partner_lines:
+        parts.append(f"Ideal Partners: {'; '.join(partner_lines)}")
+
     return "\n".join(parts)
 
 
@@ -186,6 +206,85 @@ Return 1-3 most relevant verticals as a JSON array. Nothing else."""
         return [t for t in tags if t in VALID_VERTICALS]
     except json.JSONDecodeError:
         return []
+
+
+async def infer_customer_profile(attendee) -> dict:
+    """Infer an attendee's ideal customer / partner profile (ICP) using GPT-4o.
+
+    Returns a structured dict describing who would realistically buy from,
+    invest in, or partner with this attendee — used to find non-explicit
+    matches when target_companies is empty.
+    """
+    grid = (attendee.enriched_profile or {}).get("grid") or {}
+    grid_summary = ""
+    if grid.get("grid_description"):
+        grid_summary = (
+            f"Grid Verified: {grid.get('grid_description', '')}\n"
+            f"Grid Sector: {grid.get('grid_sector', '')}\n"
+            f"Key Products: {', '.join(p.get('name', '') for p in (grid.get('grid_products') or [])[:5])}"
+        )
+
+    prompt = f"""You are inferring the ideal customer / partner profile (ICP) for a Web3 conference attendee.
+Goal: identify who would realistically buy from, invest in, sell to, or partner with this person at Proof of Talk 2026 (2,500 decision-makers, $18T AUM).
+
+ATTENDEE:
+Name: {attendee.name}
+Title: {attendee.title}
+Company: {attendee.company}
+Goals: {attendee.goals or 'Not specified'}
+AI Summary: {attendee.ai_summary or 'Not available'}
+Vertical Tags: {', '.join(attendee.vertical_tags) if attendee.vertical_tags else 'None'}
+Intent Tags: {', '.join(attendee.intent_tags) if attendee.intent_tags else 'None'}
+{grid_summary}
+
+Return ONLY a JSON object with this exact shape:
+{{
+  "offers": "<one sentence: what this attendee/company actually provides — product, capital, expertise, regulation, etc.>",
+  "ideal_customers": [
+    {{
+      "who": "<concrete persona — e.g. 'Sovereign wealth funds deploying into tokenised RWA'>",
+      "why": "<one sentence on why they'd transact>",
+      "signal_keywords": ["3-6 lowercase keywords/phrases that would appear in a matching attendee's role, goals, vertical_tags, or company description"]
+    }}
+  ],
+  "ideal_partners": [
+    {{
+      "who": "<concrete partner persona>",
+      "why": "<why the partnership creates value>",
+      "signal_keywords": ["3-6 lowercase keywords"]
+    }}
+  ],
+  "anti_personas": ["short list of who is NOT a fit — e.g. 'direct competitors in custody infra'"]
+}}
+
+Rules:
+- 2-3 ideal_customers, 1-2 ideal_partners.
+- Be SPECIFIC. "Crypto companies" is useless. "Series A DeFi protocols needing institutional custody" is useful.
+- signal_keywords must be lowercase, concrete, and likely to appear in another attendee's profile text.
+- If the attendee is themselves a buyer (investor, allocator, regulator), ideal_customers describes who they would buy FROM (e.g. an allocator's ideal_customers = founders raising in their thesis).
+- Never invent details not implied by the data. If unsure, keep personas broad but truthful.
+- Return ONLY the JSON object. No markdown, no commentary."""
+
+    response = await client.chat.completions.create(
+        model=settings.OPENAI_CHAT_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+        max_tokens=600,
+    )
+    raw = response.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            return {}
+        data.setdefault("offers", "")
+        data.setdefault("ideal_customers", [])
+        data.setdefault("ideal_partners", [])
+        data.setdefault("anti_personas", [])
+        return data
+    except json.JSONDecodeError:
+        return {}
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:

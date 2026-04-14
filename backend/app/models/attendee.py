@@ -57,6 +57,7 @@ class Attendee(Base):
     intent_tags: Mapped[list] = mapped_column(ARRAY(String), default=list)  # AI-classified intents
     vertical_tags: Mapped[list] = mapped_column(ARRAY(String), default=list)  # 1000minds sector verticals
     deal_readiness_score: Mapped[float] = mapped_column(Float, nullable=True)  # 0-1 score
+    inferred_customer_profile: Mapped[dict] = mapped_column(JSONB, default=dict)  # GPT-inferred ICP: who would buy/partner with this attendee
 
     # Data intelligence extras
     crunchbase_data: Mapped[dict] = mapped_column(JSONB, default=dict)  # Crunchbase/PitchBook data

@@ -8,7 +8,7 @@ from openai import AsyncOpenAI
 from app.core.config import get_settings
 from app.models.attendee import Attendee, Match
 from app.models.user import User
-from app.services.embeddings import embed_attendee, generate_ai_summary, classify_intents
+from app.services.embeddings import embed_attendee, generate_ai_summary, classify_intents, infer_customer_profile
 
 settings = get_settings()
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
@@ -66,6 +66,60 @@ def _grid_verticals(attendee: Attendee) -> set[str]:
     return set(GRID_SECTOR_TO_VERTICALS.get(sector, []))
 
 
+def _icp_summary(attendee: Attendee, max_personas: int = 3) -> str:
+    """Render an attendee's inferred customer profile as a compact GPT-readable block."""
+    icp = getattr(attendee, "inferred_customer_profile", None) or {}
+    if not icp:
+        return ""
+    lines = []
+    if icp.get("offers"):
+        lines.append(f"Offers: {icp['offers']}")
+    customers = icp.get("ideal_customers") or []
+    for c in customers[:max_personas]:
+        who = c.get("who", "")
+        why = c.get("why", "")
+        if who:
+            lines.append(f"  - Ideal customer: {who}{' — ' + why if why else ''}")
+    partners = icp.get("ideal_partners") or []
+    for p in partners[:2]:
+        who = p.get("who", "")
+        why = p.get("why", "")
+        if who:
+            lines.append(f"  - Ideal partner: {who}{' — ' + why if why else ''}")
+    return "\n".join(lines)
+
+
+def _icp_signal_keywords(attendee: Attendee) -> set[str]:
+    """Flatten all signal_keywords from an attendee's ICP into a lowercase set."""
+    icp = getattr(attendee, "inferred_customer_profile", None) or {}
+    keywords: set[str] = set()
+    for bucket in ("ideal_customers", "ideal_partners"):
+        for persona in (icp.get(bucket) or []):
+            for kw in (persona.get("signal_keywords") or []):
+                kw = str(kw).strip().lower()
+                if kw:
+                    keywords.add(kw)
+    return keywords
+
+
+def _candidate_signal_text(candidate: Attendee) -> str:
+    """Build a lowercase searchable blob of a candidate's profile for keyword matching."""
+    parts = [
+        candidate.title or "",
+        candidate.company or "",
+        candidate.goals or "",
+        " ".join(candidate.vertical_tags or []),
+        " ".join(candidate.intent_tags or []),
+        candidate.ai_summary or "",
+    ]
+    grid = (candidate.enriched_profile or {}).get("grid") or {}
+    parts.append(grid.get("grid_description") or "")
+    parts.append(grid.get("grid_sector") or "")
+    for prod in (grid.get("grid_products") or [])[:5]:
+        parts.append(prod.get("name") or "")
+    return " ".join(parts).lower()
+
+
 def _grid_context(attendee: Attendee) -> str:
     """Build a concise Grid intelligence summary for GPT-4o candidate descriptions."""
     grid = (attendee.enriched_profile or {}).get("grid") or {}
@@ -97,7 +151,7 @@ class MatchingEngine:
     # ── Stage 1: Embed ──────────────────────────────────────────────────
 
     async def process_attendee(self, attendee: Attendee) -> Attendee:
-        """Generate AI summary, intent tags, and embedding for an attendee."""
+        """Generate AI summary, intent tags, ICP, and embedding for an attendee."""
         # Generate AI summary
         attendee.ai_summary = await generate_ai_summary(attendee)
 
@@ -109,7 +163,13 @@ class MatchingEngine:
         matching_intents = set(attendee.intent_tags) & deal_signals
         attendee.deal_readiness_score = len(matching_intents) / len(deal_signals)
 
-        # Generate embedding
+        # Infer ideal customer / partner profile (Z's vision: AI-inferred matching layer)
+        try:
+            attendee.inferred_customer_profile = await infer_customer_profile(attendee)
+        except Exception:
+            attendee.inferred_customer_profile = {}
+
+        # Generate embedding (composite text now includes ICP)
         attendee.embedding = await embed_attendee(attendee)
 
         self.db.add(attendee)
@@ -307,9 +367,20 @@ class MatchingEngine:
         except Exception:
             pass  # Non-critical; proceed without feedback
 
+        # Precompute target attendee's ICP keyword set for "candidate matches my ICP" hints
+        target_icp_keywords = _icp_signal_keywords(attendee)
+
         candidate_descriptions = []
         for i, (candidate, sim_score) in enumerate(candidates):
             grid_info = _grid_context(candidate)
+            candidate_icp = _icp_summary(candidate, max_personas=2)
+            # Does this candidate's profile contain any of the target's ICP keywords?
+            candidate_text = _candidate_signal_text(candidate)
+            icp_hits = sorted(kw for kw in target_icp_keywords if kw and kw in candidate_text)
+            icp_hit_line = (
+                f"\n  ICP MATCH SIGNAL: candidate profile contains target's ICP keywords: {', '.join(icp_hits[:6])}"
+                if icp_hits else ""
+            )
             candidate_descriptions.append(
                 f"Candidate {i+1}:\n"
                 f"  Name: {candidate.name}\n"
@@ -323,6 +394,8 @@ class MatchingEngine:
                 f"  Deal Readiness: {candidate.deal_readiness_score or 0:.2f}\n"
                 f"  Vector Similarity: {sim_score:.3f}"
                 + (f"\n  {grid_info}" if grid_info else "")
+                + (f"\n  Candidate's own ICP:\n{candidate_icp}" if candidate_icp else "")
+                + icp_hit_line
             )
 
         prompt = f"""You are the AI matchmaking engine for Proof of Talk 2026, an exclusive Web3 conference at the Louvre Palace with 2,500 decision-makers controlling $18 trillion in assets.
@@ -349,7 +422,15 @@ Vertical Tags: {', '.join(attendee.vertical_tags) if attendee.vertical_tags else
 Deal Readiness: {attendee.deal_readiness_score or 0:.2f}
 {_grid_context(attendee)}
 
-IMPORTANT: If the attendee specified companies/people they want to meet, give HIGHEST PRIORITY to candidates from those companies or similar companies. This is explicit user intent and overrides AI inference.
+TARGET'S INFERRED IDEAL CUSTOMER PROFILE (ICP):
+{_icp_summary(attendee) or 'Not available'}
+
+WEIGHT HIERARCHY (apply in this order):
+1. EXPLICIT — if "Who they want to meet" names companies/people, candidates matching those win automatically.
+2. AI-INFERRED — when no explicit targets, prefer candidates who match the target's ICP personas above (an "ICP MATCH SIGNAL" line on a candidate is strong evidence). Also consider whether the target matches the candidate's own ICP — a two-way ICP fit is a deal-ready signal.
+3. BASELINE — vector similarity and vertical complementarity.
+
+Avoid matching the target with a direct competitor (same offer, same customers). Prefer counterparties whose offer complements the target's needs.
 {decline_feedback}
 CANDIDATES:
 {chr(10).join(candidate_descriptions)}
@@ -423,6 +504,7 @@ Return ONLY the JSON array. No markdown, no commentary."""
         """Apply deterministic boosts/penalties after LLM ranking."""
         adjusted = []
         seen_topics = set()
+        target_icp_kws = _icp_signal_keywords(attendee)
         for entry in ranked:
             score = float(entry.get("overall_score", 0.0))
             match_type = str(entry.get("match_type", "complementary"))
@@ -459,6 +541,22 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 c_grid = (candidate.enriched_profile or {}).get("grid") or {}
                 if a_grid.get("grid_products") and c_grid.get("grid_products"):
                     score += 0.02  # both have verified product data = higher confidence
+
+                # ICP boost — ranked below explicit target_companies (already prompt-weighted)
+                # and above pure similarity (which is the baseline floor)
+                candidate_text = _candidate_signal_text(candidate)
+                icp_hits = sum(1 for kw in target_icp_kws if kw and kw in candidate_text)
+                if icp_hits >= 2:
+                    score += 0.05  # strong ICP signal — multiple keyword hits
+                elif icp_hits == 1:
+                    score += 0.03
+
+                # Two-way ICP fit — candidate's ICP also points back at target
+                candidate_icp_kws = _icp_signal_keywords(candidate)
+                if candidate_icp_kws:
+                    target_text = _candidate_signal_text(attendee)
+                    if any(kw in target_text for kw in candidate_icp_kws):
+                        score += 0.03  # mutual fit = deal-ready signal
 
             entry["overall_score"] = max(0.0, min(1.0, score))
             adjusted.append(entry)
@@ -562,6 +660,51 @@ Return ONLY the JSON array. No markdown, no commentary."""
             )
             self.db.add(match)
             matches.append(match)
+
+        # Company-similarity fallback — if the threshold filter produced zero
+        # matches, surface up to 3 peers that share Grid sector or vertical tags
+        # so no attendee ends up with an empty briefing.
+        if not matches:
+            a_verts = set(attendee.vertical_tags or []) | _grid_verticals(attendee)
+            a_grid_sector = ((attendee.enriched_profile or {}).get("grid") or {}).get("grid_sector", "").strip().lower()
+            for candidate, sim_score in candidates[:5]:
+                c_verts = set(candidate.vertical_tags or []) | _grid_verticals(candidate)
+                c_grid_sector = ((candidate.enriched_profile or {}).get("grid") or {}).get("grid_sector", "").strip().lower()
+                shares_vertical = bool(a_verts & c_verts)
+                shares_grid = bool(a_grid_sector and a_grid_sector == c_grid_sector)
+                if not (shares_vertical or shares_grid):
+                    continue
+                existing = (
+                    await self.db.execute(
+                        select(Match).where(
+                            or_(
+                                (Match.attendee_a_id == attendee.id) & (Match.attendee_b_id == candidate.id),
+                                (Match.attendee_a_id == candidate.id) & (Match.attendee_b_id == attendee.id),
+                            )
+                        )
+                    )
+                ).scalars().first()
+                if existing:
+                    continue
+                shared = sorted((a_verts & c_verts) or {a_grid_sector} if a_grid_sector else set())
+                fallback = Match(
+                    attendee_a_id=attendee.id,
+                    attendee_b_id=candidate.id,
+                    similarity_score=sim_score,
+                    complementary_score=sim_score,
+                    overall_score=max(0.60, sim_score),
+                    match_type="complementary",
+                    explanation=(
+                        f"Sector peer match — both work in {', '.join(shared) or 'a related Web3 sector'}. "
+                        f"No stronger deal-ready signal was found; surfacing as a sector connection worth a brief intro."
+                    ),
+                    shared_context={"sectors": shared, "fallback": True},
+                    explanation_confidence=0.4,
+                )
+                self.db.add(fallback)
+                matches.append(fallback)
+                if len(matches) >= 3:
+                    break
 
         await self.db.commit()
 

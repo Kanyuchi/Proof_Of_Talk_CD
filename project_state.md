@@ -1,13 +1,14 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-04-07 (Railway migration complete, Resend email live, no more personal AWS)
+**Last updated:** 2026-04-14 (AI-inferred customer matching shipped — Z's ICP vision live, 247 matches @ 0.720 avg)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · **Railway** (backend) · **Resend** (email) · Netlify (frontend)
 
 ---
 
 ## What's Working
 
-- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; **317 matches** across 73 attendees, avg score **0.704**; vertical_tags + intent_tags + target_companies integrated into embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS boost; ML feedback loop feeds decline reasons into GPT prompt
+- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; **247 matches** across 60 attendees, avg score **0.720**; vertical_tags + intent_tags + target_companies + inferred_customer_profile integrated into embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS boost; ML feedback loop feeds decline reasons into GPT prompt
+- **AI-inferred customer matching (Z's vision)** — each attendee gets a GPT-4o-inferred ICP stored in `inferred_customer_profile` JSONB: `offers`, `ideal_customers[]` (who/why/signal_keywords), `ideal_partners[]`, `anti_personas`. Fed into composite embedding text so similarity search reflects "who would buy from this person"; injected into ranking prompt with explicit weight hierarchy (EXPLICIT target_companies > AI-INFERRED ICP > BASELINE similarity); deterministic rerank adds +0.03/+0.05 when a candidate's profile contains 1/≥2 of the target's ICP signal keywords, +0.03 extra when the candidate's ICP also points back at the target (two-way fit = deal-ready). Company-similarity fallback surfaces up to 3 sector peers (shared vertical_tags or Grid sector) when no matches clear `MIN_MATCH_SCORE`, preventing empty briefings.
 - **Data enrichment** — 73/73 attendees have AI summaries, embeddings, intent_tags, and vertical_tags; enrichment pipeline fully functional on EC2
 - **1000 Minds speakers sync** — `speakers_sync.py` reads from `speakers` table (Jessica's curated list), upserts into `attendees` for matching; maps seniority→ticket_type, verticals→slugs, bio→goals; daily cron at 02:15 UTC; admin button on dashboard
 - **Enhanced dashboard** — revenue tracking (€47.6k total, ticket breakdown), registration funnel (paid/failed/pending), weekly growth chart, attendee sources (Extasy/1000 Minds/self-registered), profile quality bars; live data from Extasy API with deduplication
