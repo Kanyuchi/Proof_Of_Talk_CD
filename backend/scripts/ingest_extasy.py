@@ -47,14 +47,14 @@ TICKETS_URL = f"{EXTASY_BASE}/tickets/{EXTASY_EVENT_ID}"
 # ── Ticket-type mapping ────────────────────────────────────────────────────────
 # Maps Extasy ticket name → our tickettype enum
 TICKET_TYPE_MAP = {
-    "investor pass":                    "vip",
-    "vip pass":                         "vip",
-    "vip black pass":                   "vip",
-    "general pass":                     "delegate",
-    "startup pass (application based)": "delegate",
-    "startup pass":                     "delegate",
-    "speaker pass":                     "speaker",
-    "sponsor pass":                     "sponsor",
+    "investor pass":                    "VIP",
+    "vip pass":                         "VIP",
+    "vip black pass":                   "VIP",
+    "general pass":                     "DELEGATE",
+    "startup pass (application based)": "DELEGATE",
+    "startup pass":                     "DELEGATE",
+    "speaker pass":                     "SPEAKER",
+    "sponsor pass":                     "SPONSOR",
 }
 
 # Test / internal tickets to skip
@@ -96,7 +96,7 @@ def fetch_extasy(url: str) -> list[dict]:
 
 
 def map_ticket_type(ticket_name: str) -> str:
-    return TICKET_TYPE_MAP.get(ticket_name.lower().strip(), "delegate")
+    return TICKET_TYPE_MAP.get(ticket_name.lower().strip(), "DELEGATE")
 
 
 def is_test_ticket(ticket_name: str) -> bool:
@@ -258,7 +258,7 @@ def run(dry_run: bool, force: bool) -> None:
         if email in seen_emails:
             # Find existing and compare ticket tier
             existing = next(r for r in records if r["email"] == email)
-            tier_order = ["delegate", "speaker", "sponsor", "vip"]
+            tier_order = ["DELEGATE", "SPEAKER", "SPONSOR", "VIP"]
             new_tier = map_ticket_type(ticket_name)
             if tier_order.index(new_tier) > tier_order.index(existing["ticket_type"]):
                 records.remove(existing)
