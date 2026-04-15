@@ -446,49 +446,64 @@ async def grid_health_check(
     return await health_check()
 
 
-@router.post("/re-enrich-grid")
+async def _re_enrich_grid_job() -> dict:
+    """Long-running Grid re-enrichment — runs in background via jobs service.
+
+    Uses its own DB session (the request-scoped session is closed by the time
+    the background task runs).
+    """
+    from datetime import datetime as _dt
+    from app.services.grid_enrichment import enrich_from_grid
+    from app.core.database import async_session
+
+    async with async_session() as db:
+        result = await db.execute(select(Attendee).where(Attendee.company.isnot(None)))
+        attendees = result.scalars().all()
+
+        enriched_count = 0
+        skipped = 0
+        failed = 0
+
+        for attendee in attendees:
+            enriched = attendee.enriched_profile or {}
+            if enriched.get("grid", {}).get("grid_name"):
+                skipped += 1
+                continue
+            try:
+                grid_data = await enrich_from_grid(attendee.company, attendee.company_website)
+                if grid_data:
+                    enriched["grid"] = grid_data
+                    enriched["grid_enriched_at"] = _dt.utcnow().isoformat()
+                    enriched_count += 1
+                else:
+                    enriched["grid_attempted_at"] = _dt.utcnow().isoformat()
+                    failed += 1
+                attendee.enriched_profile = enriched
+                db.add(attendee)
+            except Exception:
+                failed += 1
+
+        await db.commit()
+        return {
+            "status": "done",
+            "total": len(attendees),
+            "already_enriched": skipped,
+            "newly_enriched": enriched_count,
+            "not_found": failed,
+        }
+
+
+@router.post("/re-enrich-grid", status_code=202)
 async def re_enrich_grid(
-    db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    """Re-run Grid enrichment for all attendees missing Grid data."""
-    from app.services.grid_enrichment import enrich_from_grid
-    import json as _json
+    """Kick off Grid re-enrichment as a background job. Returns immediately.
 
-    result = await db.execute(select(Attendee).where(Attendee.company.isnot(None)))
-    attendees = result.scalars().all()
-
-    enriched_count = 0
-    skipped = 0
-    failed = 0
-
-    for attendee in attendees:
-        enriched = attendee.enriched_profile or {}
-        if enriched.get("grid", {}).get("grid_name"):
-            skipped += 1
-            continue
-        try:
-            grid_data = await enrich_from_grid(attendee.company, attendee.company_website)
-            if grid_data:
-                enriched["grid"] = grid_data
-                enriched["grid_enriched_at"] = __import__("datetime").datetime.utcnow().isoformat()
-                attendee.enriched_profile = enriched
-                enriched_count += 1
-            else:
-                enriched["grid_attempted_at"] = __import__("datetime").datetime.utcnow().isoformat()
-                attendee.enriched_profile = enriched
-                failed += 1
-        except Exception:
-            failed += 1
-
-    await db.commit()
-    return {
-        "status": "done",
-        "total": len(attendees),
-        "already_enriched": skipped,
-        "newly_enriched": enriched_count,
-        "not_found": failed,
-    }
+    Poll GET /dashboard/jobs/{job_id} for progress + result.
+    """
+    from app.services.jobs import submit
+    job_id = submit("re_enrich_grid", _re_enrich_grid_job)
+    return {"job_id": job_id, "status": "pending", "kind": "re_enrich_grid"}
 
 
 EXTASY_EVENT_ID = "32b1b684-0e87-4633-92ef-b47272aa3fce"
@@ -658,22 +673,61 @@ async def list_sponsors(
     return {"sponsors": SPONSORS}
 
 
-@router.post("/sponsor-report")
+@router.post("/sponsor-report", status_code=202)
 async def generate_sponsor_report(
     body: dict,
-    db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    """Generate a personalised intelligence report for a sponsor company."""
+    """Kick off sponsor intelligence report as a background job.
+
+    Returns 202 with job_id immediately. Poll /dashboard/jobs/{job_id} for the
+    full report once status == "done".
+    """
     company_name = body.get("company_name")
     if not company_name:
         return {"error": "company_name is required"}
 
-    from app.services.sponsor_intelligence import run_sponsor_report
-    report = await run_sponsor_report(
-        sponsor_name=company_name,
-        db=db,
-        top_k=body.get("top_k", 20),
-        identify_team=body.get("identify_team", True),
+    top_k = body.get("top_k", 20)
+    identify_team = body.get("identify_team", True)
+
+    async def _sponsor_job() -> dict:
+        from app.services.sponsor_intelligence import run_sponsor_report
+        from app.core.database import async_session
+        async with async_session() as db:
+            return await run_sponsor_report(
+                sponsor_name=company_name,
+                db=db,
+                top_k=top_k,
+                identify_team=identify_team,
+            )
+
+    from app.services.jobs import submit
+    job_id = submit(
+        "sponsor_report",
+        _sponsor_job,
+        metadata={"company_name": company_name},
     )
-    return report
+    return {"job_id": job_id, "status": "pending", "kind": "sponsor_report"}
+
+
+@router.get("/jobs/{job_id}")
+async def get_job_status(
+    job_id: str,
+    _admin: User = Depends(require_admin),
+):
+    """Get status + result of a background job."""
+    from app.services.jobs import get as jobs_get
+    job = jobs_get(job_id)
+    if not job:
+        return {"error": "job not found", "job_id": job_id}
+    return job
+
+
+@router.get("/jobs")
+async def list_recent_jobs(
+    limit: int = Query(20, ge=1, le=100),
+    _admin: User = Depends(require_admin),
+):
+    """List recent background jobs (for admin debugging)."""
+    from app.services.jobs import list_recent
+    return {"jobs": list_recent(limit=limit)}

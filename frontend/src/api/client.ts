@@ -250,20 +250,58 @@ export async function getSponsors(): Promise<{ sponsors: { name: string; value: 
   return data;
 }
 
+// ── Background job polling ───────────────────────────────────────────
+// Long-running admin actions (Grid re-enrich, sponsor report) now return
+// a job_id immediately. The client polls /dashboard/jobs/{id} until the
+// job is done or errors out. This sidesteps Railway's 30s HTTP edge timeout.
+
+type JobState = {
+  id: string;
+  kind: string;
+  status: "pending" | "running" | "done" | "error";
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+async function _waitForJob(
+  jobId: string,
+  opts: { intervalMs?: number; timeoutMs?: number } = {},
+): Promise<JobState> {
+  const interval = opts.intervalMs ?? 2500;
+  const deadline = Date.now() + (opts.timeoutMs ?? 600000); // 10 min default
+  while (Date.now() < deadline) {
+    const { data } = await api.get<JobState>(`/dashboard/jobs/${jobId}`);
+    if (data?.status === "done" || data?.status === "error") return data;
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  throw new Error("Job polling timed out after 10 minutes");
+}
+
 export async function reEnrichGrid(): Promise<{
   status: string; total: number; already_enriched: number; newly_enriched: number; not_found: number;
 }> {
-  const { data } = await api.post("/dashboard/re-enrich-grid", {}, { timeout: 120000 });
-  return data;
+  const { data: submitted } = await api.post<{ job_id: string }>(
+    "/dashboard/re-enrich-grid", {},
+  );
+  const job = await _waitForJob(submitted.job_id, { intervalMs: 3000, timeoutMs: 600000 });
+  if (job.status === "error") throw new Error(job.error || "Grid re-enrichment failed");
+  return job.result as {
+    status: string; total: number; already_enriched: number; newly_enriched: number; not_found: number;
+  };
 }
 
 export async function generateSponsorReport(companyName: string): Promise<Record<string, unknown>> {
-  const { data } = await api.post("/dashboard/sponsor-report", {
-    company_name: companyName,
-    identify_team: true,
-    top_k: 20,
-  }, { timeout: 90000 }); // GPT call can take 30s+
-  return data;
+  const { data: submitted } = await api.post<{ job_id: string }>(
+    "/dashboard/sponsor-report",
+    { company_name: companyName, identify_team: true, top_k: 20 },
+  );
+  const job = await _waitForJob(submitted.job_id, { intervalMs: 2500, timeoutMs: 300000 });
+  if (job.status === "error") throw new Error(job.error || "Sponsor report failed");
+  return job.result as Record<string, unknown>;
 }
 
 // ── Auth ─────────────────────────────────────────────────────────────

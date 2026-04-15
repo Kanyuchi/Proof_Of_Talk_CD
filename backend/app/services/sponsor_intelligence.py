@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timezone
 
 from openai import AsyncOpenAI
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -163,9 +163,25 @@ async def _generate_embedding(text_input: str) -> list[float]:
     return response.data[0].embedding
 
 
+INTERNAL_COMPANY_PATTERNS = (
+    "proof of talk", "proofoftalk", "proof of talk sa",
+    "xventures", "x ventures", "x-ventures", "xventures labs",
+)
+INTERNAL_EMAIL_DOMAINS = ("proofoftalk.io", "xventures.de", "x-ventures.de")
+
+
 async def _find_relevant_attendees(
     db: AsyncSession, embedding: list[float], top_k: int = 20
 ) -> list[dict]:
+    """Retrieve top-k attendees by cosine similarity, excluding internal staff.
+
+    Exclusions:
+      - Admin-linked attendees (existing behaviour)
+      - Anyone with a company name matching PoT / XVentures internal patterns
+      - Anyone whose email root domain is proofoftalk.io or xventures.de
+        (note: @speaker.proofoftalk.io is NOT excluded — those are legitimate
+        external speakers registered through the speaker flow)
+    """
     emb_str = "[" + ",".join(str(v) for v in embedding) + "]"
     query = text("""
         SELECT id, name, email, title, company, company_website,
@@ -178,10 +194,20 @@ async def _find_relevant_attendees(
               SELECT attendee_id FROM users
               WHERE is_admin = true AND attendee_id IS NOT NULL
           )
+          AND LOWER(COALESCE(TRIM(company), '')) NOT IN :internal_companies
+          AND split_part(LOWER(email), '@', 2) NOT IN :internal_domains
         ORDER BY embedding <=> :embedding
         LIMIT :top_k
-    """)
-    result = await db.execute(query, {"embedding": emb_str, "top_k": top_k})
+    """).bindparams(
+        bindparam("internal_companies", expanding=True),
+        bindparam("internal_domains", expanding=True),
+    )
+    result = await db.execute(query, {
+        "embedding": emb_str,
+        "top_k": top_k,
+        "internal_companies": list(INTERNAL_COMPANY_PATTERNS),
+        "internal_domains": list(INTERNAL_EMAIL_DOMAINS),
+    })
     rows = result.fetchall()
 
     attendees = []
