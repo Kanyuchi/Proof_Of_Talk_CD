@@ -10,6 +10,9 @@
 2. **Post-purchase email sequence** — Resend is live; build the 4-email sequence (welcome, first matches, weekly digest, final briefing)
 3. **Email template design** — refine match intro email body layout, branding, content for production use
 4. **Deploy AI-inferred matching to Railway** — code merged locally, 60 attendees backfilled against Supabase, matches regenerated (247 @ avg 0.720); push to main + confirm Railway auto-deploy picks it up
+5. **Schedule `ingest_extasy.py` on a cron** — script is now idempotent after the insert-or-patch refactor; scheduling it (Railway cron or GitHub Action, hourly or every 15 min) closes the last manual step in Ferd's dedup loop. New Rhuna ticket buyers would then flow into Supabase → `POT Attendees` sheet tab automatically within an hour.
+6. **Send Ferd the handover message** — draft ready (covers what's live in `POT Attendees`, how to use it for dedup, 1000 Minds nomination gap, and pending XLOOKUP column in MERGED if he wants it). Also flag the `mergeInvestorTabs()` bug at `Code.gs:105` that crashes when a source tab has zero data rows.
+7. **Decide on `POT Nominees` tab** — 219 1000 Minds nominees currently invisible to outreach dedup. Waiting on Ferd's answer; if yes, ~20 min of work (create `nominations_sync` view, add `syncNominations` function + second trigger).
 
 ## Soon
 
@@ -78,3 +81,5 @@
 - ✓ "Who do you want to meet?" — target_companies field on Profile + magic link enrichment card
 - ✓ Twitter URL fix — handles full URLs (x.com/handle) not just @handle
 - ✓ AI-inferred customer matching — GPT-4o infers ICP (`offers`, `ideal_customers[]`, `ideal_partners[]`, `anti_personas`) per attendee; fed into embeddings + ranking prompt + deterministic rerank (+0.03/+0.05 ICP keyword hits, +0.03 two-way ICP fit); company-similarity fallback when no strong matches; backfilled all 60 attendees; 247 matches @ avg 0.720 (up from 0.704); Amara↔Marcus classic case surfaces at 0.820 deal_ready
+- ✓ Ferd outreach sheet sync (POT Attendees tab) — Supabase → Google Apps Script → Sheet hourly mirror via new read-only `attendees_sync` view. 86 rows syncing, `POT Sync Log` tab recording each run, hourly trigger live. Ferd's outreach team can now check `POT Attendees` before cold-emailing to avoid double-contacting ticket holders.
+- ✓ `ingest_extasy.py` insert-or-patch refactor — replaced skip-if-exists with per-field PATCH on Rhuna-authoritative columns (`extasy_order_id`, `extasy_ticket_code`, `extasy_ticket_name`, `phone_number`, `city`, `country_iso3`, `ticket_bought_at`, `ticket_type`). Preserves `enriched_profile`, `interests`, `ai_summary`, `embedding`, `goals`, etc. Backfilled 67 rows (0 errors), moving `extasy_order_id`/`ticket_bought_at`/`extasy_ticket_code` coverage from 3 → 70. Script is now idempotent and safe to schedule.

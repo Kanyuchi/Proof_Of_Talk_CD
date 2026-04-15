@@ -1,6 +1,6 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-04-14 (AI-inferred customer matching shipped — Z's ICP vision live, 247 matches @ 0.720 avg)
+**Last updated:** 2026-04-15 (Ferd outreach sheet sync live + `ingest_extasy.py` refactored to idempotent insert-or-patch)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · **Railway** (backend) · **Resend** (email) · Netlify (frontend)
 
 ---
@@ -38,6 +38,8 @@
 - **Action model** — full-width filled "I'd like to meet" as dominant CTA; "Maybe later" as plain text link
 - **Daily match refresh** — cron at 02:00 UTC
 - **Profile photos** — user-uploaded only; AttendeeAvatar falls back to ui-avatars styled initials when no photo is set
+- **Ferd outreach sheet sync (`POT Attendees` tab)** — Google Apps Script bound to `PoT26_Master_Email_Database_v3` polls Supabase via the read-only `attendees_sync` view every hour; mirrors 86 attendees into a `POT Attendees` tab plus a `POT Sync Log` tab for run metadata. Never touches `MERGED - All Investors` (which Ferd's `mergeInvestorTabs()` rebuilds on every run). Read-only anon key scoped to 6 columns; no write-back to Supabase. Repo copy of script at `docs/integrations/sheets_sync/Code.gs`.
+- **Idempotent `ingest_extasy.py`** — `upsert_to_supabase()` now INSERTs new emails and PATCHes only Rhuna-authoritative fields (`extasy_order_id`, `extasy_ticket_code`, `extasy_ticket_name`, `phone_number`, `city`, `country_iso3`, `ticket_bought_at`, `ticket_type`) on existing rows via a diff-only PATCH. Enrichment data (`enriched_profile`, `ai_summary`, `embedding`, `interests`, `goals`, etc.) is never overwritten. Safe to re-run and safe to schedule.
 
 ## Infrastructure
 

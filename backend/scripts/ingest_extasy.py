@@ -63,6 +63,20 @@ TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
 # Orders with these statuses are real confirmed attendees (includes complimentary tickets)
 VALID_STATUSES = {"PAID", "REDEEMED"}
 
+# Fields PATCHed onto existing rows — Rhuna/Extasy is source of truth for these.
+# Never PATCH: interests, goals, seeking, enriched_profile, ai_summary, embedding,
+# linkedin_url, twitter_handle — those belong to enrichment + user input.
+EXTASY_PATCH_FIELDS = [
+    "extasy_order_id",
+    "extasy_ticket_code",
+    "extasy_ticket_name",
+    "phone_number",
+    "city",
+    "country_iso3",
+    "ticket_bought_at",
+    "ticket_type",
+]
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def supabase_headers() -> dict:
@@ -172,57 +186,92 @@ def build_attendee_record(order: dict, ticket_name: str) -> dict:
 
 
 def upsert_to_supabase(records: list[dict], dry_run: bool, force: bool) -> None:
+    """
+    Insert new attendees, PATCH Extasy metadata onto existing ones.
+
+    - New email  → POST full record
+    - Existing   → PATCH only EXTASY_PATCH_FIELDS (source-of-truth from Rhuna).
+                   Enriched data, interests, AI summary, etc. are preserved.
+    - --force    → additionally PATCH enriched_profile with the raw Extasy
+                   payload (disaster recovery; overwrites enrichment data).
+
+    PATCHes that would be no-ops are skipped.
+    """
     rest_url = f"{SUPABASE_URL}/rest/v1/attendees"
-    headers = supabase_headers()
-
-    if force:
-        # ON CONFLICT (email) DO UPDATE all non-id fields
-        headers["Prefer"] = "resolution=merge-duplicates,return=representation"
-
     total = len(records)
-    inserted = 0
-    skipped = 0
+    inserted = patched = noop = errors = 0
+
+    select_cols = "id," + ",".join(EXTASY_PATCH_FIELDS)
 
     with httpx.Client(timeout=30) as client:
         for rec in records:
             email = rec["email"]
 
-            if not dry_run:
+            check = client.get(
+                rest_url,
+                headers=supabase_headers(),
+                params={"email": f"eq.{email}", "select": select_cols},
+            )
+            if check.status_code != 200:
+                print(f"  ERROR {check.status_code} lookup: <{email}> — {check.text}")
+                errors += 1
+                continue
+
+            existing = check.json()
+
+            if existing:
+                existing_row = existing[0]
+                desired = {k: rec[k] for k in EXTASY_PATCH_FIELDS}
                 if force:
-                    # Upsert: insert or update on email conflict
-                    resp = client.post(
-                        rest_url,
-                        headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
-                        content=json.dumps([rec]),
-                    )
+                    desired["enriched_profile"] = rec["enriched_profile"]
+
+                diff = {k: v for k, v in desired.items() if existing_row.get(k) != v}
+                if not diff:
+                    print(f"  NOOP: {rec['name']} <{email}>")
+                    noop += 1
+                    continue
+
+                changed = ", ".join(diff.keys())
+                if dry_run:
+                    print(f"  DRY-RUN PATCH: {rec['name']} <{email}> [{changed}]")
+                    patched += 1
+                    continue
+
+                resp = client.patch(
+                    rest_url,
+                    headers={**supabase_headers(), "Prefer": "return=minimal"},
+                    params={"email": f"eq.{email}"},
+                    content=json.dumps(diff),
+                )
+                if resp.status_code in (200, 204):
+                    print(f"  PATCH: {rec['name']} <{email}> [{changed}]")
+                    patched += 1
                 else:
-                    # Check if already exists
-                    check = client.get(
-                        rest_url,
-                        headers={**supabase_headers(), "Prefer": "return=minimal"},
-                        params={"email": f"eq.{email}", "select": "id"},
-                    )
-                    if check.status_code == 200 and check.json():
-                        print(f"  SKIP (exists): {rec['name']} <{email}>")
-                        skipped += 1
-                        continue
+                    print(f"  ERROR {resp.status_code} PATCH: <{email}> — {resp.text}")
+                    errors += 1
+            else:
+                if dry_run:
+                    print(f"  DRY-RUN INSERT: {rec['name']} <{email}> [{rec['extasy_ticket_name']}]")
+                    inserted += 1
+                    continue
 
-                    resp = client.post(
-                        rest_url,
-                        headers=headers,
-                        content=json.dumps([rec]),
-                    )
-
+                resp = client.post(
+                    rest_url,
+                    headers={**supabase_headers(), "Prefer": "return=minimal"},
+                    content=json.dumps([rec]),
+                )
                 if resp.status_code in (200, 201):
-                    print(f"  OK: {rec['name']} <{email}> [{rec['extasy_ticket_name']}]")
+                    print(f"  INSERT: {rec['name']} <{email}> [{rec['extasy_ticket_name']}]")
                     inserted += 1
                 else:
-                    print(f"  ERROR {resp.status_code}: {rec['name']} <{email}> — {resp.text}")
-            else:
-                print(f"  DRY-RUN: {rec['name']} <{email}> [{rec['extasy_ticket_name']}] [{rec['ticket_type']}]")
-                inserted += 1
+                    print(f"  ERROR {resp.status_code} INSERT: <{email}> — {resp.text}")
+                    errors += 1
 
-    print(f"\n{'DRY-RUN ' if dry_run else ''}Results: {inserted} inserted, {skipped} skipped / {total} total")
+    prefix = "DRY-RUN " if dry_run else ""
+    print(
+        f"\n{prefix}Results: {inserted} inserted, {patched} patched, "
+        f"{noop} unchanged, {errors} errors / {total} total"
+    )
 
 
 def run(dry_run: bool, force: bool) -> None:
@@ -286,7 +335,12 @@ def run(dry_run: bool, force: bool) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Ingest Extasy confirmed attendees into Supabase")
     parser.add_argument("--dry-run", action="store_true", help="Print records without writing to Supabase")
-    parser.add_argument("--force", action="store_true", help="Upsert even if record already exists")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Also PATCH enriched_profile on existing rows (disaster recovery; "
+             "overwrites enrichment data with raw Extasy payload).",
+    )
     args = parser.parse_args()
 
     run(dry_run=args.dry_run, force=args.force)
