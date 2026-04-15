@@ -35,7 +35,7 @@ RETRY_BACKOFF = [1.0, 3.0]  # seconds between retries
 # _like is case-sensitive, so we search with multiple case variants.
 PROFILE_QUERY = """
 query SearchCompany($name: String!) {
-  profileInfos(limit: 3, where: {name: {_like: $name}, profileStatus: {slug: {_eq: "active"}}}) {
+  profileInfos(limit: 5, where: {name: {_like: $name}, profileStatus: {slug: {_in: ["active", "announced"]}}}) {
     id
     name
     rootId
@@ -200,29 +200,34 @@ def _best_match(results: list[dict], company_name: str) -> dict | None:
 
 
 def _extract_socials(socials: list[dict]) -> dict[str, str]:
+    """Guard against socialType being literal null in the Grid response."""
     out = {}
     for s in socials:
-        slug = s.get("socialType", {}).get("slug", "")
+        slug = (s.get("socialType") or {}).get("slug", "")
         urls = s.get("urls") or []
         if slug and urls:
-            out[slug] = urls[0].get("url", "")
+            out[slug] = (urls[0] or {}).get("url", "")
     return out
 
 
 def _extract_urls(urls: list[dict]) -> dict[str, str]:
+    """Guard against urlType being literal null (Vancelian has such rows)."""
     out = {}
     for u in urls:
-        slug = u.get("urlType", {}).get("slug", "")
+        slug = (u.get("urlType") or {}).get("slug", "")
         if slug:
             out[slug] = u.get("url", "")
     return out
 
 
 def _extract_media(media: list[dict]) -> dict[str, str]:
-    """Extract media URLs keyed by type slug (logo_dark_bg, logo_light_bg, icon, header)."""
+    """Extract media URLs keyed by type slug (logo_dark_bg, logo_light_bg, icon, header).
+
+    Guard against mediaType being literal null in the Grid response.
+    """
     out = {}
     for m in media:
-        slug = m.get("mediaType", {}).get("slug", "")
+        slug = (m.get("mediaType") or {}).get("slug", "")
         if slug and m.get("url"):
             out[slug] = m["url"]
     return out
