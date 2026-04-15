@@ -20,8 +20,14 @@ class EnrichmentService:
         )
 
     async def enrich_attendee(self, attendee) -> dict:
-        """Run all enrichment sources and merge results."""
-        enriched = attendee.enriched_profile or {}
+        """Run all enrichment sources and merge results.
+
+        Returns a NEW dict (not a reference to the existing enriched_profile)
+        so callers can do `attendee.enriched_profile = result` and SQLAlchemy
+        actually detects the change. Mutating the returned dict and reassigning
+        the same reference is a silent no-op for JSONB columns.
+        """
+        enriched = dict(attendee.enriched_profile or {})
 
         # --- LinkedIn enrichment ---
         # Step 1: resolve URL if not already stored

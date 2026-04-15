@@ -3,6 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 from app.core.database import get_db
 from app.models.attendee import Attendee
 from app.services.enrichment import EnrichmentService
@@ -81,6 +82,7 @@ async def enrich_all(db: AsyncSession = Depends(get_db), _admin: User = Depends(
         for attendee in attendees:
             enriched = await service.enrich_attendee(attendee)
             attendee.enriched_profile = enriched
+            flag_modified(attendee, "enriched_profile")
             attendee.enriched_at = datetime.utcnow()
             attendee.ai_summary = await generate_ai_summary(attendee)
             attendee.intent_tags = await classify_intents(attendee)
@@ -105,6 +107,7 @@ async def enrich_attendee(attendee_id: UUID, db: AsyncSession = Depends(get_db),
     try:
         enriched = await service.enrich_attendee(attendee)
         attendee.enriched_profile = enriched
+        flag_modified(attendee, "enriched_profile")
         attendee.enriched_at = datetime.utcnow()
 
         # Regenerate AI fields after enrichment

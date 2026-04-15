@@ -450,9 +450,12 @@ async def _re_enrich_grid_job() -> dict:
     """Long-running Grid re-enrichment — runs in background via jobs service.
 
     Uses its own DB session (the request-scoped session is closed by the time
-    the background task runs).
+    the background task runs). Copies the JSONB dict before mutating and uses
+    flag_modified so SQLAlchemy actually detects the change — without this,
+    mutations to enriched_profile silently fail to persist.
     """
     from datetime import datetime as _dt
+    from sqlalchemy.orm.attributes import flag_modified
     from app.services.grid_enrichment import enrich_from_grid
     from app.core.database import async_session
 
@@ -465,10 +468,12 @@ async def _re_enrich_grid_job() -> dict:
         failed = 0
 
         for attendee in attendees:
-            enriched = attendee.enriched_profile or {}
-            if enriched.get("grid", {}).get("grid_name"):
+            existing = attendee.enriched_profile or {}
+            if existing.get("grid", {}).get("grid_name"):
                 skipped += 1
                 continue
+            # Copy the dict so SQLAlchemy sees it as a new value, not an in-place mutation
+            enriched = dict(existing)
             try:
                 grid_data = await enrich_from_grid(attendee.company, attendee.company_website)
                 if grid_data:
@@ -479,6 +484,7 @@ async def _re_enrich_grid_job() -> dict:
                     enriched["grid_attempted_at"] = _dt.utcnow().isoformat()
                     failed += 1
                 attendee.enriched_profile = enriched
+                flag_modified(attendee, "enriched_profile")
                 db.add(attendee)
             except Exception:
                 failed += 1
