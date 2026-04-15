@@ -117,28 +117,85 @@ async def health_check() -> dict:
         return {"ok": False, "error": f"Unexpected: {exc}"}
 
 
+# Generic business-suffix words that are TOO weak to match on alone.
+# "Ventures", "capital", "labs" etc. are descriptive suffixes present in
+# thousands of company names, so matching solely on them produces false
+# positives like "X Ventures" → "MarketX Ventures".
+_BUSINESS_STOPWORDS = frozenset({
+    "ventures", "capital", "labs", "group", "finance", "protocol",
+    "network", "solutions", "technologies", "technology", "holdings",
+    "foundation", "foundations", "partners", "digital", "assets",
+    "global", "international", "studio", "studios", "works", "co",
+    "corp", "corporation", "inc", "llc", "ltd", "limited", "gmbh",
+    "sa", "ag", "plc", "nv", "bv", "the", "and", "for",
+})
+
+
+def _meaningful_tokens(query_lc: str) -> set[str]:
+    """Extract matching tokens, dropping short words and business stopwords."""
+    return {
+        w for w in query_lc.split()
+        if len(w) >= 3 and w not in _BUSINESS_STOPWORDS
+    }
+
+
 def _best_match(results: list[dict], company_name: str) -> dict | None:
+    """Pick the best Grid hit for a query, strictly.
+
+    The Grid GraphQL API uses `%term%` substring matching, which produces
+    false positives when the query is a substring of an unrelated name:
+      - "Atos" → "Satoshigallery" (contains "atos" at position 1)
+      - "X Ventures" → "MarketX Ventures" (contains "x ventures" after
+        "Market", and the only non-stopword token is "ventures")
+
+    Matching policy (strict, no fuzzy fallback):
+      1. Exact name match (case-insensitive, after trimming) — always accept.
+      2. Prefix match — Grid name starts with the query OR query starts
+         with the Grid name (e.g. query "Kraken" vs Grid "Kraken Exchange").
+      3. Word-level 100% overlap on the meaningful tokens — after filtering
+         short words AND common business-suffix stopwords like "ventures",
+         "capital", "labs", ALL remaining query tokens must appear as
+         distinct whitespace-separated tokens in the Grid name. If every
+         meaningful token is a stopword we fall through to failure — we
+         refuse to match on descriptor words alone.
+
+    Deliberately REMOVED: the "len(results) == 1 → accept" fallback and
+    any <100% token overlap rule. Both produced real false positives. We
+    prefer no Grid data over wrong Grid data.
+    """
     if not results:
         return None
-    lower = company_name.lower().strip()
-    # Exact match (case-insensitive)
+    query_lc = company_name.lower().strip()
+    if not query_lc:
+        return None
+
+    # 1. Exact case-insensitive match
     for r in results:
-        if r["name"].lower().strip() == lower:
+        if r.get("name", "").lower().strip() == query_lc:
             return r
-    # Word-boundary match — majority of query words must appear in Grid name
+
+    # 2. Prefix match (either direction, with whitespace boundary)
     for r in results:
-        grid_lower = r["name"].lower().strip()
-        grid_words = set(grid_lower.split())
-        query_words = set(lower.split())
-        # Ignore single-char words like "X" in overlap
-        meaningful_query = {w for w in query_words if len(w) > 1}
-        overlap = grid_words & meaningful_query
-        if overlap and len(overlap) >= max(1, len(meaningful_query) * 0.5):
+        grid_lc = r.get("name", "").lower().strip()
+        if not grid_lc:
+            continue
+        if grid_lc.startswith(query_lc + " ") or query_lc.startswith(grid_lc + " "):
             return r
-    # If only 1 result and query was specific enough (4+ chars), accept it
-    if len(results) == 1 and len(lower) >= 4:
-        return results[0]
-    # Multiple results, no substring match — too ambiguous, skip
+
+    # 3. All meaningful query tokens must appear as distinct tokens in the Grid name
+    query_tokens = _meaningful_tokens(query_lc)
+    if not query_tokens:
+        # Every query token was a stopword or too short — can't match strictly
+        return None
+    for r in results:
+        grid_lc = r.get("name", "").lower().strip()
+        if not grid_lc:
+            continue
+        grid_tokens = set(grid_lc.split())
+        if query_tokens.issubset(grid_tokens):
+            return r
+
+    # No strict match — refuse rather than guess
     return None
 
 
