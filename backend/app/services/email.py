@@ -77,6 +77,8 @@ def send_password_reset_email(
         reset_token: JWT reset token.
         app_url: Base URL of the app for the reset link.
     """
+    return  # BLOCKED: platform not yet open to attendees
+
     settings = get_settings()
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
@@ -226,6 +228,8 @@ def send_mutual_match_email(
         other_company: Company of the other party.
         app_url: Base URL of the app for the CTA link.
     """
+    return  # BLOCKED: platform not yet open to attendees
+
     settings = get_settings()
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
@@ -296,6 +300,8 @@ def send_meeting_confirmation_email(
         meeting_location: Meeting location string.
         app_url: Base URL of the app.
     """
+    return  # BLOCKED: platform not yet open to attendees
+
     settings = get_settings()
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
