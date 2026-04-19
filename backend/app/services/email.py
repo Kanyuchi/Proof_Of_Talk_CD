@@ -357,3 +357,37 @@ def send_meeting_confirmation_email(
     )
 
     _send_email(to_email, subject, body_html, body_text)
+
+
+# ── Post-event emails (Phase 6) ─────────────────────────────────────
+
+
+def send_post_event_wrapup_email(
+    to_email: str,
+    attendee_name: str,
+    total_matches: int,
+    mutual_accepts: int,
+    meetings_held: int,
+    top_connections: list[dict],
+    magic_token: str | None = None,
+    app_url: str | None = None,
+) -> None:
+    """D+1 wrap-up email: summarises the attendee's POT 2026 experience.
+
+    top_connections: list of dicts with keys name, company, title, linkedin_url.
+    """
+    return  # BLOCKED: platform not yet open to attendees
+
+
+def send_followup_nudge_email(
+    to_email: str,
+    attendee_name: str,
+    connections: list[dict],
+    magic_token: str | None = None,
+    app_url: str | None = None,
+) -> None:
+    """D+7 nudge email: reminds attendee to follow up on connections.
+
+    connections: list of dicts with keys name, company, linkedin_url.
+    """
+    return  # BLOCKED: platform not yet open to attendees

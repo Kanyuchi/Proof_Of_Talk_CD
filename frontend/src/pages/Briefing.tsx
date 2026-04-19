@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   FileText, Printer, ArrowLeft, Sparkles, Brain, Target,
   Linkedin, Twitter, Globe, Calendar, MapPin, Clock,
-  ChevronRight, Shield, TrendingUp,
+  ChevronRight, Shield, TrendingUp, Download,
 } from "lucide-react";
 import { getMatchesByMagicLink, getAttendee } from "../api/client";
 import { matchTypeConfig, twitterUrl, formatMeetingTime } from "../utils/matchHelpers";
@@ -25,6 +25,31 @@ function gridData(a: Attendee) {
   const g = ep.grid as Record<string, unknown> | undefined;
   if (!g || !g.grid_name) return null;
   return g;
+}
+
+function exportContactsCSV(matches: Match[], attendeeName: string) {
+  const rows = [
+    ["Name", "Title", "Company", "Match Type", "Score", "LinkedIn", "Twitter", "Website", "Why You Should Meet", "Talking Points"].join(","),
+  ];
+  for (const m of matches) {
+    const o = m.matched_attendee;
+    if (!o) continue;
+    const esc = (s: string) => `"${(s || "").replace(/"/g, '""')}"`;
+    const actions = (m.shared_context?.action_items ?? []).join("; ");
+    rows.push([
+      esc(o.name), esc(o.title), esc(o.company),
+      esc(m.match_type), String(Math.round(m.overall_score * 100)) + "%",
+      esc(o.linkedin_url ?? ""), esc(o.twitter_handle ?? ""), esc(o.company_website ?? ""),
+      esc(m.explanation), esc(actions),
+    ].join(","));
+  }
+  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `POT2026_Contacts_${attendeeName.replace(/\s+/g, "_")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /* ── main page ───────────────────────────────────────────────────────── */
@@ -86,12 +111,20 @@ export default function Briefing() {
         >
           <ArrowLeft className="w-4 h-4" /> Back to matches
         </Link>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 px-4 py-2 bg-[#E76315] text-white rounded-lg hover:bg-[#c5520f] text-sm font-medium"
-        >
-          <Printer className="w-4 h-4" /> Print / Save PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportContactsCSV(matches, attendee?.name ?? "attendee")}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-white/70 rounded-lg hover:bg-white/10 text-sm"
+          >
+            <Download className="w-4 h-4" /> Export Contacts
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-4 py-2 bg-[#E76315] text-white rounded-lg hover:bg-[#c5520f] text-sm font-medium"
+          >
+            <Printer className="w-4 h-4" /> Print / Save PDF
+          </button>
+        </div>
       </div>
 
       {/* ── header ─────────────────────────────────────────────────── */}
