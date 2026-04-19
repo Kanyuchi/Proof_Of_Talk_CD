@@ -362,6 +362,23 @@ def send_meeting_confirmation_email(
 # ── Post-event emails (Phase 6) ─────────────────────────────────────
 
 
+def send_morning_schedule_email(
+    to_email: str,
+    attendee_name: str,
+    meetings_today: list[dict],
+    event_day: str,
+    magic_token: str | None = None,
+    app_url: str | None = None,
+) -> None:
+    """At-event morning email: "You have N meetings today" (Phase 5).
+
+    Sent at 07:00 on each conference day (June 2 and June 3).
+    meetings_today: list of dicts with keys name, company, time, location.
+    event_day: "Day 1 — June 2" or "Day 2 — June 3".
+    """
+    return  # BLOCKED: platform not yet open to attendees
+
+
 def send_post_event_wrapup_email(
     to_email: str,
     attendee_name: str,
