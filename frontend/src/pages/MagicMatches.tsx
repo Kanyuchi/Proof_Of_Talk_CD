@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Brain, Target, MessageSquare,
-  Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck,
+  Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText,
 } from "lucide-react";
 import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink } from "../api/client";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
@@ -87,6 +87,12 @@ export default function MagicMatches() {
         <p className="text-white/30 text-sm">
           Here are your personalised meeting recommendations for Proof of Talk 2026
         </p>
+        <Link
+          to={`/m/${token}/briefing`}
+          className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-[#1a1a2e] border border-white/10 rounded-lg text-sm text-white/60 hover:text-white hover:border-[#E76315]/30 transition-colors"
+        >
+          <FileText className="w-4 h-4" /> View Meeting Prep Brief
+        </Link>
       </div>
 
       {/* Profile enrichment card */}

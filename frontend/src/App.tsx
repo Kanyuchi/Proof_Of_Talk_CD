@@ -16,6 +16,7 @@ import Onboarding from "./pages/Onboarding";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import MagicMatches from "./pages/MagicMatches";
+import Briefing from "./pages/Briefing";
 import Threads from "./pages/Threads";
 
 const queryClient = new QueryClient({
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/m/:token" element={<MagicMatches />} />
+              <Route path="/m/:token/briefing" element={<Briefing />} />
               <Route path="/matches" element={<MyMatches />} />
               <Route path="/messages" element={<Messages />} />
               <Route path="/threads" element={<Threads />} />

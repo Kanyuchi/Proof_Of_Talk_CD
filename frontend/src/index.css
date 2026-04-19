@@ -102,6 +102,14 @@ h1, h2, h3 {
   letter-spacing: 1.5px;
 }
 
+/* ── Print styles (Meeting Prep Brief) ─────────────── */
+@media print {
+  body { background: white !important; color: black !important; }
+  nav, footer, .print\\:hidden { display: none !important; }
+  * { color-adjust: exact; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { margin: 1.5cm; size: A4; }
+}
+
 /* Orange left-accent card (used on match cards) */
 .pot-match-card {
   border-left: 3px solid var(--pot-orange);
