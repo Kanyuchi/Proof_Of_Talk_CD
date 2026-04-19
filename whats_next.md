@@ -6,11 +6,11 @@
 
 ## Now
 
-1. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors
-2. **Post-purchase email sequence** — Resend is live; build the 4-email sequence (welcome, first matches, weekly digest, final briefing)
-3. **Email template design** — refine match intro email body layout, branding, content for production use
-4. **Deploy AI-inferred matching to Railway** — code merged locally, 60 attendees backfilled against Supabase, matches regenerated (247 @ avg 0.720); push to main + confirm Railway auto-deploy picks it up
-5. **Schedule `ingest_extasy.py` on a cron** — script is now idempotent after the insert-or-patch refactor; scheduling it (Railway cron or GitHub Action) closes the last manual step in Ferd's dedup loop. New Rhuna ticket buyers would then flow into Supabase → `POT Attendees` sheet tab automatically.
+1. **Open platform to attendees** — re-enable emails (remove `return` lines in `email.py`), decide on attendee onboarding flow (magic link distribution vs self-registration vs Rhuna webhook auto-create). Pouneh Bligaard already asking via LinkedIn.
+2. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); internal staff now excluded from candidates; reports run as background jobs (no more 504). Next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors
+3. **Schedule `ingest_extasy.py` on a cron** — script is now idempotent; scheduling it (Railway cron or GitHub Action, hourly) closes the last manual step. New Rhuna ticket buyers flow into Supabase → `POT Attendees` sheet tab automatically.
+4. **Post-purchase email sequence** — Resend is configured; build the 4-email sequence (welcome, first matches, weekly digest, final briefing). Blocked on #1 (emails currently disabled).
+5. **Align CEO dashboard with Rhuna** — CEO dash reads from stale Google Sheet, matchmaker reads Extasy live. Talk to Steffie about shared definitions (paid vs comp, Media reclassification). Optionally point CEO dash at Extasy API directly.
 
 ## Soon
 
@@ -20,10 +20,13 @@
 
 ## Later / Backlog
 
-- Supabase migration — company infrastructure preference; migration checklist in `docs/deployment.md`
-- Post-event continuation (item #20) — contact export, LinkedIn prompt, D+7 follow-up nudge email
-- Session/content matching (item #21) — match attendees to sessions based on goals and intent tags
-- Proxycurl batch enrichment — re-run enrichment for all 34 attendees once a funded Proxycurl key is available to improve AI summary depth
+- Post-event continuation — contact export, LinkedIn prompt, D+7 follow-up nudge email
+- Session/content matching — match attendees to sessions based on goals and intent tags
+- Proxycurl batch enrichment — re-run enrichment for all attendees once a funded Proxycurl key is available
+- Grid normaliser improvements — manually-curated canonical-name dict for edge-case companies (e.g. Theqrl → The QRL). Limited ROI — most unmatched companies genuinely aren't in Grid.
+- Delete RDS permanently with final snapshot (currently stopped, auto-restarts in 7 days)
+- Email template design — match intro email needs design polish before re-enabling
+- Rotate Supabase DB password (exposed in CLI session 2026-04-14)
 
 ## Done ✓
 
@@ -82,3 +85,16 @@
 - ✓ Ferd outreach sheet sync (POT Attendees tab) — Supabase → Google Apps Script → Sheet hourly mirror via new read-only `attendees_sync` view. 86 rows syncing, `POT Sync Log` tab recording each run, hourly trigger live. Ferd's outreach team can now check `POT Attendees` before cold-emailing to avoid double-contacting ticket holders.
 - ✓ `ingest_extasy.py` insert-or-patch refactor — replaced skip-if-exists with per-field PATCH on Rhuna-authoritative columns (`extasy_order_id`, `extasy_ticket_code`, `extasy_ticket_name`, `phone_number`, `city`, `country_iso3`, `ticket_bought_at`, `ticket_type`). Preserves `enriched_profile`, `interests`, `ai_summary`, `embedding`, `goals`, etc. Backfilled 67 rows (0 errors), moving `extasy_order_id`/`ticket_bought_at`/`extasy_ticket_code` coverage from 3 → 70. Script is now idempotent and safe to schedule.
 - ✓ Consolidated POT Attendees + In Funnel flag on all feeder tabs — POT Attendees now combines attendees (86) + nominees (224) into single source of truth with Source column. ARRAYFORMULA-based `In Funnel` column on all outreach tabs (Close network, COLD - T1/T2 T3 VCs, Family Offices, Startups, Accelerators): TRUE (green) = skip, FALSE = safe to contact. Auto-discovers new tabs. Daily trigger at 11 PM. Ferd briefed and handover sent.
+- ✓ Deploy AI-inferred matching to Railway — ICP feature live on Railway, 85 attendees backfilled, matches regenerated. Amara↔Marcus canonical case at top.
+- ✓ Netlify auto-deploy repaired — GitHub App relinked, verified with `7fd610b` Published
+- ✓ Seed profiles removed — 5 case-study seeds + 1 test user deleted from Supabase
+- ✓ Duplicate profiles merged — Victor Blas ×2, Shaun ×2, Kathryn Dodds ×2, Pavan Kaur ×2 → 4 pairs merged to canonical records
+- ✓ Background job system — `app/services/jobs.py` for long-running admin ops; Grid re-enrich + sponsor reports no longer 504
+- ✓ Sponsor intelligence internal exclusion — PoT/XVentures staff filtered from candidate retrieval
+- ✓ JSONB mutation tracking fix — `enriched_profile` mutations now persist correctly (was silently dropping)
+- ✓ Grid matcher hardened — false-positive stopword filter, null field guards, "announced" status accepted; Ubyx + Vancelian recovered; Atos/MarketX/Spot On Chain false positives cleared
+- ✓ Grid coverage audit — 23/85 (27%) confirmed as ceiling via name + URL + email-domain probes; CSV exports at `exports/`
+- ✓ All emails disabled — platform not yet open to attendees
+- ✓ Revenue aligned with Rhuna — removed custom dedup that dropped Tommi's legitimate second purchase (€599 gap resolved)
+- ✓ AWS RDS stopped — final snapshot taken, compute savings ~€12/mo
+- ✓ Extasy enum fix — uppercase tickettype values for Supabase compatibility

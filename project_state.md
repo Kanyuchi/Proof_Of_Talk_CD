@@ -1,13 +1,13 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-04-15 (Ferd outreach sheet sync live + `ingest_extasy.py` refactored to idempotent insert-or-patch)
+**Last updated:** 2026-04-19 (all emails disabled, revenue aligned with Rhuna, Grid hardened, duplicates merged, RDS stopped)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · **Railway** (backend) · **Resend** (email) · Netlify (frontend)
 
 ---
 
 ## What's Working
 
-- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; **247 matches** across 60 attendees, avg score **0.720**; vertical_tags + intent_tags + target_companies + inferred_customer_profile integrated into embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS boost; ML feedback loop feeds decline reasons into GPT prompt
+- **3-stage AI matching pipeline** — Embed → pgvector retrieval → GPT-4o rank & explain; **234 matches** across 85 attendees, avg score **0.713**; vertical_tags + intent_tags + target_companies + inferred_customer_profile integrated into embeddings, GPT prompt, and deterministic reranking with COMPLEMENTARY_VERTICALS boost; ML feedback loop feeds decline reasons into GPT prompt
 - **AI-inferred customer matching (Z's vision)** — each attendee gets a GPT-4o-inferred ICP stored in `inferred_customer_profile` JSONB: `offers`, `ideal_customers[]` (who/why/signal_keywords), `ideal_partners[]`, `anti_personas`. Fed into composite embedding text so similarity search reflects "who would buy from this person"; injected into ranking prompt with explicit weight hierarchy (EXPLICIT target_companies > AI-INFERRED ICP > BASELINE similarity); deterministic rerank adds +0.03/+0.05 when a candidate's profile contains 1/≥2 of the target's ICP signal keywords, +0.03 extra when the candidate's ICP also points back at the target (two-way fit = deal-ready). Company-similarity fallback surfaces up to 3 sector peers (shared vertical_tags or Grid sector) when no matches clear `MIN_MATCH_SCORE`, preventing empty briefings.
 - **Data enrichment** — 73/73 attendees have AI summaries, embeddings, intent_tags, and vertical_tags; enrichment pipeline fully functional on EC2
 - **1000 Minds speakers sync** — `speakers_sync.py` reads from `speakers` table (Jessica's curated list), upserts into `attendees` for matching; maps seniority→ticket_type, verticals→slugs, bio→goals; daily cron at 02:15 UTC; admin button on dashboard
@@ -46,14 +46,17 @@
 - **Production URL**: `https://meet.proofoftalk.io` (Netlify frontend → Railway backend)
 - **Backend**: **Railway** (`proofoftalkcd-production.up.railway.app`) — x-ventures Pro plan, auto-deploys from GitHub `main` branch, root dir `backend`
 - **Database**: **Supabase PostgreSQL** (`db.mkcememoueziibbpqhfk.supabase.co:5432/postgres`) — XLabs Ext Pro plan, IPv4 add-on, shared with 1000 Minds (`speakers` table)
-- **Email**: **Resend** — `matches@proofoftalk.io`, `proofoftalk.io` domain verified, production sending enabled, no sandbox restrictions
+- **Email**: **Resend** — `matches@proofoftalk.io`, `proofoftalk.io` domain verified — **ALL 4 EMAIL TYPES CURRENTLY DISABLED** (`return` at top of each send function in `email.py`). Will re-enable when platform opens to attendees.
 - **EC2 decommissioned**: was on personal AWS account; no longer in use
-- **Deploy**: push to `main` → Railway auto-deploys backend; `npx netlify deploy --prod --dir=frontend/dist` for frontend
+- **RDS stopped**: `pot-matchmaker` instance stopped 2026-04-15 with final snapshot `pot-matchmaker-preretire-20260415-0757`. AWS auto-restarts stopped instances after 7 days — consider deleting with final snapshot if not needed.
+- **Deploy**: push to `main` → Railway auto-deploys backend; Netlify auto-deploys frontend (GitHub App relinked 2026-04-15)
+- **Background jobs**: long-running admin actions (Grid re-enrich, sponsor reports) run as asyncio background tasks with `GET /dashboard/jobs/{id}` polling — no more 504 timeouts
 
 ## Broken / Incomplete
 
 - **Email template design** — match intro email is functional but needs design polish for production use (layout, branding, content)
-- **generate-all HTTP timeout** — full match regeneration for all 80 attendees exceeds HTTP timeout; runs successfully in background but returns no response to caller; needs async job pattern for long-running operations
+- **Grid coverage ceiling** — 23/85 attendees (27%) verified by The Grid. Remaining 62 are companies genuinely not indexed by Grid (confirmed via name + URL + email-domain probes). Would need Grid to expand their index or manual canonical-name dict for edge cases.
+- **Attendee onboarding flow** — attendees like Pouneh Bligaard have Rhuna tickets but no user accounts on the platform. No self-serve path to get matches until emails are re-enabled or magic links are distributed.
 
 ## Key Decisions Made
 
@@ -66,15 +69,21 @@
 
 ## Deployment
 
-- **Production URL**: `https://meet.proofoftalk.io` (Netlify frontend + proxied API to EC2) — DNS restored 2026-04-01
-- **Green EC2**: `3.239.218.239` — gunicorn + nginx; `APP_PUBLIC_URL=https://meet.proofoftalk.io`
-- **Blue EC2** (fallback): `54.89.55.202` — old RDS connection (not updated)
-- **Database**: **Supabase PostgreSQL** (`db.mkcememoueziibbpqhfk.supabase.co:5432/postgres`) — XLabs Ext Pro plan, IPv4 add-on enabled, shared project with 1000 Minds (`speakers` table). RDS backup saved as `.env.rds-backup` on EC2
-- **Deploy command**: `bash deploy/push.sh 3.239.218.239 ~/Downloads/Credentials_Keys/pot-key.pem`
-- **Integration API key**: set on EC2 in `.env` (`INTEGRATION_API_KEY`)
+- **Production URL**: `https://meet.proofoftalk.io` (Netlify frontend → Railway backend → Supabase)
+- **Deploy**: push to `main` → Railway auto-deploys backend, Netlify auto-deploys frontend (GitHub App relinked 2026-04-15)
+- **EC2 + RDS**: both decommissioned/stopped. RDS snapshot: `pot-matchmaker-preretire-20260415-0757`
+
+## Current Numbers (2026-04-19)
+
+- **85 attendees** in Supabase (after removing 6 seeds/test + merging 4 duplicate pairs)
+- **234 matches** at avg score 0.713 (10 deal_ready / 21 non_obvious / 203 complementary)
+- **23 Grid-verified** (27% coverage — confirmed ceiling via name + URL + email-domain probes)
+- **Rhuna/Extasy**: 189 total orders, 102 valid (99 paid + 3 redeemed), ~€64k revenue
+- **All emails disabled** until platform opens to attendees
 
 ## Current Focus
 
-- Privacy mode for anonymous/pseudonymous Web3 attendees (Jes's request)
-- Share Runa integration spec + API key with Swerve
-- Email provider switch — SES production denied; switch to Resend/SendGrid/Postmark (needs Victor + DNS access)
+- Re-enable emails + attendee onboarding when platform is ready for attendees to sign in
+- Sponsor intelligence rollout — Victor pitching pilot reports
+- Schedule `ingest_extasy.py` on a cron for auto-sync
+- Align CEO dashboard with matchmaker dashboard revenue figures
