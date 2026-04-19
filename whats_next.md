@@ -6,11 +6,10 @@
 
 ## Now
 
-1. **Open platform to attendees** — re-enable emails (remove `return` lines in `email.py`), decide on attendee onboarding flow (magic link distribution vs self-registration vs Rhuna webhook auto-create). Pouneh Bligaard already asking via LinkedIn.
-2. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); internal staff now excluded from candidates; reports run as background jobs (no more 504). Next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors
-3. **Schedule `ingest_extasy.py` on a cron** — script is now idempotent; scheduling it (Railway cron or GitHub Action, hourly) closes the last manual step. New Rhuna ticket buyers flow into Supabase → `POT Attendees` sheet tab automatically.
-4. **Post-purchase email sequence** — Resend is configured; build the 4-email sequence (welcome, first matches, weekly digest, final briefing). Blocked on #1 (emails currently disabled).
-5. **Align CEO dashboard with Rhuna** — CEO dash reads from stale Google Sheet, matchmaker reads Extasy live. Talk to Steffie about shared definitions (paid vs comp, Media reclassification). Optionally point CEO dash at Extasy API directly.
+1. **Open platform to attendees** — re-enable emails (remove `return` lines in `email.py` — 7 functions), decide on attendee onboarding flow (magic link distribution vs self-registration vs Rhuna webhook auto-create). Pouneh Bligaard already asking via LinkedIn. Blocked on Rhuna webhook go-live (Sveat says next week).
+2. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); internal staff now excluded from candidates; reports run as background jobs (no more 504). Next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors.
+3. **Schedule `ingest_extasy.py` on a cron** — script is now idempotent; scheduling it (Railway cron or GitHub Action, hourly) closes the last manual step.
+4. **Align CEO dashboard with Rhuna** — CEO dash reads from stale Google Sheet, matchmaker reads Extasy live. Talk to Steffie about shared definitions. Optionally point CEO dash at Extasy API directly.
 
 ## Soon
 
@@ -98,3 +97,7 @@
 - ✓ Revenue aligned with Rhuna — removed custom dedup that dropped Tommi's legitimate second purchase (€599 gap resolved)
 - ✓ AWS RDS stopped — final snapshot taken, compute savings ~€12/mo
 - ✓ Extasy enum fix — uppercase tickettype values for Supabase compatibility
+- ✓ Meeting Prep Brief (Phase 4) — `/m/:token/briefing` page: per-match cards with explanation, talking points, Grid intel, social links, scheduled meetings; print/PDF via window.print(); "View Meeting Prep Brief" button on MagicMatches
+- ✓ Contact Export (Phase 6) — "Export Contacts" CSV download on Briefing page: name, title, company, match type, score, LinkedIn, Twitter, website, explanation, talking points
+- ✓ Post-event email stubs (Phase 5-6) — morning schedule, D+1 wrap-up, D+7 nudge: function signatures + docstrings in email.py, all blocked. 7 total email functions across full lifecycle, all ready to enable.
+- ✓ Matchmaking UX integration brief for Zohair — `docs/matchmaking-ux-integration.md` + `.docx`; 6-phase attendee timeline, what's built vs needed, critical unlock identified

@@ -57,6 +57,18 @@
 - **Email template design** — match intro email is functional but needs design polish for production use (layout, branding, content)
 - **Grid coverage ceiling** — 23/85 attendees (27%) verified by The Grid. Remaining 62 are companies genuinely not indexed by Grid (confirmed via name + URL + email-domain probes). Would need Grid to expand their index or manual canonical-name dict for edge cases.
 - **Attendee onboarding flow** — attendees like Pouneh Bligaard have Rhuna tickets but no user accounts on the platform. No self-serve path to get matches until emails are re-enabled or magic links are distributed.
+- **Full email HTML templates** — morning schedule, D+1 wrap-up, D+7 nudge have function stubs but no HTML body yet (return-at-top blocks execution). Templates to be written when emails are re-enabled.
+
+## Attendee Experience Phases (from docs/matchmaking-ux-integration.md)
+
+| Phase | Status |
+|---|---|
+| 1. Instant (post-purchase magic link) | Blocked on Rhuna webhook go-live |
+| 2. First Matches (24-48h email) | Blocked on Phase 1 |
+| 3. Warm-Up (threads, messaging, scheduling) | Built |
+| 4. Final Briefing (prep brief + PDF) | **Shipped** — `/m/:token/briefing` |
+| 5. At-Event (morning email, QR, feedback) | Easy parts done, real-time = stretch |
+| 6. Post-Event (contact export, follow-up) | **Shipped** — CSV export + email stubs |
 
 ## Key Decisions Made
 
