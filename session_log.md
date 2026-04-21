@@ -383,6 +383,31 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **Verified end-to-end**: `In Funnel` column visible on `Close network of Investors`, `COLD - T1 VCs`, `COLD - T2 T3 VCs`, `COLD - Startups`, `COLD - Family Offices LPs`, `COLD - Accelerators`. Green TRUE cells confirmed for matching emails (e.g. `julien@stake.capital` = ticket holder, `simon@moonrockcapital.io` = nominee). Overlap is small — a handful across ~2500+ cold contacts.
 - **Files touched**: `docs/integrations/sheets_sync/Code.gs` (rewritten — consolidated sync + ARRAYFORMULA approach).
 
+## 2026-04-20–21 — Category column, Attendees page fixes, AI guardrails, live sponsors, enrichment audit
+- **Ferd's Category request**: added AI-inferred `Category` column to POT Attendees (Investor/Exchange/Regulator/Startup/Infrastructure/etc.). SQL CASE expression in `attendees_sync` view uses intent_tags + `inferred_customer_profile.offers` text matching. ~80% accurate, Ferd accepted as starting point.
+- **Nominations view updated**: `nominations_sync` now includes `nominee_vertical` and `nominee_seniority` for category coverage on nominees.
+- **Attendees page fixes (3 bugs)**:
+  - Search: removed `ai_summary` from search fields — "proof of talk" was matching every attendee's summary. Replaced with email search.
+  - Overflow: AI summary clamped to `line-clamp-2`, card has `overflow-hidden`, Brain icon uses `shrink-0`.
+  - Sponsor filter removed: 0 sponsors in DB (sponsors are CRM relationships, not attendees). Removed from `TICKET_TYPES`.
+- **Live sponsor data**: `sponsor_intelligence.py` now reads from CEO Dashboard Supabase (`emsofswnzqnepekmiwwp/dashboard_snapshots`) via REST API instead of hardcoded 24-sponsor list. Returns 37 live sponsors from CRM. Falls back to hardcoded list if env vars missing. New env vars: `CEO_DASH_SUPABASE_URL`, `CEO_DASH_SUPABASE_ANON_KEY`.
+- **Admin password reset**: both `admin@pot.demo` and `shaun@proofoftalk.io` passwords reset via direct DB update (bcrypt hash). Old passwords were failing.
+- **Admin attendee profile removed**: unlinked `admin@pot.demo` from attendees table and deleted the attendee row — admin is not a real attendee, shouldn't have matches.
+- **AI Concierge anti-hallucination guardrails** (`concierge.py`):
+  - 7 accuracy rules in system prompt: don't invent facts, tag claims with sources, flag sparse data honestly.
+  - Attendee context labels each field `[VERIFIED]` vs `[AI-INFERRED]`.
+  - Data quality score per attendee (SPARSE/PARTIAL/GOOD) based on real field coverage.
+  - AI summary suppressed for SPARSE profiles (completeness ≤1) — model can't see fabricated text.
+  - Smoke tested: sparse profiles now say "goals aren't detailed" instead of fabricating.
+- **Upstream enrichment guardrails** (`embeddings.py` + `enrich_and_embed.py`):
+  - `generate_ai_summary()` checks data completeness before calling GPT. Sparse profiles (no interests, no goals, no meaningful enrichment) get a factual stub — no GPT call, no hallucination.
+  - Only counts meaningful enrichment keys (linkedin, grid, twitter, crunchbase, company_description) — not Extasy ticket metadata.
+  - GPT prompt has explicit anti-fabrication rules matching the sponsor intelligence pattern.
+  - Both the service version and batch script version updated.
+  - All 96 AI summaries regenerated: 45 stubs, 51 GPT with guardrails, 0 errors.
+- **LinkedIn enrichment audit**: Voyager `FullProfileWithEntities-86` endpoint returns 410 (deprecated). Proxycurl API sunset (returns 410, team moved to NinjaPear at $49/mo — too expensive for 96 profiles). Fresh cookies obtained but LinkedIn changed internal API structure — `identity/dash/profiles` no longer called by frontend. LinkedIn enrichment is effectively dead. Grid B2B + website scraping remain as primary enrichment sources.
+- **Files touched**: `backend/app/services/concierge.py`, `backend/app/services/embeddings.py`, `backend/app/services/sponsor_intelligence.py`, `backend/app/api/routes/dashboard.py`, `backend/scripts/enrich_and_embed.py`, `frontend/src/pages/Attendees.tsx`, `docs/integrations/sheets_sync/Code.gs`.
+
 ## 2026-04-14 (cont.) — ICP deployed + Runa sync + seed removal + infrastructure cleanup
 - **DATABASE_URL fixed**: `.env` from old machine still pointed at decommissioned AWS RDS (`pot-matchmaker.c16ym02woedf.eu-west-1.rds.amazonaws.com`). All SQLAlchemy operations (alembic, backfill, regen) had been running against RDS, not Supabase production. Fixed to `postgresql+asyncpg://postgres:***@db.mkcememoueziibbpqhfk.supabase.co:5432/postgres`. Supabase confirmed at 92 attendees vs RDS frozen at 60.
 - **ICP re-run on Supabase**: alembic migration applied to Supabase (was only on RDS), ICP backfill 92/92 success, match regeneration 387 matches @ avg 0.727.

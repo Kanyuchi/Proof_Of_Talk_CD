@@ -105,12 +105,19 @@ This 3-stage approach avoids expensive LLM calls for all N^2 pairs while still p
 ### Data Enrichment Strategy
 Enrichment runs as background jobs per attendee. Sources are layered:
 - Registration form data (always available, shallow)
-- LinkedIn via Proxycurl API (career history, skills, trajectory)
+- The Grid B2B (verified Web3 company data — sector, products, description)
+- Company website scraping (meta descriptions, page text)
+- LinkedIn — **currently non-functional** (Voyager API deprecated, Proxycurl sunset/moved to NinjaPear at $49/mo). Registration form collects LinkedIn URLs but automated enrichment is dead.
 - Twitter/X API (real-time interests, positioning)
-- Company website scraping (what the company actually does)
 - Crunchbase data (funding, investors, deal stage)
 
-The AI summary is regenerated after each enrichment update.
+AI summaries have anti-hallucination guardrails: sparse profiles (no interests, no goals, no meaningful enrichment) get factual stubs instead of GPT-generated fabrications. The `generate_ai_summary()` function in both `embeddings.py` and `enrich_and_embed.py` checks data completeness before calling GPT.
+
+### Sponsor Data
+Sponsor intelligence reports pull live data from the CEO Dashboard's Supabase project (`emsofswnzqnepekmiwwp`) via REST API. The `SPONSORS` list in `sponsor_intelligence.py` is a fallback — live data comes from `dashboard_snapshots.data.sponsorsCRM` (37 sponsors from the Google Sheet CRM). Requires `CEO_DASH_SUPABASE_URL` and `CEO_DASH_SUPABASE_ANON_KEY` env vars.
+
+### Ferd's Outreach Sheet Sync
+Google Apps Script bound to `PoT26_Master_Email_Database_v3` syncs Supabase attendees + nominations into a `POT Attendees` tab daily at 11 PM. ARRAYFORMULA-based `In Funnel` column on all feeder tabs (COLD, Close network) flags contacts already in the funnel. Repo copy of script at `docs/integrations/sheets_sync/Code.gs`.
 
 ### Attendee Profile Embedding
 The embedding is generated from a composite text blob combining: name, title, company, goals, interests, AI summary, and enriched data highlights. This ensures the vector captures the full picture, not just registration keywords.
@@ -125,16 +132,13 @@ Copy `backend/.env.example` to `backend/.env` and fill in:
 - `SECRET_KEY` — JWT signing key
 - `APP_PUBLIC_URL` — public URL (`https://meet.proofoftalk.io`)
 - `INTEGRATION_API_KEY` — Runa integration auth
-- `PROXYCURL_API_KEY` — optional, for LinkedIn enrichment
+- `PROXYCURL_API_KEY` — **defunct** (Proxycurl sunset, API returns 410)
+- `LINKEDIN_LI_AT_COOKIE`, `LINKEDIN_CSRF_TOKEN` — LinkedIn Voyager cookies (expire weekly, **Voyager API currently deprecated**)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — Supabase REST API (for data ingestion scripts)
+- `CEO_DASH_SUPABASE_URL`, `CEO_DASH_SUPABASE_ANON_KEY` — CEO Dashboard Supabase (for live sponsor data)
 
 ## Test Profiles
 
-Five fictional attendees from the case study are in `backend/data/seed_profiles.json`. These are the primary demo data:
-1. **Amara Okafor** — Abu Dhabi SWF, $200M mandate for tokenised RWA
-2. **Marcus Chen** — VaultBridge CEO, Series B custody/settlement infra
-3. **Dr. Elena Vasquez** — Meridian Crypto Ventures GP, $500M AUM, TradFi-DeFi thesis
-4. **James Whitfield** — NexaLayer CTO, enterprise L2 with compliance modules
-5. **Sophie Bergmann** — Deutsche Bundesbank, CBDC and MiCA regulation
+The 5 original case-study seeds (Amara Okafor, Marcus Chen, etc.) have been **deleted** from production Supabase (2026-04-14). The database now contains only real attendees from Rhuna/Extasy + 1000 Minds speaker sync. Do not re-seed.
 
 The matching engine must produce non-obvious connections between these profiles (e.g., James + Sophie on compliance infrastructure, Amara + Marcus on custody for sovereign funds).

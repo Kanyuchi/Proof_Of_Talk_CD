@@ -100,4 +100,11 @@
 - ✓ Meeting Prep Brief (Phase 4) — `/m/:token/briefing` page: per-match cards with explanation, talking points, Grid intel, social links, scheduled meetings; print/PDF via window.print(); "View Meeting Prep Brief" button on MagicMatches
 - ✓ Contact Export (Phase 6) — "Export Contacts" CSV download on Briefing page: name, title, company, match type, score, LinkedIn, Twitter, website, explanation, talking points
 - ✓ Post-event email stubs (Phase 5-6) — morning schedule, D+1 wrap-up, D+7 nudge: function signatures + docstrings in email.py, all blocked. 7 total email functions across full lifecycle, all ready to enable.
+- ✓ Attendees page fixes — search no longer matches on ai_summary (was returning all results for "proof of talk"); AI summary clamped to 2 lines; Sponsor filter removed (0 sponsors in attendees table)
+- ✓ Live sponsor data — `sponsor_intelligence.py` reads from CEO Dashboard Supabase REST API (37 sponsors from CRM) instead of hardcoded 24-sponsor list. Fallback to hardcoded if env vars missing.
+- ✓ AI Concierge anti-hallucination — 7 accuracy rules, source tags ([VERIFIED]/[AI-INFERRED]), data quality scoring, AI summary suppressed for SPARSE profiles
+- ✓ Upstream enrichment guardrails — `generate_ai_summary()` returns factual stubs for sparse profiles instead of hallucinations. All 96 summaries regenerated (45 stubs + 51 GPT with guardrails).
+- ✓ Category column in POT Attendees — SQL-based classification (Investor/Exchange/Regulator/Startup/Infrastructure/etc.) from intent_tags + offers text. ~80% accurate, Ferd accepted as starting point.
+- ✓ Admin profile cleanup — removed admin@pot.demo from attendees table, password reset for both admin accounts
+- ✗ LinkedIn enrichment — Voyager API deprecated (410), Proxycurl sunset, NinjaPear too expensive ($49/mo). Parked. Grid B2B + website scraping are the primary enrichment sources.
 - ✓ Matchmaking UX integration brief for Zohair — `docs/matchmaking-ux-integration.md` + `.docx`; 6-phase attendee timeline, what's built vs needed, critical unlock identified
