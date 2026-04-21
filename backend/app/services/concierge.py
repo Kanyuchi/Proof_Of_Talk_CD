@@ -29,19 +29,42 @@ async def _list_attendees(db: AsyncSession) -> list[Attendee]:
 
 
 def _brief_attendee_line(a: Attendee) -> str:
-    summary = a.ai_summary or f"{a.title} at {a.company}"
-    intents = ", ".join(a.intent_tags) if a.intent_tags else "not classified"
+    intents = ", ".join(a.intent_tags) if a.intent_tags else "none"
     deal = f"{a.deal_readiness_score:.0%}" if a.deal_readiness_score else "0%"
     interests = ", ".join((a.interests or [])[:4]) or "none"
     stage = a.deal_stage or "unspecified"
-    verticals = ", ".join(a.vertical_tags) if a.vertical_tags else "not classified"
-    return (
-        f"• {a.name} ({a.ticket_type.upper()}) — {a.title}, {a.company}\n"
-        f"  Interests: {interests}\n"
-        f"  Verticals: {verticals}\n"
-        f"  Intents: {intents} | Deal Readiness: {deal} | Stage: {stage}\n"
-        f"  Summary: {summary}"
-    )
+    verticals = ", ".join(a.vertical_tags) if a.vertical_tags else "none"
+    goals = a.goals or "none"
+    title = a.title or "not provided"
+
+    # Flag data completeness so the AI knows when to be cautious
+    has_interests = bool(a.interests)
+    has_goals = bool(a.goals and a.goals.strip())
+    has_intents = bool(a.intent_tags)
+    has_title = bool(a.title and a.title.strip())
+    completeness = sum([has_interests, has_goals, has_intents, has_title])
+    if completeness <= 1:
+        quality = "SPARSE — treat AI summary with caution, do NOT present inferred details as facts"
+    elif completeness <= 2:
+        quality = "PARTIAL"
+    else:
+        quality = "GOOD"
+
+    lines = [
+        f"• {a.name} ({a.ticket_type.upper()}) — {title}, {a.company}",
+        f"  [VERIFIED] Title: {title} | Company: {a.company}",
+        f"  [VERIFIED] Interests: {interests}",
+        f"  [VERIFIED] Goals: {goals}",
+        f"  [VERIFIED] Verticals: {verticals}",
+        f"  [VERIFIED] Intents: {intents} | Deal Readiness: {deal} | Stage: {stage}",
+        f"  Data quality: {quality}",
+    ]
+    # Only include AI summary for profiles with enough real data to cross-check against
+    if a.ai_summary and completeness >= 2:
+        lines.append(f"  [AI-INFERRED] Summary: {a.ai_summary}")
+    elif completeness <= 1:
+        lines.append(f"  ⚠ No reliable summary available — ONLY use the VERIFIED fields above.")
+    return "\n".join(lines)
 
 
 def _build_attendee_context(attendees: list[Attendee]) -> str:
@@ -153,6 +176,15 @@ async def concierge_chat(
 
 You help attendees discover who to meet, prepare for meetings, and spot non-obvious connections.
 
+CRITICAL ACCURACY RULES:
+1. ONLY cite facts that appear in the REGISTERED ATTENDEES data below. Never invent interests, goals, deal sizes, or connections.
+2. If an attendee's interests or summary say "not classified" or are generic, say "their specific goals aren't listed" — do NOT guess what they might want.
+3. Tag each claim with its source: [PROFILE] for title/company, [GOALS] for self-reported interests/goals, [AI-INFERRED] for anything from the AI summary.
+4. Never claim someone "is actively seeking" or "wants to" unless their interests, goals, or intent tags explicitly say so.
+5. If you cannot find a relevant attendee for the user's request, say so honestly — do not force a weak recommendation.
+6. Never fabricate company products, funding amounts, investment theses, or mandates that are not in the data.
+7. When information is sparse for an attendee, explicitly note: "Limited profile data — based on [PROFILE] only."
+
 REGISTERED ATTENDEES:
 {attendee_context}
 
@@ -166,9 +198,9 @@ Response style — conversational and chat-friendly:
 - Do NOT use ### headers or section titles — just flow naturally
 - When recommending people, use this pattern (one blank line between each):
   **Name** — Title, Company
-  [1-2 sentences: why this connection matters for the user specifically]
+  [1-2 sentences: why this connection matters for the user specifically, with source tags]
 - Limit recommendations to 2–3 people unless the user asks for more
-- Be specific — reference real names, deal sizes, products, verticals
+- Be specific — reference real names, deal sizes, products, verticals FROM THE DATA ONLY
 - Explain WHY a connection is valuable, not just that it exists
 - Suggest a concrete opener or talking point when relevant
 - End with a short follow-up question or offer ("Want me to dig into any of these?" or "I can help you prep for that meeting")
