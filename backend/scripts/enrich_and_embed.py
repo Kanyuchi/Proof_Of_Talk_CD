@@ -171,26 +171,53 @@ async def call_openai_chat(messages: list[dict], max_tokens: int = 300, temperat
 
 
 async def generate_ai_summary(attendee: dict) -> str:
-    """Generate a 2-3 sentence professional profile summary."""
+    """Generate a 2-3 sentence professional profile summary.
+
+    For sparse profiles (no interests, no goals, no meaningful enrichment),
+    returns a factual stub without calling GPT.
+    """
     enriched = attendee.get("enriched_profile") or {}
     company_desc = enriched.get("company_description", "")
     ticket_type = attendee.get("ticket_type", "delegate")
+    title = attendee.get("title", "") or ""
     interests_raw = attendee.get("interests") or []
+    goals = (attendee.get("goals") or "").strip()
+    name = attendee.get("name", "")
+    company = attendee.get("company", "")
+
+    # Check for meaningful enrichment (not just Extasy ticket metadata)
+    useful_keys = {"linkedin", "grid", "twitter", "crunchbase", "company_description"}
+    has_enrichment = any(k in enriched for k in useful_keys)
+    has_interests = len(interests_raw) > 0
+    has_goals = bool(goals)
+
+    if not has_interests and not has_goals and not has_enrichment:
+        role_part = f"{title} at " if title.strip() else f"a {ticket_type} attendee from "
+        return f"{name} is {role_part}{company}, attending Proof of Talk 2026 as a {ticket_type}. Specific interests and goals have not been provided."
+
     interests = ", ".join(interests_raw) if interests_raw else "Not specified"
 
     prompt = f"""You are an AI assistant for Proof of Talk 2026, an exclusive Web3 conference at the Louvre Palace (2,500 decision-makers, $18T AUM).
 
-Generate a concise 2-3 sentence professional summary for this attendee:
+Generate a concise 2-3 sentence professional summary for this attendee.
 
-Name: {attendee.get('name', '')}
-Title: {attendee.get('title', '') or 'Unknown role'}
-Company: {attendee.get('company', '') or 'Unknown company'}
+CRITICAL ACCURACY RULES:
+- ONLY state facts directly supported by the data below.
+- If Goals or Interests say "Not specified", write "Specific interests/goals have not been disclosed" — do NOT guess.
+- Do NOT invent investment theses, mandates, or product descriptions not in the data.
+- Do NOT claim someone "is actively seeking" unless their Goals or Interests explicitly say so.
+- If Company looks like an email domain (Gmail, Googlemail, Hotmail), note company is not confirmed.
+- Be specific where data exists, brief where it doesn't.
+
+Name: {name}
+Title: {title or 'Not provided'}
+Company: {company or 'Unknown company'}
 Ticket Type: {ticket_type}
-Goals: {attendee.get('goals') or 'Not specified'}
+Goals: {goals or 'Not specified'}
 Interests: {interests}
 Company Description: {company_desc or 'Not available'}
 
-Write in third person. Be specific about what they do and why they're attending. Do not use generic language like "passionate about" or "experienced professional"."""
+Write in third person."""
 
     return await call_openai_chat(
         [{"role": "user", "content": prompt}],
