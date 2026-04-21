@@ -117,7 +117,10 @@ async def generate_ai_summary(attendee) -> str:
     has_title = bool(title.strip())
     has_interests = len(interests) > 0
     has_goals = bool(goals)
-    has_enrichment = bool(enriched and enriched != {})
+    # Only count enrichment that's useful for a profile summary —
+    # NOT Extasy ticket metadata (source, paid_amount, voucher_code, etc.)
+    _USEFUL_ENRICHMENT_KEYS = {"linkedin", "grid", "twitter", "crunchbase", "company_description"}
+    has_enrichment = bool(enriched and any(k in enriched for k in _USEFUL_ENRICHMENT_KEYS))
 
     if not has_interests and not has_goals and not has_enrichment:
         # Nothing for GPT to work with — return a factual stub, not a hallucination
