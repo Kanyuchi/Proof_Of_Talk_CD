@@ -101,25 +101,50 @@ async def embed_attendee(attendee) -> list[float]:
 
 
 async def generate_ai_summary(attendee) -> str:
-    """Use GPT-4o to generate a concise attendee profile summary."""
+    """Use GPT-4o to generate a concise attendee profile summary.
+
+    Returns a factual summary grounded in available data.
+    For sparse profiles (no interests, no goals, no enrichment), returns
+    a minimal stub rather than letting GPT fabricate details.
+    """
+    title = attendee.title or ""
+    interests = attendee.interests or []
+    goals = (attendee.goals or "").strip()
+    enriched = attendee.enriched_profile or {}
+    ticket_type = attendee.ticket_type.value if hasattr(attendee.ticket_type, "value") else attendee.ticket_type
+
+    # Check data completeness — if too thin, return a factual stub
+    has_title = bool(title.strip())
+    has_interests = len(interests) > 0
+    has_goals = bool(goals)
+    has_enrichment = bool(enriched and enriched != {})
+
+    if not has_interests and not has_goals and not has_enrichment:
+        # Nothing for GPT to work with — return a factual stub, not a hallucination
+        role_part = f"{title} at " if has_title else f"a {ticket_type} attendee from "
+        return f"{attendee.name} is {role_part}{attendee.company}, attending Proof of Talk 2026 as a {ticket_type}. Specific interests and goals have not been provided."
+
     prompt = f"""You are an AI assistant for a premium Web3 conference (Proof of Talk 2026, 2500 decision-makers, $18T AUM).
 
-Generate a concise 2-3 sentence professional summary of this attendee that captures:
-- Their role and what their organization does
-- What they're actively looking for at this event
-- Their deal-readiness and decision-making authority
+Generate a concise 2-3 sentence professional summary of this attendee.
+
+CRITICAL ACCURACY RULES:
+- ONLY state facts that are directly supported by the data below.
+- If Interests or Goals say "Not specified", write "Specific interests/goals have not been disclosed" — do NOT guess or infer what they might want.
+- Do NOT invent investment theses, mandates, product descriptions, or strategic priorities that are not in the data.
+- Do NOT claim someone "is actively seeking" or "is looking to" unless their Goals or Interests explicitly say so.
+- If Company is derived from an email domain (e.g. "Gmail", "Googlemail", "Hotmail"), note that the company is not confirmed.
+- Write in third person. Be specific where data exists, brief where it doesn't.
 
 Attendee data:
 Name: {attendee.name}
-Title: {attendee.title}
+Title: {title or 'Not provided'}
 Company: {attendee.company}
-Ticket Type: {attendee.ticket_type.value if hasattr(attendee.ticket_type, 'value') else attendee.ticket_type}
-Interests: {', '.join(attendee.interests) if attendee.interests else 'Not specified'}
-Goals: {attendee.goals or 'Not specified'}
+Ticket Type: {ticket_type}
+Interests: {', '.join(interests) if interests else 'Not specified'}
+Goals: {goals or 'Not specified'}
 
-Enriched data: {attendee.enriched_profile or 'None available'}
-
-Write the summary in third person. Be specific about their investment thesis, product, or mandate. Do not use generic language."""
+Enriched data: {enriched or 'None available'}"""
 
     response = await client.chat.completions.create(
         model=settings.OPENAI_CHAT_MODEL,
