@@ -664,9 +664,10 @@ async def revenue_stats(
 async def list_sponsors(
     _admin: User = Depends(require_admin),
 ):
-    """List all 24 POT 2026 sponsors."""
-    from app.services.sponsor_intelligence import SPONSORS
-    return {"sponsors": SPONSORS}
+    """List POT 2026 sponsors (live from CEO Dashboard CRM)."""
+    from app.services.sponsor_intelligence import fetch_live_sponsors
+    sponsors = await fetch_live_sponsors()
+    return {"sponsors": sponsors}
 
 
 @router.post("/sponsor-report", status_code=202)

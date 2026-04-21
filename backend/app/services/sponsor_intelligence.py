@@ -11,8 +11,10 @@ not by GPT — to prevent hallucinated confidence levels.
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 
+import httpx
 from openai import AsyncOpenAI
 from sqlalchemy import text, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,8 +26,11 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
-# ── Sponsor data (from Google Sheet: POT 2026 Sponsorship Tracker) ────────
-SPONSORS = [
+# ── Sponsor data ─────────────────────────────────────────────────────────
+# Live source: CEO Dashboard Supabase → dashboard_snapshots.data.sponsorsCRM
+# Fallback: hardcoded list from April 2026 (stale but keeps things working)
+
+SPONSORS_FALLBACK = [
     {"name": "Zircuit",          "value": 50000,  "tier": "Gold",     "lead": "Karl"},
     {"name": "CertiK",          "value": 49000,  "tier": "Platinum", "lead": "Karl"},
     {"name": "BPI France",      "value": 20000,  "tier": "Silver",   "lead": "Karl"},
@@ -51,6 +56,60 @@ SPONSORS = [
     {"name": "Holonym",        "value": 8000,   "tier": "Startup",  "lead": "William"},
     {"name": "MatterFi",       "value": 12000,  "tier": "Silver",   "lead": "William"},
 ]
+
+# Tier extracted from the CRM "category" field (e.g. "3 - Gold" → "Gold")
+_CATEGORY_TO_TIER = {
+    "1 - Diamond": "Diamond", "2 - Platinum": "Platinum", "3 - Gold": "Gold",
+    "4 - Silver": "Silver", "5 - Startup": "Startup",
+}
+
+
+async def fetch_live_sponsors() -> list[dict]:
+    """Fetch sponsor list from CEO Dashboard's Supabase, normalised to our format."""
+    url = os.getenv("CEO_DASH_SUPABASE_URL")
+    key = os.getenv("CEO_DASH_SUPABASE_ANON_KEY")
+    if not url or not key:
+        logger.info("CEO_DASH env vars not set, using fallback sponsor list")
+        return SPONSORS_FALLBACK
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                f"{url}/rest/v1/dashboard_snapshots",
+                headers={"apikey": key, "Authorization": f"Bearer {key}"},
+                params={"order": "created_at.desc", "limit": "1", "select": "data"},
+            )
+            if resp.status_code != 200:
+                logger.warning("CEO Dashboard API returned %s, using fallback", resp.status_code)
+                return SPONSORS_FALLBACK
+
+            rows = resp.json()
+            if not rows:
+                return SPONSORS_FALLBACK
+
+            crm = rows[0].get("data", {}).get("sponsorsCRM", {})
+            raw_sponsors = crm.get("sponsors", [])
+            if not raw_sponsors:
+                return SPONSORS_FALLBACK
+
+            # Normalise CRM fields → matchmaker format
+            return [
+                {
+                    "name": s.get("name", ""),
+                    "value": s.get("committed") or s.get("paid") or 0,
+                    "tier": _CATEGORY_TO_TIER.get(s.get("category", ""), s.get("category", "")),
+                    "lead": s.get("lead", ""),
+                }
+                for s in raw_sponsors
+                if s.get("name")
+            ]
+    except Exception as e:
+        logger.warning("Failed to fetch live sponsors: %s, using fallback", e)
+        return SPONSORS_FALLBACK
+
+
+# Keep a module-level alias for code that imports SPONSORS directly
+SPONSORS = SPONSORS_FALLBACK
 
 
 # ── Confidence scoring (deterministic, not GPT) ──────────────────────────
@@ -336,11 +395,11 @@ async def run_sponsor_report(
 ) -> dict:
     """Full pipeline: Grid → Embed → pgvector → GPT-4o → report with confidence."""
 
-    # Find sponsor
-    sponsor = next((s for s in SPONSORS if s["name"].lower() == sponsor_name.lower()), None)
+    # Find sponsor from live CRM data
+    sponsors = await fetch_live_sponsors()
+    sponsor = next((s for s in sponsors if s["name"].lower() == sponsor_name.lower()), None)
     if not sponsor:
-        # Fuzzy match
-        sponsor = next((s for s in SPONSORS if sponsor_name.lower() in s["name"].lower()), None)
+        sponsor = next((s for s in sponsors if sponsor_name.lower() in s["name"].lower()), None)
     if not sponsor:
         return {"error": f"Sponsor '{sponsor_name}' not found"}
 

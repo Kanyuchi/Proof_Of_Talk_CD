@@ -31,7 +31,7 @@ const SKIP_TABS = new Set([
   'EXCLUDE - Speakers', 'EXCLUDE - Priority VIP', 'NEW'
 ]);
 
-const POT_HEADERS = ['Email', 'Name', 'Company', 'Source', 'Signed Up At', 'Ticket Type', 'Confirmed'];
+const POT_HEADERS = ['Email', 'Name', 'Company', 'Title', 'Category', 'Source', 'Signed Up At', 'Ticket Type', 'Confirmed'];
 
 // ── Master sync (point the hourly trigger here) ─────────────────────────────
 
@@ -53,9 +53,9 @@ function syncAll() {
 
 function syncPotAttendees(ss, url, key) {
   var attendees = fetchAll(url, key, 'attendees_sync',
-    'email,name,company,created_at,ticket_type,ticket_bought_at');
+    'email,name,company,title,created_at,ticket_type,ticket_bought_at,category');
   var nominees = fetchAll(url, key, 'nominations_sync',
-    'nominee_email,nominee_name,nominee_company,nominee_title,nominator_name,nominator_email,status,nominee_confirmed,created_at');
+    'nominee_email,nominee_name,nominee_company,nominee_title,nominee_vertical,nominee_seniority,nominator_name,nominator_email,status,nominee_confirmed,created_at');
 
   var sheet = ss.getSheetByName(POT_TAB);
   if (!sheet) sheet = ss.insertSheet(POT_TAB);
@@ -72,6 +72,8 @@ function syncPotAttendees(ss, url, key) {
       (r.email || '').toLowerCase().trim(),
       r.name || '',
       r.company || '',
+      r.title || '',
+      r.category || '',
       'TICKET',
       r.created_at || '',
       r.ticket_type || '',
@@ -86,6 +88,8 @@ function syncPotAttendees(ss, url, key) {
       email,
       n.nominee_name || '',
       n.nominee_company || '',
+      n.nominee_title || (n.nominee_seniority || ''),
+      n.nominee_vertical || '',
       'NOMINEE',
       n.created_at || '',
       '',

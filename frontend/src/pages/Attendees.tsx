@@ -23,7 +23,7 @@ const ticketColors: Record<string, string> = {
   delegate: "bg-blue-400/10 text-blue-400 border-blue-400/20",
 };
 
-const TICKET_TYPES = ["vip", "speaker", "sponsor", "delegate"] as const;
+const TICKET_TYPES = ["vip", "speaker", "delegate"] as const;
 
 const matchScoreColor: Record<string, string> = {
   deal_ready:    "bg-emerald-400/15 text-emerald-400 border-emerald-400/25",
@@ -68,7 +68,7 @@ export default function Attendees() {
       a.name.toLowerCase().includes(q) ||
       a.company.toLowerCase().includes(q) ||
       a.title.toLowerCase().includes(q) ||
-      (a.ai_summary?.toLowerCase().includes(q) ?? false);
+      a.email.toLowerCase().includes(q);
     const matchesFilter = filters.length === 0 || filters.includes(a.ticket_type);
     return matchesSearch && matchesFilter;
   });
@@ -141,7 +141,7 @@ export default function Attendees() {
             <Link
               key={attendee.id}
               to={`/attendees/${attendee.id}`}
-              className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-[#E76315]/30 hover:bg-white/[0.05] transition-all group"
+              className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-[#E76315]/30 hover:bg-white/[0.05] transition-all group overflow-hidden"
             >
               {/* Avatar */}
               <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#E76315]/20 to-[#D35400]/20 flex items-center justify-center text-[#E76315] font-semibold text-lg shrink-0">
@@ -165,9 +165,9 @@ export default function Attendees() {
                   {attendee.title} &middot; {attendee.company}
                 </div>
                 {attendee.ai_summary && (
-                  <div className="text-xs text-white/30 mt-1 truncate">
-                    <Brain className="w-3 h-3 inline mr-1" />
-                    {attendee.ai_summary}
+                  <div className="text-xs text-white/30 mt-1 flex items-start gap-1">
+                    <Brain className="w-3 h-3 shrink-0 mt-0.5" />
+                    <span className="line-clamp-2">{attendee.ai_summary}</span>
                   </div>
                 )}
               </div>
