@@ -36,3 +36,8 @@ Thumbs.db
 # Local Netlify folder
 .netlify
 .gstack/
+
+# Data exports and PhantomBuster results (local only)
+csv/
+exports/*.csv
+exports/*.xlsx
