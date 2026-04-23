@@ -31,7 +31,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-DELAY_SECONDS = 5  # seconds between profile visits
+DELAY_SECONDS = 10  # seconds between profile visits
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     print("ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required")

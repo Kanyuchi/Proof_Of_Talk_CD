@@ -190,22 +190,36 @@ class EnrichmentService:
     async def _verify_linkedin_identifier(self, identifier: str) -> bool:
         """Return True if the given public identifier resolves to a real LinkedIn profile.
 
-        Uses linkedin-api library if available, falls back to Voyager cookies.
+        Uses linkedin-api's session cookies if available, falls back to manual Voyager cookies.
         """
-        # Try linkedin-api first (free, auto-auth)
+        headers = None
+
+        # Try linkedin-api session cookies first
         client = _get_linkedin_client()
         if client:
             try:
-                loop = asyncio.get_event_loop()
-                profile = await loop.run_in_executor(None, client.get_profile, identifier)
-                await asyncio.sleep(1)  # Rate limit
-                return profile is not None and bool(profile.get("firstName") or profile.get("lastName"))
+                cookies = client.client.session.cookies
+                li_at = cookies.get("li_at", domain=".linkedin.com") or cookies.get("li_at")
+                csrf = cookies.get("JSESSIONID", domain=".linkedin.com") or cookies.get("JSESSIONID")
+                if li_at:
+                    csrf_clean = csrf.strip('"') if csrf else ""
+                    headers = {
+                        "Cookie": f'li_at={li_at}; JSESSIONID="{csrf_clean}"',
+                        "csrf-token": csrf_clean,
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+                        "Accept": "application/vnd.linkedin.normalized+json+2.1",
+                        "x-restli-protocol-version": "2.0.0",
+                    }
             except Exception:
-                pass  # Fall through to Voyager
+                pass
 
-        # Fallback: Voyager cookies
-        if not settings.LINKEDIN_LI_AT_COOKIE:
+        # Fallback: manual Voyager cookies
+        if not headers and settings.LINKEDIN_LI_AT_COOKIE:
+            headers = self._voyager_headers()
+
+        if not headers:
             return False
+
         try:
             resp = await self.http_client.get(
                 "https://www.linkedin.com/voyager/api/identity/dash/profiles",
@@ -214,19 +228,20 @@ class EnrichmentService:
                     "memberIdentity": identifier,
                     "decorationId": "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-86",
                 },
-                headers=self._voyager_headers(),
+                headers=headers,
                 follow_redirects=True,
             )
-            # 200 = found, 403 = found but private, 404 = not found
+            await asyncio.sleep(1)  # Rate limit
             return resp.status_code in (200, 403)
         except Exception:
             return False
 
     async def _enrich_linkedin_api(self, linkedin_url: str) -> dict | None:
-        """Fetch LinkedIn profile data via the linkedin-api library (free, auto-auth).
+        """Fetch LinkedIn profile data using linkedin-api's authenticated session
+        with the dash/profiles endpoint (the old profileView endpoint returns 410).
 
-        The library is synchronous so we run it in a thread executor.
-        Adds a 3-second delay between calls to avoid triggering LinkedIn rate limits.
+        Uses linkedin-api only for auth/session management, then calls the working
+        dash endpoint directly via the library's session cookies.
         """
         client = _get_linkedin_client()
         if not client:
@@ -238,52 +253,105 @@ class EnrichmentService:
                 return None
             profile_id = match.group(1).rstrip("/")
 
+            # Use the library's authenticated session to call the dash endpoint
+            def _fetch_dash_profile(pid: str) -> dict | None:
+                cookies = client.client.session.cookies
+                li_at = cookies.get("li_at", domain=".linkedin.com") or cookies.get("li_at")
+                csrf = cookies.get("JSESSIONID", domain=".linkedin.com") or cookies.get("JSESSIONID")
+                if not li_at:
+                    return None
+                csrf_clean = csrf.strip('"') if csrf else ""
+                headers = {
+                    "Cookie": f'li_at={li_at}; JSESSIONID="{csrf_clean}"',
+                    "csrf-token": csrf_clean,
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                    "Accept": "application/vnd.linkedin.normalized+json+2.1",
+                    "x-restli-protocol-version": "2.0.0",
+                    "x-li-lang": "en_US",
+                }
+                resp = httpx.get(
+                    "https://www.linkedin.com/voyager/api/identity/dash/profiles",
+                    params={
+                        "q": "memberIdentity",
+                        "memberIdentity": pid,
+                        "decorationId": "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-86",
+                    },
+                    headers=headers,
+                    follow_redirects=True,
+                    timeout=15,
+                )
+                if resp.status_code not in (200, 403):
+                    return None
+                return resp.json()
+
             loop = asyncio.get_event_loop()
-            profile = await loop.run_in_executor(None, client.get_profile, profile_id)
-            if not profile:
+            data = await loop.run_in_executor(None, _fetch_dash_profile, profile_id)
+            if not data:
                 return None
 
             # Rate-limit: 3s pause between LinkedIn requests
             await asyncio.sleep(3)
 
-            # Extract profile picture URL from display artifacts
-            profile_pic_url = None
-            dp_url = profile.get("displayPictureUrl", "")
-            artifacts = profile.get("img_400_400") or profile.get("img_200_200") or ""
-            if dp_url and artifacts:
-                profile_pic_url = dp_url + artifacts
+            included = data.get("included", [])
+            if not included:
+                # 403 (private) or empty — return minimal stub
+                logger.info("linkedin_profile_private_or_empty", profile=profile_id)
+                return {"headline": None, "summary": None, "experiences": [], "skills": [],
+                        "education": [], "source": "linkedin_api_private"}
+
+            # Parse the dash response (same format as _enrich_linkedin_voyager)
+            profile_obj = next(
+                (i for i in included if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Profile"), {}
+            )
+            positions = [
+                i for i in included
+                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Position"
+            ]
+            skills_list = [
+                i for i in included
+                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Skill"
+            ]
+            educations = [
+                i for i in included
+                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Education"
+            ]
 
             experiences = [
-                {
-                    "title": exp.get("title"),
-                    "company": exp.get("companyName"),
-                    "description": exp.get("description"),
-                }
-                for exp in (profile.get("experience") or [])[:5]
+                {"title": pos.get("title"), "company": pos.get("companyName"), "description": pos.get("description")}
+                for pos in positions[:5]
             ]
-
-            skills_raw = profile.get("skills") or []
-            skills = [s.get("name") for s in skills_raw if s.get("name")][:15]
-
+            skills = [s.get("name") for s in skills_list[:15] if s.get("name")]
             education = [
-                {
-                    "school": edu.get("schoolName"),
-                    "degree": edu.get("degreeName"),
-                    "field": edu.get("fieldOfStudy"),
-                }
-                for edu in (profile.get("education") or [])[:3]
+                {"school": edu.get("schoolName"), "degree": edu.get("degreeName"), "field": edu.get("fieldOfStudy")}
+                for edu in educations[:3]
             ]
+
+            # Extract photo URL
+            profile_pic_url = None
+            try:
+                vector_image = (
+                    profile_obj.get("profilePicture", {})
+                    .get("displayImageReference", {})
+                    .get("vectorImage", {})
+                )
+                root_url = vector_image.get("rootUrl", "")
+                artifacts = vector_image.get("artifacts", [])
+                if root_url and artifacts:
+                    largest = max(artifacts, key=lambda a: a.get("width", 0))
+                    profile_pic_url = root_url + largest.get("fileIdentifyingUrlPathSegment", "")
+            except Exception:
+                pass
 
             logger.info("linkedin_api_enriched", profile_id=profile_id)
             return {
-                "headline": profile.get("headline"),
-                "summary": profile.get("summary"),
+                "headline": profile_obj.get("headline"),
+                "summary": profile_obj.get("summary"),
                 "profile_pic_url": profile_pic_url,
                 "experiences": experiences,
                 "skills": skills,
                 "education": education,
-                "industry": profile.get("industryName"),
-                "location": profile.get("locationName"),
+                "industry": profile_obj.get("industryName"),
+                "location": profile_obj.get("geoLocationName"),
                 "source": "linkedin_api",
             }
         except Exception as e:

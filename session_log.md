@@ -455,3 +455,6 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **`enrich_and_embed.py`**: standalone script now includes LinkedIn as Layer 0 before website scraping; `--skip-linkedin` flag added; fetches `linkedin_url` from Supabase; auto-populates `title` from LinkedIn headline when missing
 - **Config**: `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` env vars added to `config.py` and `.env.example`; `PROXYCURL_API_KEY` marked as defunct
 - **CLAUDE.md**: LinkedIn enrichment status updated from "non-functional" to "functional via linkedin-api"
+- **Voyager dash endpoint fix**: `linkedin-api` library's `get_profile()` returns 410 (old endpoint deprecated); rewrote `_enrich_linkedin_api()` to use library only for auth, then call the working `dash/profiles` endpoint directly with the session cookies
+- **Playwright scraper run**: scraped 21/25 LinkedIn profiles successfully (4 private/blocked); delay increased to 10s; 7 wrong-person enrichments (bad URLs like `/in/robin-s`, `/in/mark`) cleaned up and URLs cleared from Supabase
+- **Full re-enrichment**: `enrich_and_embed.py --force --skip-linkedin` regenerated all 115 AI summaries, intent tags, and embeddings incorporating the new LinkedIn data
