@@ -107,7 +107,7 @@ Enrichment runs as background jobs per attendee. Sources are layered:
 - Registration form data (always available, shallow)
 - The Grid B2B (verified Web3 company data — sector, products, description)
 - Company website scraping (meta descriptions, page text)
-- LinkedIn — **currently non-functional** (Voyager API deprecated, Proxycurl sunset/moved to NinjaPear at $49/mo). Registration form collects LinkedIn URLs but automated enrichment is dead.
+- LinkedIn — **functional via `linkedin-api` library** (free, uses personal LinkedIn credentials). Proxycurl is dead, Voyager cookies are a manual fallback. Set `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` in `.env`. Rate-limited to 1 request per 3s to avoid account restrictions.
 - Twitter/X API (real-time interests, positioning)
 - Crunchbase data (funding, investors, deal stage)
 
@@ -132,8 +132,9 @@ Copy `backend/.env.example` to `backend/.env` and fill in:
 - `SECRET_KEY` — JWT signing key
 - `APP_PUBLIC_URL` — public URL (`https://meet.proofoftalk.io`)
 - `INTEGRATION_API_KEY` — Runa integration auth
+- `LINKEDIN_EMAIL`, `LINKEDIN_PASSWORD` — LinkedIn credentials for `linkedin-api` library (primary LinkedIn enrichment method, free)
+- `LINKEDIN_LI_AT_COOKIE`, `LINKEDIN_CSRF_TOKEN` — LinkedIn Voyager cookies (manual fallback if `linkedin-api` auth fails)
 - `PROXYCURL_API_KEY` — **defunct** (Proxycurl sunset, API returns 410)
-- `LINKEDIN_LI_AT_COOKIE`, `LINKEDIN_CSRF_TOKEN` — LinkedIn Voyager cookies (expire weekly, **Voyager API currently deprecated**)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — Supabase REST API (for data ingestion scripts)
 - `CEO_DASH_SUPABASE_URL`, `CEO_DASH_SUPABASE_ANON_KEY` — CEO Dashboard Supabase (for live sponsor data)
 

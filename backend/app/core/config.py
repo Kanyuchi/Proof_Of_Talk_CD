@@ -47,11 +47,16 @@ class Settings(BaseSettings):
     INTEGRATION_API_KEY_SECONDARY: str = ""  # For key rotation
 
     # Enrichment API keys (optional, for Level 3 data enrichment)
-    PROXYCURL_API_KEY: str = ""  # LinkedIn enrichment
+    PROXYCURL_API_KEY: str = ""  # LinkedIn enrichment (defunct — Proxycurl sunset)
+    SCRAPIN_API_KEY: str = ""    # LinkedIn enrichment via Scrapin.io (paid, not currently used)
     TWITTER_BEARER_TOKEN: str = ""
     CRUNCHBASE_API_KEY: str = ""  # Crunchbase Basic API (optional)
 
-    # LinkedIn Voyager (Chrome DevTools session cookie — no third-party API needed)
+    # LinkedIn — linkedin-api library (primary, free, uses your LinkedIn credentials)
+    LINKEDIN_EMAIL: str = ""      # LinkedIn account email
+    LINKEDIN_PASSWORD: str = ""   # LinkedIn account password
+
+    # LinkedIn Voyager (Chrome DevTools session cookie — fallback if linkedin-api fails)
     LINKEDIN_LI_AT_COOKIE: str = ""   # li_at cookie value from Chrome DevTools
     LINKEDIN_CSRF_TOKEN: str = ""     # ajax:XXXXXXX part of JSESSIONID cookie
 

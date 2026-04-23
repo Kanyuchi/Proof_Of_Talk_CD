@@ -1,11 +1,12 @@
 """
 Batch enrichment + embedding script (standalone — no FastAPI server required)
 ==============================================================================
-Fetches all attendees from Supabase, runs website scraping enrichment,
+Fetches all attendees from Supabase, runs multi-source enrichment,
 generates AI summary / intent tags / embeddings via OpenAI, and patches
 the results back to Supabase.
 
 Layers run in order:
+  0. LinkedIn profile scraping (needs LINKEDIN_EMAIL + LINKEDIN_PASSWORD)
   1. Company website scraping  (no API key needed)
   2. AI summary via GPT-4o     (needs OPENAI_API_KEY)
   3. Intent classification      (needs OPENAI_API_KEY)
@@ -24,6 +25,9 @@ Usage:
 
     # Only scrape websites, skip AI/embedding (faster, no OpenAI cost):
     python scripts/enrich_and_embed.py --scrape-only
+
+    # Skip LinkedIn enrichment:
+    python scripts/enrich_and_embed.py --skip-linkedin
 """
 
 import argparse
@@ -45,6 +49,8 @@ SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o")
 OPENAI_EMBEDDING_MODEL = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+LINKEDIN_EMAIL = os.getenv("LINKEDIN_EMAIL", "")
+LINKEDIN_PASSWORD = os.getenv("LINKEDIN_PASSWORD", "")
 
 if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     print("ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in backend/.env")
@@ -76,7 +82,7 @@ def fetch_all_attendees() -> list[dict]:
                 headers=headers,
                 params={
                     "select": "id,name,email,company,title,ticket_type,goals,interests,"
-                              "company_website,enriched_profile,ai_summary,intent_tags,embedding",
+                              "linkedin_url,company_website,enriched_profile,ai_summary,intent_tags,embedding",
                     "offset": offset,
                     "limit": page_size,
                     "order": "created_at.asc",
@@ -107,6 +113,108 @@ def patch_attendee(attendee_id: str, payload: dict, dry_run: bool) -> bool:
             content=json.dumps(payload),
         )
         return resp.status_code in (200, 204)
+
+
+# ── Layer 0: LinkedIn enrichment ──────────────────────────────────────────────
+
+_linkedin_client = None
+_linkedin_client_failed = False
+
+
+def _get_linkedin_client():
+    """Get or create the linkedin-api client (singleton)."""
+    global _linkedin_client, _linkedin_client_failed
+    if _linkedin_client is not None:
+        return _linkedin_client
+    if _linkedin_client_failed:
+        return None
+    if not LINKEDIN_EMAIL or not LINKEDIN_PASSWORD:
+        return None
+    try:
+        from linkedin_api import Linkedin
+        _linkedin_client = Linkedin(LINKEDIN_EMAIL, LINKEDIN_PASSWORD)
+        print(f"  LinkedIn API authenticated as {LINKEDIN_EMAIL}")
+        return _linkedin_client
+    except Exception as e:
+        _linkedin_client_failed = True
+        print(f"  LinkedIn API auth failed: {e}")
+        return None
+
+
+import re
+
+
+def fetch_linkedin_profile(linkedin_url: str) -> dict | None:
+    """Fetch LinkedIn profile data via linkedin-api (synchronous)."""
+    client = _get_linkedin_client()
+    if not client:
+        return None
+    try:
+        match = re.search(r"/in/([^/?#]+)", linkedin_url)
+        if not match:
+            return None
+        profile_id = match.group(1).rstrip("/")
+        profile = client.get_profile(profile_id)
+        if not profile:
+            return None
+
+        # Extract profile picture URL
+        profile_pic_url = None
+        dp_url = profile.get("displayPictureUrl", "")
+        artifacts = profile.get("img_400_400") or profile.get("img_200_200") or ""
+        if dp_url and artifacts:
+            profile_pic_url = dp_url + artifacts
+
+        experiences = [
+            {
+                "title": exp.get("title"),
+                "company": exp.get("companyName"),
+                "description": exp.get("description"),
+            }
+            for exp in (profile.get("experience") or [])[:5]
+        ]
+
+        skills_raw = profile.get("skills") or []
+        skills = [s.get("name") for s in skills_raw if s.get("name")][:15]
+
+        education = [
+            {
+                "school": edu.get("schoolName"),
+                "degree": edu.get("degreeName"),
+                "field": edu.get("fieldOfStudy"),
+            }
+            for edu in (profile.get("education") or [])[:3]
+        ]
+
+        return {
+            "headline": profile.get("headline"),
+            "summary": profile.get("summary"),
+            "profile_pic_url": profile_pic_url,
+            "experiences": experiences,
+            "skills": skills,
+            "education": education,
+            "industry": profile.get("industryName"),
+            "location": profile.get("locationName"),
+            "source": "linkedin_api",
+        }
+    except Exception as e:
+        print(f"    LinkedIn error for {linkedin_url}: {e}")
+        return None
+
+
+def summarize_linkedin(data: dict) -> str:
+    """Create a text summary from LinkedIn data."""
+    parts = []
+    if data.get("headline"):
+        parts.append(data["headline"])
+    if data.get("summary"):
+        parts.append(data["summary"][:300])
+    if data.get("experiences"):
+        recent = data["experiences"][0]
+        parts.append(f"Current: {recent.get('title', '')} at {recent.get('company', '')}")
+    if data.get("skills"):
+        parts.append(f"Skills: {', '.join(data['skills'][:8])}")
+    return ". ".join(parts)
 
 
 # ── Layer 1: Website scraping ─────────────────────────────────────────────────
@@ -305,6 +413,7 @@ async def process_attendee(
     dry_run: bool,
     force: bool,
     scrape_only: bool,
+    skip_linkedin: bool = False,
 ) -> str:
     """Run enrichment + AI pipeline for a single attendee. Returns status string."""
     name = attendee.get("name", "Unknown")
@@ -313,6 +422,31 @@ async def process_attendee(
 
     patch = {}
     status_parts = []
+
+    # ── Layer 0: LinkedIn enrichment ──────────────────────────────────────────
+    already_has_linkedin = bool(enriched.get("linkedin"))
+    linkedin_url = attendee.get("linkedin_url", "")
+
+    if not skip_linkedin and linkedin_url and (force or not already_has_linkedin):
+        linkedin_data = fetch_linkedin_profile(linkedin_url)
+        if linkedin_data:
+            enriched["linkedin"] = linkedin_data
+            enriched["linkedin_summary"] = summarize_linkedin(linkedin_data)
+            enriched["linkedin_enriched_at"] = __import__("datetime").datetime.utcnow().isoformat()
+            # Auto-populate title/company from LinkedIn if missing in registration
+            if not attendee.get("title") and linkedin_data.get("headline"):
+                patch["title"] = linkedin_data["headline"]
+            status_parts.append("linkedin✓")
+            # Rate limit: 3s between LinkedIn requests
+            await asyncio.sleep(3)
+        else:
+            status_parts.append("linkedin✗")
+    elif already_has_linkedin and not force:
+        status_parts.append("linkedin=cached")
+    elif not linkedin_url:
+        status_parts.append("linkedin=no_url")
+    else:
+        status_parts.append("linkedin=skipped")
 
     # ── Layer 1: Website scraping ──────────────────────────────────────────────
     already_scraped = bool(enriched.get("company_description"))
@@ -393,12 +527,21 @@ async def process_attendee(
     return f"{name}: {', '.join(status_parts)} | patch={'ok' if ok else 'ERR'}"
 
 
-async def run(dry_run: bool, force: bool, scrape_only: bool) -> None:
+async def run(dry_run: bool, force: bool, scrape_only: bool, skip_linkedin: bool = False) -> None:
     print("=== POT Matchmaker — Batch Enrichment + Embedding ===\n")
 
     if not OPENAI_API_KEY and not scrape_only:
         print("WARNING: OPENAI_API_KEY not set — will run website scraping only.\n")
         scrape_only = True
+
+    # LinkedIn availability check
+    if not skip_linkedin and (LINKEDIN_EMAIL and LINKEDIN_PASSWORD):
+        print("LinkedIn enrichment: ENABLED (linkedin-api)\n")
+    elif skip_linkedin:
+        print("LinkedIn enrichment: SKIPPED (--skip-linkedin)\n")
+    else:
+        print("LinkedIn enrichment: DISABLED (set LINKEDIN_EMAIL + LINKEDIN_PASSWORD in .env)\n")
+        skip_linkedin = True
 
     print("Fetching attendees from Supabase...")
     attendees = fetch_all_attendees()
@@ -409,6 +552,10 @@ async def run(dry_run: bool, force: bool, scrape_only: bool) -> None:
         return
 
     # Summary of enrichment state
+    needs_linkedin = sum(
+        1 for a in attendees
+        if a.get("linkedin_url") and not (a.get("enriched_profile") or {}).get("linkedin")
+    )
     needs_scraping = sum(
         1 for a in attendees
         if not (a.get("enriched_profile") or {}).get("company_description")
@@ -416,12 +563,13 @@ async def run(dry_run: bool, force: bool, scrape_only: bool) -> None:
     needs_ai = sum(1 for a in attendees if not a.get("ai_summary"))
     needs_embedding = sum(1 for a in attendees if not a.get("embedding"))
 
+    print(f"  Needs LinkedIn:         {needs_linkedin}")
     print(f"  Needs website scraping: {needs_scraping}")
     print(f"  Needs AI summary:       {needs_ai}")
     print(f"  Needs embedding:        {needs_embedding}")
     print()
 
-    if not force and needs_scraping == 0 and needs_ai == 0 and needs_embedding == 0:
+    if not force and needs_linkedin == 0 and needs_scraping == 0 and needs_ai == 0 and needs_embedding == 0:
         print("All attendees already enriched. Use --force to re-process.")
         return
 
@@ -431,7 +579,7 @@ async def run(dry_run: bool, force: bool, scrape_only: bool) -> None:
     err_count = 0
 
     for attendee in attendees:
-        result = await process_attendee(attendee, dry_run=dry_run, force=force, scrape_only=scrape_only)
+        result = await process_attendee(attendee, dry_run=dry_run, force=force, scrape_only=scrape_only, skip_linkedin=skip_linkedin)
         has_error = "ERR" in result
         status_char = "✗" if has_error else "✓"
         print(f"  {status_char} {result}")
@@ -448,6 +596,7 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="Print what would be updated without writing")
     parser.add_argument("--force", action="store_true", help="Re-process even already-enriched attendees")
     parser.add_argument("--scrape-only", action="store_true", help="Only run website scraping, skip AI/embedding")
+    parser.add_argument("--skip-linkedin", action="store_true", help="Skip LinkedIn enrichment")
     args = parser.parse_args()
 
-    asyncio.run(run(dry_run=args.dry_run, force=args.force, scrape_only=args.scrape_only))
+    asyncio.run(run(dry_run=args.dry_run, force=args.force, scrape_only=args.scrape_only, skip_linkedin=args.skip_linkedin))

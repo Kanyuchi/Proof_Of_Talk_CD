@@ -21,7 +21,7 @@
 
 - Post-event continuation — contact export, LinkedIn prompt, D+7 follow-up nudge email
 - Session/content matching — match attendees to sessions based on goals and intent tags
-- Proxycurl batch enrichment — re-run enrichment for all attendees once a funded Proxycurl key is available
+- LinkedIn batch enrichment — run `enrich_and_embed.py` with `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` set to backfill LinkedIn data for all attendees with `linkedin_url`
 - Grid normaliser improvements — manually-curated canonical-name dict for edge-case companies (e.g. Theqrl → The QRL). Limited ROI — most unmatched companies genuinely aren't in Grid.
 - Delete RDS permanently with final snapshot (currently stopped, auto-restarts in 7 days)
 - Email template design — match intro email needs design polish before re-enabling
@@ -106,5 +106,5 @@
 - ✓ Upstream enrichment guardrails — `generate_ai_summary()` returns factual stubs for sparse profiles instead of hallucinations. All 96 summaries regenerated (45 stubs + 51 GPT with guardrails).
 - ✓ Category column in POT Attendees — SQL-based classification (Investor/Exchange/Regulator/Startup/Infrastructure/etc.) from intent_tags + offers text. ~80% accurate, Ferd accepted as starting point.
 - ✓ Admin profile cleanup — removed admin@pot.demo from attendees table, password reset for both admin accounts
-- ✗ LinkedIn enrichment — Voyager API deprecated (410), Proxycurl sunset, NinjaPear too expensive ($49/mo). Parked. Grid B2B + website scraping are the primary enrichment sources.
+- ✓ LinkedIn enrichment restored — `linkedin-api` library (free, email+password auth) replaces dead Proxycurl + manual Voyager cookies. Wired into both `enrichment.py` (FastAPI service) and `enrich_and_embed.py` (standalone script). Set `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` in `.env` to activate.
 - ✓ Matchmaking UX integration brief for Zohair — `docs/matchmaking-ux-integration.md` + `.docx`; 6-phase attendee timeline, what's built vs needed, critical unlock identified

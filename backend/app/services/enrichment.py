@@ -1,3 +1,4 @@
+import asyncio
 import httpx
 import structlog
 import re
@@ -8,6 +9,30 @@ from app.core.config import get_settings
 
 settings = get_settings()
 logger = structlog.get_logger()
+
+# Singleton linkedin-api client — initialized lazily on first use
+_linkedin_client = None
+_linkedin_client_failed = False
+
+
+def _get_linkedin_client():
+    """Get or create the linkedin-api client (singleton, synchronous)."""
+    global _linkedin_client, _linkedin_client_failed
+    if _linkedin_client is not None:
+        return _linkedin_client
+    if _linkedin_client_failed:
+        return None
+    if not settings.LINKEDIN_EMAIL or not settings.LINKEDIN_PASSWORD:
+        return None
+    try:
+        from linkedin_api import Linkedin
+        _linkedin_client = Linkedin(settings.LINKEDIN_EMAIL, settings.LINKEDIN_PASSWORD)
+        logger.info("linkedin_api_authenticated", email=settings.LINKEDIN_EMAIL)
+        return _linkedin_client
+    except Exception as e:
+        _linkedin_client_failed = True
+        logger.error("linkedin_api_auth_failed", error=str(e))
+        return None
 
 
 class EnrichmentService:
@@ -32,17 +57,17 @@ class EnrichmentService:
         # --- LinkedIn enrichment ---
         # Step 1: resolve URL if not already stored
         linkedin_url = attendee.linkedin_url
-        if not linkedin_url and settings.LINKEDIN_LI_AT_COOKIE:
+        if not linkedin_url and (settings.LINKEDIN_EMAIL or settings.LINKEDIN_LI_AT_COOKIE):
             linkedin_url = await self._find_linkedin_url_by_email(attendee.email, attendee.name or "")
-        if not linkedin_url and settings.LINKEDIN_LI_AT_COOKIE and attendee.name and attendee.company:
+        if not linkedin_url and (settings.LINKEDIN_EMAIL or settings.LINKEDIN_LI_AT_COOKIE) and attendee.name and attendee.company:
             linkedin_url = await self._find_linkedin_url_by_name(attendee.name, attendee.company)
 
         # Step 2: fetch profile data
+        # Priority: linkedin-api library (free, auto-auth) → Voyager cookies (manual fallback)
         if linkedin_url:
             linkedin_data = None
-            if settings.PROXYCURL_API_KEY:
-                linkedin_data = await self._enrich_linkedin(linkedin_url)
-            elif settings.LINKEDIN_LI_AT_COOKIE:
+            linkedin_data = await self._enrich_linkedin_api(linkedin_url)
+            if not linkedin_data and settings.LINKEDIN_LI_AT_COOKIE:
                 linkedin_data = await self._enrich_linkedin_voyager(linkedin_url)
             if linkedin_data:
                 if not attendee.linkedin_url:
@@ -163,7 +188,24 @@ class EnrichmentService:
         return None
 
     async def _verify_linkedin_identifier(self, identifier: str) -> bool:
-        """Return True if the given public identifier resolves to a real LinkedIn profile."""
+        """Return True if the given public identifier resolves to a real LinkedIn profile.
+
+        Uses linkedin-api library if available, falls back to Voyager cookies.
+        """
+        # Try linkedin-api first (free, auto-auth)
+        client = _get_linkedin_client()
+        if client:
+            try:
+                loop = asyncio.get_event_loop()
+                profile = await loop.run_in_executor(None, client.get_profile, identifier)
+                await asyncio.sleep(1)  # Rate limit
+                return profile is not None and bool(profile.get("firstName") or profile.get("lastName"))
+            except Exception:
+                pass  # Fall through to Voyager
+
+        # Fallback: Voyager cookies
+        if not settings.LINKEDIN_LI_AT_COOKIE:
+            return False
         try:
             resp = await self.http_client.get(
                 "https://www.linkedin.com/voyager/api/identity/dash/profiles",
@@ -179,6 +221,74 @@ class EnrichmentService:
             return resp.status_code in (200, 403)
         except Exception:
             return False
+
+    async def _enrich_linkedin_api(self, linkedin_url: str) -> dict | None:
+        """Fetch LinkedIn profile data via the linkedin-api library (free, auto-auth).
+
+        The library is synchronous so we run it in a thread executor.
+        Adds a 3-second delay between calls to avoid triggering LinkedIn rate limits.
+        """
+        client = _get_linkedin_client()
+        if not client:
+            return None
+        try:
+            match = re.search(r"/in/([^/?#]+)", linkedin_url)
+            if not match:
+                logger.warning("linkedin_api_bad_url", url=linkedin_url)
+                return None
+            profile_id = match.group(1).rstrip("/")
+
+            loop = asyncio.get_event_loop()
+            profile = await loop.run_in_executor(None, client.get_profile, profile_id)
+            if not profile:
+                return None
+
+            # Rate-limit: 3s pause between LinkedIn requests
+            await asyncio.sleep(3)
+
+            # Extract profile picture URL from display artifacts
+            profile_pic_url = None
+            dp_url = profile.get("displayPictureUrl", "")
+            artifacts = profile.get("img_400_400") or profile.get("img_200_200") or ""
+            if dp_url and artifacts:
+                profile_pic_url = dp_url + artifacts
+
+            experiences = [
+                {
+                    "title": exp.get("title"),
+                    "company": exp.get("companyName"),
+                    "description": exp.get("description"),
+                }
+                for exp in (profile.get("experience") or [])[:5]
+            ]
+
+            skills_raw = profile.get("skills") or []
+            skills = [s.get("name") for s in skills_raw if s.get("name")][:15]
+
+            education = [
+                {
+                    "school": edu.get("schoolName"),
+                    "degree": edu.get("degreeName"),
+                    "field": edu.get("fieldOfStudy"),
+                }
+                for edu in (profile.get("education") or [])[:3]
+            ]
+
+            logger.info("linkedin_api_enriched", profile_id=profile_id)
+            return {
+                "headline": profile.get("headline"),
+                "summary": profile.get("summary"),
+                "profile_pic_url": profile_pic_url,
+                "experiences": experiences,
+                "skills": skills,
+                "education": education,
+                "industry": profile.get("industryName"),
+                "location": profile.get("locationName"),
+                "source": "linkedin_api",
+            }
+        except Exception as e:
+            logger.error("linkedin_api_enrichment_error", error=str(e), url=linkedin_url)
+            return None
 
     async def _enrich_linkedin_voyager(self, linkedin_url: str) -> dict | None:
         """

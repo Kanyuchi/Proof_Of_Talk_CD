@@ -446,3 +446,12 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
   - All 3 have `return` at top (blocked like all other emails). Full HTML templates ready to add when emails re-enabled.
 - **Matchmaking UX integration brief** for Zohair — `docs/matchmaking-ux-integration.md` + Word doc at `docs/Matchmaking_UX_Integration_Brief.docx`. Covers the full 6-phase attendee timeline (Instant → First Matches → Warm-Up → Final Briefing → At-Event → Post-Event), what's built vs what's needed, and the critical unlock (Rhuna → magic link → matches in 24h).
 - **All email functions now stubbed** across the full lifecycle: 7 email types (match intro, password reset, mutual match, meeting confirmation, morning schedule, D+1 wrap-up, D+7 nudge), all blocked with `return`, all ready to enable with one line removal each.
+
+## 2026-04-23 — LinkedIn enrichment restored via linkedin-api library
+
+- **`linkedin-api` integration** — replaced dead Proxycurl + manual Voyager cookie approach with the free `linkedin-api` Python library (v2.3.1, wraps Voyager internally, authenticates with email+password)
+- **`enrichment.py`**: new `_enrich_linkedin_api()` method as primary LinkedIn source; lazy singleton client with auto-auth; runs in thread executor (library is sync, service is async); 3s rate limit between requests; falls back to manual Voyager cookies if `linkedin-api` auth fails
+- **`_verify_linkedin_identifier()`**: updated to try `linkedin-api` first for URL resolution, Voyager cookies as fallback
+- **`enrich_and_embed.py`**: standalone script now includes LinkedIn as Layer 0 before website scraping; `--skip-linkedin` flag added; fetches `linkedin_url` from Supabase; auto-populates `title` from LinkedIn headline when missing
+- **Config**: `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` env vars added to `config.py` and `.env.example`; `PROXYCURL_API_KEY` marked as defunct
+- **CLAUDE.md**: LinkedIn enrichment status updated from "non-functional" to "functional via linkedin-api"
