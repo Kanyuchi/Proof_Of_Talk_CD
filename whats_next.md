@@ -29,6 +29,7 @@
 
 ## Done ✓
 
+- ✓ Rhuna ticket audit (2026-04-24) — `backend/scripts/rhuna_ticket_audit.py` exports per-attendee CSV of Extasy ticket name + paid/free status + voucher code, to answer Ferd's DELEGATE-ticket question. Live Extasy API + Supabase join. 125 valid orders: 76 FREE, 49 PAID (€67,497.64). Deferred: surfacing `extasy_ticket_name` + `is_comped` in the `POT Attendees` sheet (only if Ferd asks).
 - ✓ URL validation — auto `https://` prepend on blur
 - ✓ Fix messaging empty state — explains mutual-accept requirement + shortcut to matches
 - ✓ Remove JS prompt on decline — inline textarea panel in both MyMatches + AttendeeMatches
