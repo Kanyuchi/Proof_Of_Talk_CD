@@ -447,6 +447,15 @@ def build_composite_text(attendee: dict) -> str:
         parts.append(f"LinkedIn: {enriched['linkedin_summary']}")
     if enriched.get("company_description"):
         parts.append(f"Company Info: {enriched['company_description']}")
+    grid = enriched.get("grid") or {}
+    if grid.get("grid_description"):
+        grid_bits = [grid["grid_description"]]
+        if grid.get("grid_sector"):
+            grid_bits.append(f"Sector: {grid['grid_sector']}")
+        products = [p.get("name") for p in (grid.get("grid_products") or []) if p.get("name")]
+        if products:
+            grid_bits.append(f"Products: {', '.join(products[:5])}")
+        parts.append(f"Verified (Grid): {' | '.join(grid_bits)}")
     if enriched.get("recent_activity"):
         parts.append(f"Recent Activity: {enriched['recent_activity']}")
     return "\n".join(parts)
@@ -511,6 +520,32 @@ async def process_attendee(
         status_parts.append("website=cached")
     else:
         status_parts.append("website=no_url")
+
+    # ── Layer 1.5: The Grid B2B enrichment (Web3 company database) ──────────────
+    already_has_grid = bool(enriched.get("grid"))
+    company = attendee.get("company", "")
+    email = attendee.get("email", "")
+    email_domain = email.split("@")[1].lower() if "@" in email else None
+
+    if company and (force or not already_has_grid):
+        # Import here to avoid loading heavy dependencies if Grid step is skipped
+        import sys as _sys
+        backend_path = str(Path(__file__).resolve().parents[1])
+        if backend_path not in _sys.path:
+            _sys.path.insert(0, backend_path)
+        from app.services.grid_enrichment import enrich_from_grid
+        grid_data = await enrich_from_grid(company, website_url, email_domain)
+        if grid_data:
+            enriched["grid"] = grid_data
+            enriched["grid_enriched_at"] = __import__("datetime").datetime.utcnow().isoformat()
+            status_parts.append("grid✓")
+        else:
+            status_parts.append("grid✗")
+        enriched["grid_attempted_at"] = __import__("datetime").datetime.utcnow().isoformat()
+    elif already_has_grid and not force:
+        status_parts.append("grid=cached")
+    else:
+        status_parts.append("grid=no_company")
 
     if enriched != (attendee.get("enriched_profile") or {}):
         patch["enriched_profile"] = enriched
@@ -606,16 +641,21 @@ async def run(dry_run: bool, force: bool, scrape_only: bool, skip_linkedin: bool
         1 for a in attendees
         if not (a.get("enriched_profile") or {}).get("company_description")
     )
+    needs_grid = sum(
+        1 for a in attendees
+        if a.get("company") and not (a.get("enriched_profile") or {}).get("grid")
+    )
     needs_ai = sum(1 for a in attendees if not a.get("ai_summary"))
     needs_embedding = sum(1 for a in attendees if not a.get("embedding"))
 
     print(f"  Needs LinkedIn:         {needs_linkedin}")
     print(f"  Needs website scraping: {needs_scraping}")
+    print(f"  Needs Grid lookup:      {needs_grid}")
     print(f"  Needs AI summary:       {needs_ai}")
     print(f"  Needs embedding:        {needs_embedding}")
     print()
 
-    if not force and needs_linkedin == 0 and needs_scraping == 0 and needs_ai == 0 and needs_embedding == 0:
+    if not force and needs_linkedin == 0 and needs_scraping == 0 and needs_grid == 0 and needs_ai == 0 and needs_embedding == 0:
         print("All attendees already enriched. Use --force to re-process.")
         return
 

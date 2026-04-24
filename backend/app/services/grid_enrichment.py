@@ -52,6 +52,41 @@ query SearchCompany($name: String!) {
 }
 """
 
+# Fallback: search Grid profiles whose URL list contains a given domain substring
+URL_SEARCH_QUERY = """
+query SearchByUrl($pattern: String!) {
+  profileInfos(
+    limit: 5,
+    where: {
+      urls: {url: {_like: $pattern}},
+      profileStatus: {slug: {_in: ["active", "announced"]}}
+    }
+  ) {
+    id
+    name
+    rootId
+    tagLine
+    descriptionShort
+    descriptionLong
+    profileType { name slug }
+    profileSector { name slug }
+    foundingDate
+    media { url mediaType { name slug } }
+    urls { url urlType { name slug } }
+    socials { name socialType { name slug } urls { url } }
+  }
+}
+"""
+
+# Platform / aggregator domains that appear inside unrelated Grid profiles' URL lists.
+# Skip URL-contains search for these to avoid false-positive matches.
+_PLATFORM_DOMAINS = frozenset({
+    "google.com", "gmail.com", "twitter.com", "x.com", "facebook.com",
+    "instagram.com", "linkedin.com", "youtube.com", "medium.com",
+    "github.com", "notion.so", "calendly.com", "telegram.org",
+    "discord.com", "discord.gg", "reddit.com",
+})
+
 # Stage 2: Fetch products + entities by rootId
 DETAILS_QUERY = """
 query OrgDetails($rootId: String!) {
@@ -447,7 +482,49 @@ async def _search_grid(client: httpx.AsyncClient, search_term: str) -> list[dict
     return []
 
 
-async def enrich_from_grid(company_name: str, company_website: str | None = None) -> dict | None:
+async def _search_grid_by_url(client: httpx.AsyncClient, domain: str) -> list[dict]:
+    """Search Grid for profiles whose URL list contains the domain substring.
+    Case-sensitive _like, so try common case variants.
+    """
+    for variant in dict.fromkeys([domain, domain.lower(), domain.title()]):
+        for attempt in range(MAX_RETRIES + 1):
+            try:
+                resp = await client.post(
+                    GRID_GRAPHQL_URL,
+                    json={"query": URL_SEARCH_QUERY, "variables": {"pattern": f"%{variant}%"}},
+                    headers={"Content-Type": "application/json"},
+                )
+                if resp.status_code >= 500:
+                    if attempt < MAX_RETRIES:
+                        await asyncio.sleep(RETRY_BACKOFF[attempt])
+                        continue
+                    return []
+                resp.raise_for_status()
+                data = resp.json()
+                if data.get("errors"):
+                    return []
+                results = (data.get("data") or {}).get("profileInfos") or []
+                if results:
+                    return results
+                break  # try next case variant
+            except httpx.TimeoutException:
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF[attempt])
+                    continue
+                return []
+            except httpx.HTTPError:
+                if attempt < MAX_RETRIES:
+                    await asyncio.sleep(RETRY_BACKOFF[attempt])
+                    continue
+                return []
+    return []
+
+
+async def enrich_from_grid(
+    company_name: str,
+    company_website: str | None = None,
+    email_domain: str | None = None,
+) -> dict | None:
     """
     Search The Grid for a company by name and return full org data:
     profile info, media/logos, products, and legal entities.
@@ -456,6 +533,9 @@ async def enrich_from_grid(company_name: str, company_website: str | None = None
     1. Exact company name
     2. Normalized variants (split concatenated words, strip suffixes)
     3. Domain-based search from company_website
+    4. URL-contains search using email_domain — picks up profiles where
+       the company's Grid URL list includes the email domain (catches
+       name-mismatch cases like 'GenVentures' → 'Generative Ventures')
 
     Returns None if no match found or API is unreachable.
     """
@@ -489,6 +569,24 @@ async def enrich_from_grid(company_name: str, company_website: str | None = None
                 if profile:
                     logger.info("grid_enrichment: matched '%s' via search '%s'", company_name, variant)
                     break
+
+            # Fallback: URL-contains search using the email domain
+            # Catches cases where Grid's registered name doesn't match our company name
+            # (e.g. 'GenVentures' on our side, 'Generative Ventures' on Grid's side).
+            if not profile and email_domain and email_domain.lower() not in _PLATFORM_DOMAINS:
+                url_results = await _search_grid_by_url(client, email_domain)
+                for candidate in url_results:
+                    for u in (candidate.get("urls") or []):
+                        url_str = (u.get("url") or "").lower()
+                        if email_domain.lower() in url_str:
+                            profile = candidate
+                            logger.info(
+                                "grid_enrichment: matched '%s' via URL-contains on '%s' → '%s'",
+                                company_name, email_domain, profile.get("name"),
+                            )
+                            break
+                    if profile:
+                        break
         if not profile:
             logger.info("grid_enrichment: no match for '%s'", company_name)
             return None

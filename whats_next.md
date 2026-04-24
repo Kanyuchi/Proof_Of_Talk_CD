@@ -107,4 +107,8 @@
 - ✓ Category column in POT Attendees — SQL-based classification (Investor/Exchange/Regulator/Startup/Infrastructure/etc.) from intent_tags + offers text. ~80% accurate, Ferd accepted as starting point.
 - ✓ Admin profile cleanup — removed admin@pot.demo from attendees table, password reset for both admin accounts
 - ✓ LinkedIn enrichment restored — `linkedin-api` library (free, email+password auth) replaces dead Proxycurl + manual Voyager cookies. Wired into both `enrichment.py` (FastAPI service) and `enrich_and_embed.py` (standalone script). Set `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` in `.env` to activate.
+- ✓ LinkedIn Playwright discovery — `linkedin_scrape.py --discover` uses LinkedIn's search UI to find profile URLs by name + company for attendees without URLs. Takes 70 profiles from 14 enriched → 70 enriched (60% coverage). Requires manual browser login (handles 2FA). Delay 10s between profiles.
+- ✓ Grid URL-fallback — `grid_enrichment.py` now accepts `email_domain` and falls back to URL-contains search when name search misses. Picks up name-mismatch cases (e.g. `GenVentures` → `Generative Ventures`). `backend/scripts/grid_domain_audit.py` audits coverage by domain.
+- ✓ Grid added to standalone `enrich_and_embed.py` — previously only FastAPI service ran Grid; now the batch script does too. Grid data feeds into the composite embedding text.
+- ✓ Full re-enrichment (2026-04-24) — all 116 attendees processed end-to-end: 60% LinkedIn, 31% Grid, 58% website, 100% AI summary + embedding.
 - ✓ Matchmaking UX integration brief for Zohair — `docs/matchmaking-ux-integration.md` + `.docx`; 6-phase attendee timeline, what's built vs needed, critical unlock identified

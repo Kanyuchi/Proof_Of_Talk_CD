@@ -190,33 +190,55 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
 
 
 async def discover_linkedin_url(page, name: str, company: str) -> str | None:
-    """Try to find a LinkedIn profile by searching name + company."""
+    """Find a LinkedIn profile by searching name + company on LinkedIn search."""
     parts = name.lower().split()
     if len(parts) < 2:
         return None
 
-    # Try first-last pattern
-    slug = f"{parts[0]}-{parts[-1]}"
-    url = f"https://www.linkedin.com/in/{slug}"
+    # Build search query: "firstname lastname company"
+    query = f"{name} {company}".strip() if company else name
+    search_url = f"https://www.linkedin.com/search/results/people/?keywords={query.replace(' ', '%20')}&origin=GLOBAL_SEARCH_HEADER"
 
     try:
-        resp = await page.goto(url, wait_until="domcontentloaded", timeout=10000)
-        await page.wait_for_timeout(1000)
+        await page.goto(search_url, wait_until="domcontentloaded", timeout=15000)
+        await page.wait_for_timeout(3000)
 
+        # Check we're not on login/authwall
         if "/login" in page.url or "/authwall" in page.url:
             return None
 
-        # Check if the page shows a real profile (not 404)
-        h1 = await page.query_selector("h1")
-        if h1:
-            page_name = await h1.inner_text()
-            # Verify the name roughly matches
-            if parts[0].lower() in page_name.lower() or parts[-1].lower() in page_name.lower():
-                return url
-    except Exception:
-        pass
+        # Find the first search result link that points to a profile
+        result = await page.evaluate("""(searchName) => {
+            const parts = searchName.toLowerCase().split(/\\s+/);
+            const firstName = parts[0];
+            const lastName = parts[parts.length - 1];
 
-    return None
+            // Find all result links to /in/ profiles
+            const links = [...document.querySelectorAll('a[href*="/in/"]')];
+            for (const link of links) {
+                const href = link.getAttribute('href') || '';
+                if (!href.includes('/in/') || href.includes('/search/')) continue;
+
+                // Check if the link text or nearby text contains the person's name
+                const container = link.closest('li') || link.closest('div') || link;
+                const text = container.innerText.toLowerCase();
+
+                if (text.includes(firstName) && text.includes(lastName)) {
+                    // Extract clean profile URL
+                    const match = href.match(/\\/in\\/([^/?]+)/);
+                    if (match) {
+                        return 'https://www.linkedin.com/in/' + match[1];
+                    }
+                }
+            }
+            return null;
+        }""", name)
+
+        return result
+
+    except Exception as e:
+        print(f"    Discovery error: {e}")
+        return None
 
 
 async def run(dry_run: bool, limit: int | None, discover: bool):
@@ -234,7 +256,8 @@ async def run(dry_run: bool, limit: int | None, discover: bool):
         attendees_without_url = []
         print(f"  Attendees with LinkedIn URL: {len(attendees_with_url)}")
 
-    all_targets = attendees_with_url + attendees_without_url
+    # In discover mode, process discovery candidates first, then existing URLs
+    all_targets = attendees_without_url + attendees_with_url if discover else attendees_with_url + attendees_without_url
     if limit:
         all_targets = all_targets[:limit]
     print(f"  Processing: {len(all_targets)}\n")
