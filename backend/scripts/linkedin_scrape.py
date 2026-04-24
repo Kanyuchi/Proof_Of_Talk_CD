@@ -189,59 +189,88 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
         return None
 
 
-async def discover_linkedin_url(page, name: str, company: str) -> str | None:
-    """Find a LinkedIn profile by searching name + company on LinkedIn search."""
-    parts = name.lower().split()
-    if len(parts) < 2:
-        return None
+async def _search_linkedin(page, query: str, name: str) -> str | None:
+    """Run a LinkedIn people-search for `query` and return the first profile URL
+    whose surrounding text matches the attendee's first and last name tokens.
 
-    # Build search query: "firstname lastname company"
-    query = f"{name} {company}".strip() if company else name
+    Handles hyphenated last names (Romero-Finger), accented chars, and the
+    /search/results/all fallback where LinkedIn sometimes redirects.
+    """
     search_url = f"https://www.linkedin.com/search/results/people/?keywords={query.replace(' ', '%20')}&origin=GLOBAL_SEARCH_HEADER"
-
     try:
         await page.goto(search_url, wait_until="domcontentloaded", timeout=15000)
-        await page.wait_for_timeout(3000)
+        await page.wait_for_timeout(3500)
 
-        # Check we're not on login/authwall
         if "/login" in page.url or "/authwall" in page.url:
             return None
 
-        # Find the first search result link that points to a profile
-        result = await page.evaluate("""(searchName) => {
-            const parts = searchName.toLowerCase().split(/\\s+/);
+        return await page.evaluate("""(attendeeName) => {
+            // Normalize: lowercase, strip accents, replace hyphens with space
+            const norm = (s) => (s || "")
+                .toLowerCase()
+                .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
+                .replace(/[-–—]/g, " ")
+                .replace(/\\s+/g, " ")
+                .trim();
+
+            const parts = norm(attendeeName).split(/\\s+/).filter(p => p.length >= 2);
+            if (parts.length < 2) return null;
             const firstName = parts[0];
             const lastName = parts[parts.length - 1];
 
-            // Find all result links to /in/ profiles
             const links = [...document.querySelectorAll('a[href*="/in/"]')];
             for (const link of links) {
                 const href = link.getAttribute('href') || '';
                 if (!href.includes('/in/') || href.includes('/search/')) continue;
 
-                // Check if the link text or nearby text contains the person's name
-                const container = link.closest('li') || link.closest('div') || link;
-                const text = container.innerText.toLowerCase();
+                // Look at an expanding neighbourhood: the link itself, its parent li,
+                // and the enclosing search-result container.
+                const containers = [
+                    link,
+                    link.closest('li'),
+                    link.closest('[data-chameleon-result-urn]'),
+                    link.closest('div[class*="entity"]'),
+                    link.parentElement,
+                ].filter(Boolean);
 
-                if (text.includes(firstName) && text.includes(lastName)) {
-                    // Extract clean profile URL
-                    const match = href.match(/\\/in\\/([^/?]+)/);
-                    if (match) {
-                        return 'https://www.linkedin.com/in/' + match[1];
+                for (const c of containers) {
+                    const text = norm(c.innerText);
+                    if (text.includes(firstName) && text.includes(lastName)) {
+                        const match = href.match(/\\/in\\/([^/?]+)/);
+                        if (match) return 'https://www.linkedin.com/in/' + match[1];
                     }
                 }
             }
             return null;
         }""", name)
-
-        return result
-
     except Exception as e:
-        print(f"    Discovery error: {e}")
+        print(f"    Search error: {e}")
         return None
 
 
-async def run(dry_run: bool, limit: int | None, discover: bool):
+async def discover_linkedin_url(page, name: str, company: str) -> str | None:
+    """Find a LinkedIn profile by searching LinkedIn people-search.
+
+    Strategy:
+      1. name + company (full query, if company is present)
+      2. name only (fallback — handles email-derived 'companies' like
+         'Catierf' that narrow the search too much)
+    """
+    parts = name.lower().split()
+    if len(parts) < 2:
+        return None
+
+    # Strategy 1: name + company
+    if company:
+        url = await _search_linkedin(page, f"{name} {company}", name)
+        if url:
+            return url
+
+    # Strategy 2: name only (always run as fallback)
+    return await _search_linkedin(page, name, name)
+
+
+async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False):
     print("=== LinkedIn Profile Scraper (Playwright) ===\n")
 
     # Fetch attendees
@@ -257,7 +286,11 @@ async def run(dry_run: bool, limit: int | None, discover: bool):
         print(f"  Attendees with LinkedIn URL: {len(attendees_with_url)}")
 
     # In discover mode, process discovery candidates first, then existing URLs
-    all_targets = attendees_without_url + attendees_with_url if discover else attendees_with_url + attendees_without_url
+    if only_missing:
+        all_targets = attendees_without_url  # retry just the failures
+        print(f"  Mode: --only-missing — retrying {len(all_targets)} attendees without URLs")
+    else:
+        all_targets = attendees_without_url + attendees_with_url if discover else attendees_with_url + attendees_without_url
     if limit:
         all_targets = all_targets[:limit]
     print(f"  Processing: {len(all_targets)}\n")
@@ -405,6 +438,9 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing to Supabase")
     parser.add_argument("--limit", type=int, default=None, help="Max profiles to process")
     parser.add_argument("--discover", action="store_true", help="Also try to find URLs for attendees without one")
+    parser.add_argument("--only-missing", action="store_true", help="Only process attendees without linkedin_url (retry failed discoveries, skip the ones we already have)")
     args = parser.parse_args()
 
-    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=args.discover))
+    # --only-missing implies --discover
+    discover = args.discover or args.only_missing
+    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing))
