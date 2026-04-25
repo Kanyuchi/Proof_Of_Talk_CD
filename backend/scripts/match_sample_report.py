@@ -37,49 +37,44 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     print("ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required")
     sys.exit(1)
 
-# Organiser-staff exclusion (conservative — keep X Ventures investors since they
-# actively use the matching as any other VC would). We only drop Proof of Talk
-# organiser staff and obvious placeholder/test accounts.
+# Internal staff exclusion. Anyone at @xventures.de or @proofoftalk.io is
+# considered organiser staff and is excluded from the matching pool, with the
+# SOLE EXCEPTION of Zohair and Victor — both are X Ventures partners who use
+# the matching as any external VC would.
+INTERNAL_EMAIL_DOMAINS = {"proofoftalk.io", "xventures.de", "x-ventures.de"}
 INTERNAL_COMPANY_PATTERNS = {
     "proof of talk", "proofoftalk", "proof of talk sa",
-}
-INTERNAL_EMAIL_DOMAINS = {"proofoftalk.io"}
-
-# Hard-coded excluded names — placeholder accounts or duplicates of the admin user
-# that don't belong in any attendee report
-EXCLUDED_NAMES = {
-    "welcome to proof of talk",  # placeholder
-    "shaun",                      # dev/admin duplicate (real record is "Shaun Kutsanzira")
+    "xventures", "x ventures", "x-ventures", "xventures labs",
 }
 
-
-# Allow-list: X Ventures investors who use the matching like any other VC.
-# Keep these even if their email or company field accidentally marks them as
-# internal (e.g. Zohair's record has company='Proof of Talk' but he's at
-# @xventures.de and runs XVentures matchmaking).
+# Allow-list: ONLY Zohair and Victor are kept despite being at xventures.de.
 ALLOWED_NAMES = {
     "zohair dehnadi",
     "victor blas",
-    "hamid behbudi",
 }
 
 
 def is_internal(attendee: dict) -> bool:
-    """Return True if this attendee is POT organiser staff or a placeholder."""
+    """Return True if this attendee is POT/X Ventures organiser staff.
+
+    Exception: Zohair and Victor (ALLOWED_NAMES) are always kept — they use
+    the matchmaker as external VCs would.
+    """
     name = (attendee.get("name") or "").strip().lower()
     if name in ALLOWED_NAMES:
         return False
-    if name in EXCLUDED_NAMES:
-        return True
+
     email = (attendee.get("email") or "").lower()
     if "@" in email:
         domain = email.split("@", 1)[1]
         # @speaker.proofoftalk.io is OK (legitimate external speakers)
         if domain in INTERNAL_EMAIL_DOMAINS:
             return True
+
     company = (attendee.get("company") or "").strip().lower()
     if company in INTERNAL_COMPANY_PATTERNS:
         return True
+
     return False
 
 
@@ -260,8 +255,8 @@ def main(out_path: str | None, per_bucket: int):
     scores = [m["overall_score"] for m in matches]
     external_count = len(attendees) - len(internal_ids)
     lines.append(f"**Generated from {len(matches)} matches across {external_count} attendees.**")
-    lines.append(f"_Proof of Talk organiser staff ({len(internal_ids)}) excluded from this report. "
-                 f"X Ventures investors (Zohair, Victor, etc.) are kept as they use the matching like any other VC._")
+    lines.append(f"_Proof of Talk + X Ventures organiser staff ({len(internal_ids)}) excluded from this report. "
+                 f"Zohair Dehnadi and Victor Blas are kept as they use the matchmaker like any other VC._")
     lines.append(f"Score range: {min(scores):.3f} → {max(scores):.3f}, mean {sum(scores)/len(scores):.3f}.")
     lines.append("")
     lines.append("## How scoring works")

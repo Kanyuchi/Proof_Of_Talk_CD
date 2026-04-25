@@ -1,7 +1,7 @@
 # POT Matchmaker — Sample Match Report
 
-**Generated from 202 matches across 111 attendees.**
-_Proof of Talk organiser staff (5) excluded from this report. X Ventures investors (Zohair, Victor, etc.) are kept as they use the matching like any other VC._
+**Generated from 196 matches across 109 attendees.**
+_Proof of Talk + X Ventures organiser staff (7) excluded from this report. Zohair Dehnadi and Victor Blas are kept as they use the matchmaker like any other VC._
 Score range: 0.600 → 0.780, mean 0.711.
 
 ## How scoring works
@@ -59,29 +59,6 @@ _Explanation confidence: 0.80_
 
 ---
 
-### 💼 ferdinand le tendre  ↔  Robin Saunders
-**Overall score: 0.78**  |  Match type: `deal_ready`  |  Embedding similarity: 0.44  |  Complementary: 0.85
-
-- **ferdinand le tendre** — [DELEGATE]
-  - Sectors: investment_and_capital_markets
-  - Intents: seeking_partnerships, knowledge_exchange
-  - Goals: meet jake
-  - LinkedIn: COO, Proof of Talk | Investor, X Ventures | Passionate Surfer
-- **Robin Saunders** — Kucoin — [VIP]
-  - Sectors: decentralized_finance, investment_and_capital_markets, infrastructure_and_scaling
-  - Intents: seeking_partnerships, technology_evaluation, knowledge_exchange
-  - LinkedIn: Managing Partner and Chief Investment Officer at CLEARBROOK CAPITAL PARTNERS LLP
-  - Grid: KuCoin is a global crypto exchange that lets you trade hundreds of digital assets with advanced tools and competitive fees.
-
-**Why they should meet (GPT-4o):**
-> Robin Saunders from KuCoin and Ferdinand Le Tendre should meet due to their shared interest in strategic partnerships and investment in Web3. KuCoin's platform can provide Ferdinand with the exposure and liquidity needed for blockchain projects, aligning with his focus on strategic partnerships.
-
-**Shared context:** sectors: investment_and_capital_markets, decentralized_finance | synergies: exchange listings for blockchain projects, enhancing user access through partnerships | action_items: Discuss potential token listings on KuCoin, Explore partnership opportunities to enhance Web3 access, Evaluate strategic investment opportunities in blockchain projects
-
-_Explanation confidence: 0.80_
-
----
-
 ### 💼 Zohair Dehnadi  ↔  Victor Blas
 **Overall score: 0.78**  |  Match type: `deal_ready`  |  Embedding similarity: 0.61  |  Complementary: 0.85
 
@@ -102,6 +79,31 @@ _Explanation confidence: 0.80_
 > Victor Blas from X Ventures is actively seeking early-stage startups in institutional custody and layer-2 solutions, aligning with Zohair Dehnadi's interest in blockchain infrastructure and tokenization. Both parties are deal-ready, with Victor's capital deployment capabilities matching Zohair's goal of raising capital and forming strategic partnerships.
 
 **Shared context:** sectors: investment_and_capital_markets, infrastructure_and_scaling | synergies: capital deployment for blockchain infrastructure, strategic partnerships in tokenization | action_items: Discuss potential investment in blockchain infrastructure projects, Explore co-investment opportunities in tokenization startups, Evaluate layer-2 solutions for institutional custody
+
+_Explanation confidence: 0.80_
+
+---
+
+### 💼 Max Kantelia  ↔  Victor Blas
+**Overall score: 0.78**  |  Match type: `deal_ready`  |  Embedding similarity: 0.60  |  Complementary: 0.85
+
+- **Max Kantelia** — CEO & Co-Founder at Zilliqa Group — [VIP]
+  - Sectors: infrastructure_and_scaling, ecosystem_and_foundations, investment_and_capital_markets, decentralized_ai
+  - Intents: seeking_partnerships, knowledge_exchange, deal_making
+  - Goals: Max Kantelia is a serial entrepreneur and a primary architect of the high-performance blockchain ecosystem as the co-founder of Zilliqa. With over 25 years of experience in deep te…
+  - LinkedIn: Divisional Account Director
+  - Grid: Zilliqa is a Layer 1 blockchain that lets developers and enterprises build scalable applications using EVM-compatible tools and customizable application-specific shards.
+- **Victor Blas** — Head of Investment at X Ventures — [VIP]
+  - Sectors: investment_and_capital_markets, tokenisation_of_finance, infrastructure_and_scaling
+  - Intents: deploying_capital, deal_making, seeking_partnerships
+  - Goals: I want to meet early stage start up
+  - LinkedIn: Venture Capitalist at X Ventures | Early investor in Web3 & Blockchain start-up | DeAI Accelerator
+  - Grid: X Ventures is a venture capital firm and studio that invests in Web3 and blockchain startups, providing funding and strategic support for early-stage companies.
+
+**Why they should meet (GPT-4o):**
+> Victor Blas from X Ventures is actively seeking early-stage startups in the blockchain space, aligning with Max Kantelia's focus on integrating decentralized infrastructure with consumer experiences. This match is deal-ready as Victor is deploying capital and Max is seeking partnerships, creating a strong opportunity for investment in Zilliqa's innovative projects.
+
+**Shared context:** sectors: infrastructure_and_scaling, investment_and_capital_markets | synergies: capital deployment for blockchain infrastructure, investment in scalable consumer engagement solutions | action_items: Discuss investment opportunities in Zilliqa's projects, Explore potential for co-investment in spatial web applications, Evaluate strategic partnerships for scaling blockchain solutions
 
 _Explanation confidence: 0.80_
 
