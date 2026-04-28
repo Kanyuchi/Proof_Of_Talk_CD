@@ -15,6 +15,10 @@ client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
 # Only persist matches above this quality threshold — avoids padding with weak connections
 MIN_MATCH_SCORE = 0.60
+# Non-obvious matches carry a higher burden of explanation, so they must
+# clear a higher bar to surface — a thin "different sectors, vague link"
+# pairing at 0.60 is worse than no match.
+MIN_NON_OBVIOUS_SCORE = 0.65
 
 # Cross-sector verticals that create high-value complementary matches
 COMPLEMENTARY_VERTICALS = {
@@ -443,17 +447,27 @@ Avoid matching the target with a direct competitor (same offer, same customers).
 CANDIDATES:
 {chr(10).join(candidate_descriptions)}
 
+EXPLANATION QUALITY RULES — read carefully, these are non-negotiable:
+- BANNED PHRASES: do NOT use "while not directly aligned", "could provide insights", "may benefit", "potential synergies", "valuable perspective", or any other hedging language. If you find yourself reaching for those phrases, the connection is too thin — drop the match (set overall_score below 0.60) instead of writing a hedge.
+- VARY THE OPENING. Do not start every explanation with "<Name> from <Company> is/offers/specializes...". Rotate between: (a) a specific contrast or observation ("Both are tackling X from opposite ends..."), (b) a direct named hook ("Pouneh deploys Dragonfly's fund into RWA tokenization — exactly the thesis Zohair is building POT around"), (c) a question ("Who better to advise POT on stablecoin compliance than..."), (d) an action-anchored opening ("Lead with: ..."). Across the candidate set you return, the openings must be visibly different from each other.
+- BE SPECIFIC. Reference concrete details by name: the company's actual product/fund/mandate, dollar amounts if present in the data, the specific Grid product or sector, the named goal from the candidate's profile. Generic phrases ("blockchain infrastructure", "tokenization") used without a specific anchor are a red flag.
+- For non_obvious matches: the explanation MUST identify the SHARED UNDERLYING PROBLEM in one sharp sentence ("Both are solving discovery in a fragmented buyer market"). If you can't name it, the match isn't non_obvious — re-classify as complementary or drop it.
+
+ACTION ITEMS QUALITY RULES:
+- Each action item must reference SOMETHING SPECIFIC from the candidate's profile (their fund name, their product, their explicit goal, their Grid sector). Generic items like "Discuss sponsorship opportunities", "Explore tokenization projects", "Identify investment interests" are FORBIDDEN — they apply to half the conference and are useless to the attendee.
+- Format each item as a concrete prompt the attendee can use verbatim ("Ask <Name> about <specific thing>", "Pitch <specific opportunity>", "Compare notes on <named situation>").
+
 Return a JSON array ranked from best to worst match. Each entry:
 {{
   "candidate_index": <1-based index>,
-  "overall_score": <0.0-1.0 — be conservative: only score above 0.75 if the connection is genuinely strong and specific. A score below 0.60 means the match adds little value.>,
+  "overall_score": <0.0-1.0 — be conservative: only score above 0.75 if the connection is genuinely strong and specific. A score below 0.60 means the match adds little value and you should drop it rather than hedge.>,
   "complementary_score": <0.0-1.0>,
   "match_type": "complementary" | "non_obvious" | "deal_ready",
-  "explanation": "<2-3 sentences explaining WHY these two should meet. Be specific about the mutual value. Reference concrete details like funding amounts, products, mandates, and the conference context.>",
+  "explanation": "<2-3 sentences. Follow the EXPLANATION QUALITY RULES above. Vary openings, be specific, no hedging.>",
   "shared_context": {{
     "sectors": ["list of shared/overlapping sectors"],
     "synergies": ["specific synergy points — be concrete, not generic"],
-    "action_items": ["2-3 specific conversation topics or deal scenarios to explore at POT 2026"]
+    "action_items": ["2-3 items per the ACTION ITEMS QUALITY RULES above — specific, named, verbatim-usable"]
   }}
 }}
 
@@ -637,6 +651,10 @@ Return ONLY the JSON array. No markdown, no commentary."""
             # Apply minimum quality threshold — avoid padding with weak matches
             overall_score = entry.get("overall_score", sim_score)
             if overall_score < MIN_MATCH_SCORE:
+                continue
+            # Non-obvious matches must clear a higher bar — a thin cross-sector
+            # connection that the AI couldn't articulate sharply isn't worth surfacing.
+            if entry.get("match_type") == "non_obvious" and overall_score < MIN_NON_OBVIOUS_SCORE:
                 continue
 
             # Deduplication: skip if this pair already exists in either direction

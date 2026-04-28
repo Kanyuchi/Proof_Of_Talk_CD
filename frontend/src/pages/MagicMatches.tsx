@@ -208,6 +208,22 @@ export default function MagicMatches() {
                         {person?.privacy_mode === "b2b_only" && (
                           <span className="px-1.5 py-0.5 rounded bg-white/5 text-white/30 text-[9px] uppercase tracking-wider shrink-0">B2B Profile</span>
                         )}
+                        {person && (() => {
+                          const ep = (person.enriched_profile as Record<string, any>) || {};
+                          const hasGrid = !!ep?.grid?.grid_name;
+                          const hasLinkedIn = !!ep?.linkedin?.headline;
+                          const hasTitle = !!person.title;
+                          const hasGoals = !!(person as any).goals;
+                          const sparse = !hasGrid && !hasLinkedIn && (!hasTitle || !hasGoals);
+                          return sparse ? (
+                            <span
+                              title="This profile has limited enrichment data — the AI reasoning may be less precise."
+                              className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300/70 text-[9px] uppercase tracking-wider shrink-0"
+                            >
+                              Profile Incomplete
+                            </span>
+                          ) : null;
+                        })()}
                       </div>
                       <p className="text-white/50 text-sm">
                         {person?.title ? `${person.title} · ${person.company}` : person?.company}
