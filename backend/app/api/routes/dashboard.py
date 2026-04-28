@@ -533,10 +533,17 @@ async def revenue_stats(
         return {"error": f"Extasy API unavailable: {exc}"}
 
     # ── Registration funnel ───────────────────────────────────────────────
+    # Exclude test tickets from every funnel count so the headline "Valid
+    # Tickets" matches the per-type breakdown below (which also drops them).
+    real_orders = [
+        o for o in orders
+        if (o.get("ticketNames") or "").split(",")[0].strip().lower()
+        not in TEST_TICKET_NAMES
+    ]
     funnel = defaultdict(int)
-    for o in orders:
+    for o in real_orders:
         funnel[o.get("status", "UNKNOWN")] += 1
-    total_orders = len(orders)
+    total_orders = len(real_orders)
     paid = funnel.get("PAID", 0)
     redeemed = funnel.get("REDEEMED", 0)
     failed = funnel.get("FAILED", 0)

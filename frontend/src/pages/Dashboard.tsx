@@ -458,7 +458,7 @@ export default function Dashboard() {
             <StatCard icon={DollarSign} label="Total Revenue" value={`€${revenueData.revenue.total.toLocaleString()}`} color="bg-emerald-500" />
             <StatCard icon={Users} label="Valid Tickets" value={revenueData.funnel.valid} color="bg-blue-500" />
             <StatCard icon={TrendingUp} label="Conversion Rate" value={`${(revenueData.funnel.conversion_rate * 100).toFixed(1)}%`} color="bg-purple-500" />
-            <StatCard icon={DollarSign} label="Avg Ticket Price" value={`€${revenueData.revenue.avg_ticket_price.toFixed(0)}`} color="bg-[#D35400]" />
+            <StatCard icon={DollarSign} label={`Avg Paid Ticket (${revenueData.revenue.paid_tickets} paying)`} value={`€${revenueData.revenue.avg_ticket_price.toFixed(0)}`} color="bg-[#D35400]" />
           </div>
 
           {/* Registration funnel */}
@@ -508,7 +508,7 @@ export default function Dashboard() {
                   </div>
                 ))}
                 <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                  <span className="text-xs text-white/40">Paid: {revenueData.revenue.paid_tickets} · Comp: {revenueData.revenue.comp_tickets}</span>
+                  <span className="text-xs text-white/40">Paying: {revenueData.revenue.paid_tickets} · Comped: {revenueData.revenue.comp_tickets}</span>
                 </div>
               </div>
             </div>
