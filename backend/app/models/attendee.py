@@ -51,6 +51,11 @@ class Attendee(Base):
     company_website: Mapped[str] = mapped_column(String(500), nullable=True)
     enriched_profile: Mapped[dict] = mapped_column(JSONB, default=dict)  # Full enriched data blob
 
+    # Rhuna/Extasy ticket linkage — set by extasy_sync. Top-level columns (not
+    # just JSONB) so PostgREST/Supabase can filter on them directly.
+    extasy_order_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    country_iso3: Mapped[str | None] = mapped_column(String(3), nullable=True)
+
     # AI-generated fields
     ai_summary: Mapped[str] = mapped_column(Text, nullable=True)  # AI-generated profile summary
     embedding: Mapped[list] = mapped_column(Vector(1536), nullable=True)  # OpenAI embedding

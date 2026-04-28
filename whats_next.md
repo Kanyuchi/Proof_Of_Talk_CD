@@ -6,13 +6,16 @@
 
 ## Now
 
-1. **Open platform to attendees** — re-enable emails (remove `return` lines in `email.py` — 7 functions), decide on attendee onboarding flow (magic link distribution vs self-registration vs Rhuna webhook auto-create). Pouneh Bligaard already asking via LinkedIn. Blocked on Rhuna webhook go-live (Sveat says next week).
-2. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); internal staff now excluded from candidates; reports run as background jobs (no more 504). Next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors.
-3. **Schedule `ingest_extasy.py` on a cron** — script is now idempotent; scheduling it (Railway cron or GitHub Action, hourly) closes the last manual step.
-4. **Align CEO dashboard with Rhuna** — CEO dash reads from stale Google Sheet, matchmaker reads Extasy live. Talk to Steffie about shared definitions. Optionally point CEO dash at Extasy API directly.
+1. **Ship the extasy_sync fix** — uncommitted changes on `backend/app/models/attendee.py` and `backend/app/services/extasy_sync.py` fix three bugs (silent skip, ORM blindness to `extasy_order_id`/`country_iso3`, session poisoning). Tested locally — `inserted: 0, backfilled: 26, errors: 0`; Supabase ticket holders 81 → 107. Next: write Alembic migration mirroring the ORM column additions, commit + push, verify Railway logs the next 02:00 UTC `pipeline complete`.
+2. **Change Extasy sync cadence to every 5h** — once the fix is live and verified, edit `backend/app/main.py:49` from `CronTrigger(hour=2, minute=0)` to `IntervalTrigger(hours=5)` per Karl's request. Do not change the cron *before* confirming the fix actually works in prod, otherwise it'll fail 5× more often.
+3. **Add `last_extasy_sync_at` to admin dashboard** — surface the timestamp of the most recent successful sync so silent drift is detectable next time. Bug #3 only became visible because Karl asked about ticket-holder counts; a "Last sync: 8 days ago" indicator would have caught it weeks earlier.
+4. **Open platform to attendees** — re-enable emails (remove `return` lines in `email.py` — 7 functions), decide on attendee onboarding flow (magic link distribution vs self-registration vs Rhuna webhook auto-create). Pouneh Bligaard already asking via LinkedIn. Blocked on Rhuna webhook go-live (Sveat says next week).
+5. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); internal staff now excluded from candidates; reports run as background jobs (no more 504). Next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors.
 
 ## Soon
 
+- **Align CEO dashboard with Rhuna** — CEO dash reads from stale Google Sheet, matchmaker reads Extasy live. Talk to Steffie about shared definitions. Optionally point CEO dash at Extasy API directly.
+- **Multi-ticket buyer modeling** — 25 valid Extasy orders are reassigned/multi-ticket purchases by a single buyer. Currently those secondary attendees aren't represented in `attendees` (one-row-per-buyer-email). Decide whether to model per-ticket-holder or stay buyer-centric.
 - **AI Meeting Prep Briefs** — generate formal briefing doc per scheduled meeting (partially done via concierge chat)
 - **Session Matchmaking** — match attendees to conference sessions based on goals/intent
 - **Matchmaking Lunch Algorithm** — group attendees into optimised lunch tables
@@ -29,6 +32,9 @@
 
 ## Done ✓
 
+- ✓ **Ticket holder export for Karl (2026-04-27/28)** — `backend/scripts/export_ticket_holders.py` outputs `exports/ticket_holders_company_position.csv` with name/email/company/position/ticket_type/country/LinkedIn. Position falls back to `enriched_profile.linkedin.headline` when registration title empty (lifts position coverage 15% → 79%). Final CSV: 107 ticket holders, 76% company, 79% position, 86% LinkedIn URL.
+- ✓ **Three production extasy_sync bugs fixed locally (2026-04-27/28)** — (1) silent skip on existing rows now backfills `extasy_order_id` always; (2) ORM model now declares `extasy_order_id` + `country_iso3` columns (previously silently ignored on every UPDATE/INSERT); (3) per-row Postgres SAVEPOINT via `db.begin_nested()` prevents one bad row from poisoning the whole batch (was causing 100+ cascading errors and zero inserts every night). Local test: backfilled 26 previously-orphan ticket holders, 0 errors. Supabase ticket-holder count 81 → 107. Awaiting commit + deploy + Railway verification.
+- ✓ **Railway CLI installed + linked (2026-04-27)** — `brew install railway`, project linked to `observant-achievement` (the auto-generated Railway codename for POT). Use `railway logs --json --lines 5000` for diagnostics.
 - ✓ Rhuna ticket audit (2026-04-24) — `backend/scripts/rhuna_ticket_audit.py` exports per-attendee CSV of Extasy ticket name + paid/free status + voucher code, to answer Ferd's DELEGATE-ticket question. Live Extasy API + Supabase join. 125 valid orders: 76 FREE, 49 PAID (€67,497.64). Deferred: surfacing `extasy_ticket_name` + `is_comped` in the `POT Attendees` sheet (only if Ferd asks).
 - ✓ URL validation — auto `https://` prepend on blur
 - ✓ Fix messaging empty state — explains mutual-accept requirement + shortcut to matches

@@ -483,3 +483,50 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - **LinkedIn validator** (`backend/scripts/validate_linkedin.py`): checks scraped slug + headline against attendee's registered name/company. Heuristics: accept abbreviations (`abhiguj` for Abhilash Gujar), accept initial+last patterns (`jbouteloup`, `pjahnke`, `o-antonova`), hard-fail on different first-name token in slug (Jaime → Fernando), escape hatch when headline mentions attendee's last name or company. Of 107 LinkedIn-enriched: 98 OK, 4 suspicious, 5 auto-cleaned (Aditya/d5ter, Welcome to Proof of Talk placeholder, Richard Holmes/mineaction, Sebastian Felipe name-swap, Jaime Pena/Fernando).
 - **Manual cleanup**: 3 wrong-person matches the validator missed because slug surnames matched as substrings: Razvan Paun → razvanalexpaun (Amazon Alexa, not Dragonfly), Aurélien Cambron → cambronne (different surname), Xavier Gomez → xaviertenaqueralt (different surname).
 - **Final re-enrichment**: full 116-attendee batch with `--force --skip-linkedin` regenerated all AI summaries, intent tags, embeddings using cleaned data. Final coverage: **87% LinkedIn URL (101/116), 84% LinkedIn data (98/116), 31% Grid (36/116), 58% website, 100% AI summary + embedding**.
+
+## 2026-04-27 / 2026-04-28 — Ticket-holder export for Karl + critical extasy_sync bugs uncovered & fixed
+
+**Triggered by Karl asking for a CSV of ticket holders with company + position.** Building the export surfaced a chain of three production bugs that explain why Supabase ticket-holder data has been silently drifting from Rhuna for weeks.
+
+### Karl's CSV
+- **New `backend/scripts/export_ticket_holders.py`** — pulls everyone with `extasy_order_id IS NOT NULL` from Supabase; falls back to `enriched_profile.linkedin.headline` when the registration `title` is empty (since most Rhuna ticket holders never filled in a job title). Output: `backend/exports/ticket_holders_company_position.csv` (gitignored). Final coverage with all fixes applied: **107 ticket holders, 76% company, 79% position, 86% LinkedIn URL**.
+- LinkedIn scrape backfill: ran `scripts/linkedin_scrape.py` against the 59 holders who had a URL but no title — 97 enriched, headlines populated under `enriched_profile.linkedin.headline`. The export script now uses headline as the position fallback (lifts position coverage from 15% → 79%).
+
+### Bug #1 — Silent skip on existing rows (`extasy_sync.py:171-172`)
+- Previous behavior: when a ticket order's email matched an existing attendee row (e.g. someone already in attendees via the speaker/nomination path), the sync only updated the row if it was a tier upgrade. Otherwise it incremented `skipped` and **never wrote the `extasy_order_id` back**.
+- Effect: ~26 paying attendees (Francesco Castle, Joanna Kelly, William De'Ath, Jordan Leech, Devon Euring, Javier Bastardo, Lukasz Dec, etc.) had profiles + matches but their ticket-holder linkage was invisible.
+
+### Bug #2 — ORM model missing two columns
+- `attendees` table has top-level `extasy_order_id VARCHAR` and `country_iso3 VARCHAR(3)` columns (added via Alembic at some point), but **the SQLAlchemy `Attendee` ORM class never declared them**. Setting `attendee.extasy_order_id = "..."` did nothing — SQLAlchemy ignored the attribute on UPDATE/INSERT.
+- Effect: even when `extasy_sync` *tried* to backfill these fields, nothing persisted. This had been silently broken since the columns were added.
+- **Fix**: added both columns to `backend/app/models/attendee.py` as `Mapped[str | None]` with `extasy_order_id` indexed.
+
+### Bug #3 — Session poisoning in `sync_extasy_to_db()` (the catastrophic one)
+- Production scheduler logs (`railway logs --json --lines 5000`) showed the 02:00 UTC daily Extasy sync **firing every night but inserting zero rows**. First order each night that triggered an `IntegrityError: duplicate key value violates unique constraint "attendees_email_key"` poisoned the SQLAlchemy session; the per-iteration `try/except` logged the error but didn't `await db.rollback()`, so every subsequent flush() failed with `"This Session's transaction has been rolled back due to a previous exception"`. Final `await db.commit()` ran against a poisoned session → nothing persisted.
+- Logs from 2026-04-27 02:00 UTC showed 99 cascading errors and **zero `pipeline complete` log entries** — the function never returned successfully.
+- **Fix**: wrapped each row in `async with db.begin_nested()` (Postgres SAVEPOINT). One bad row now rolls back its own savepoint without affecting siblings. Added separate `IntegrityError` handler (warning) vs general `Exception` handler (error). Added defensive `await db.rollback()` if the final commit ever fails.
+- Why the IntegrityError happens at all (Bug #2 underneath): when the ORM didn't know about `extasy_order_id`, every nightly sync would try to INSERT (since SELECT-by-email might miss whitespace-padded versions inserted by other paths), hit a unique-violation on the email, poison, cascade.
+
+### Verification
+- Local `sync_and_enrich()` after all three fixes: `inserted: 0, backfilled: 26, upgraded: 0, skipped: 81, errors: 0`. Supabase HEAD count: **107 attendees with `extasy_order_id` populated** (was 81). Lukasz, Francesco verified linked.
+- Remaining gap: 132 valid Extasy orders → 107 unique buyer emails = 25 multi-ticket / reassigned-ticket buyers. Those secondary attendees aren't in `attendees` because the model is one-row-per-buyer-email. Documented as a known limitation, not currently fixed.
+
+### Files touched
+- `backend/app/models/attendee.py` — added `extasy_order_id` + `country_iso3` to ORM
+- `backend/app/services/extasy_sync.py` — savepoint per row, always-backfill on existing, separate IntegrityError handler, `backfilled` counter added to stats
+- `backend/scripts/export_ticket_holders.py` — new
+- `backend/scripts/rhuna_full_export.py` — new (already-present helper used during diagnosis)
+- `backend/scripts/rhuna_ticket_audit.py` — already present
+- `backend/exports/ticket_holders_company_position.csv` — gitignored output
+
+### Operational findings (handover-critical)
+- **Daily 02:00 UTC scheduler IS running** in Railway (`railway logs` confirmed timestamps). It just produced zero useful work since the bugs were introduced. Now that fixes are in, it should write properly.
+- **Dashboard at meet.proofoftalk.io always *looked* current** because the dashboard reads live from Extasy API on every page load — masking the underlying Supabase drift completely. Add a `last_extasy_sync_at` indicator so this kind of silent failure is detectable next time.
+- **Railway CLI installed locally** via `brew install railway`, project linked to `observant-achievement` (the random Railway codename for POT). Useful for future log diagnostics: `cd /Users/kanyuchi/Developer/Proof_Of_Talk_CD && railway logs --json --lines 5000`.
+
+### Not yet done (carried into whats_next.md)
+- Alembic migration mirroring the ORM column additions (DB and model are aligned because the columns were added by hand at some point; a fresh DB stand-up would diverge without a migration).
+- Commit + push the two-file fix.
+- Verify on Railway after deploy that the scheduler now logs `pipeline complete`.
+- Change `main.py:49` from `CronTrigger(hour=2, minute=0)` to `IntervalTrigger(hours=5)` per Karl's request — only after fixed sync confirmed working in production.
+- Add `last_extasy_sync_at` timestamp to admin dashboard for drift visibility.

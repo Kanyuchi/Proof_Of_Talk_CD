@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 
 import httpx
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attendee import Attendee, TicketType
@@ -113,91 +114,141 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
 
     inserted      = 0
     upgraded      = 0
+    backfilled    = 0
     skipped       = 0
     errors        = 0
     inserted_ids: list[str] = []
     seen_emails: set[str] = set()
 
     for order in valid_orders:
-        try:
-            ticket_name = (order.get("ticketNames") or "").split(",")[0].strip()
+        order_id    = order.get("id")
+        ticket_name = (order.get("ticketNames") or "").split(",")[0].strip()
 
-            # Skip test/internal tickets
-            if ticket_name.lower().strip() in TEST_TICKET_NAMES:
-                continue
-
-            email = (order.get("email") or "").strip().lower()
-            if not email:
-                continue
-
-            # Deduplicate within this batch — keep highest tier
-            if email in seen_emails:
-                continue
-            seen_emails.add(email)
-
-            first = (order.get("firstName") or "").strip()
-            last  = (order.get("lastName")  or "").strip()
-            name  = f"{first} {last}".strip() or "Unknown"
-
-            ticket_type              = _map_ticket_type(ticket_name)
-            company, company_website = _infer_company(email)
-
-            enriched_profile = {
-                "source":          "extasy",
-                "extasy_order_id": order.get("id"),
-                "ticket_code":     (order.get("ticketCodes") or "").split(",")[0].strip(),
-                "ticket_name":     ticket_name,
-                "phone":           order.get("phoneNumber") or None,
-                "city":            order.get("city") or None,
-                "country":         order.get("countryIso3Code") or None,
-                "paid_amount":     order.get("paymentsAmount") or None,
-                "voucher_code":    order.get("voucherCode") or None,
-                "synced_at":       datetime.now(timezone.utc).isoformat(),
-            }
-
-            # Upsert by email
-            result   = await db.execute(select(Attendee).where(Attendee.email == email))
-            existing = result.scalar_one_or_none()
-
-            if existing:
-                # Upgrade ticket type if the new one is higher tier
-                if _tier_index(ticket_type) > _tier_index(existing.ticket_type):
-                    existing.ticket_type = ticket_type
-                    existing.updated_at  = datetime.utcnow()
-                    # Merge enriched_profile so we don't overwrite existing enrichment
-                    merged = {**enriched_profile, **(existing.enriched_profile or {})}
-                    existing.enriched_profile = merged
-                    upgraded += 1
-                else:
-                    skipped += 1
-            else:
-                attendee = Attendee(
-                    name=name,
-                    email=email,
-                    company=company,
-                    title="",
-                    ticket_type=ticket_type,
-                    interests=[],
-                    goals=None,
-                    company_website=company_website or None,
-                    enriched_profile=enriched_profile,
-                )
-                db.add(attendee)
-                await db.flush()   # get the auto-assigned UUID
-                inserted_ids.append(str(attendee.id))
-                inserted += 1
-
-        except Exception as exc:
-            logger.error("extasy_sync: error processing order %s: %s", order.get("id"), exc)
-            errors += 1
+        # Skip test/internal tickets
+        if ticket_name.lower().strip() in TEST_TICKET_NAMES:
             continue
 
-    await db.commit()
+        email = (order.get("email") or "").strip().lower()
+        if not email:
+            continue
+
+        # Deduplicate within this batch — keep first occurrence
+        if email in seen_emails:
+            continue
+        seen_emails.add(email)
+
+        first = (order.get("firstName") or "").strip()
+        last  = (order.get("lastName")  or "").strip()
+        name  = f"{first} {last}".strip() or "Unknown"
+
+        ticket_type              = _map_ticket_type(ticket_name)
+        company, company_website = _infer_company(email)
+        country_iso3             = order.get("countryIso3Code") or None
+
+        enriched_profile = {
+            "source":          "extasy",
+            "extasy_order_id": order_id,
+            "ticket_code":     (order.get("ticketCodes") or "").split(",")[0].strip(),
+            "ticket_name":     ticket_name,
+            "phone":           order.get("phoneNumber") or None,
+            "city":            order.get("city") or None,
+            "country":         country_iso3,
+            "paid_amount":     order.get("paymentsAmount") or None,
+            "voucher_code":    order.get("voucherCode") or None,
+            "synced_at":       datetime.now(timezone.utc).isoformat(),
+        }
+
+        # Per-row savepoint isolates failures so one bad row can't poison the
+        # whole batch (previous behavior caused 100+ cascading "session has been
+        # rolled back" errors after a single IntegrityError).
+        try:
+            async with db.begin_nested():
+                result   = await db.execute(select(Attendee).where(Attendee.email == email))
+                existing = result.scalar_one_or_none()
+
+                if existing:
+                    changed = False
+
+                    # Backfill the ticket-holder linkage if this attendee
+                    # entered via another path (speaker sync, nomination, etc.)
+                    # and we never recorded their Rhuna order.
+                    if not getattr(existing, "extasy_order_id", None):
+                        existing.extasy_order_id = order_id
+                        changed = True
+                    if not getattr(existing, "country_iso3", None) and country_iso3:
+                        existing.country_iso3 = country_iso3
+                        changed = True
+
+                    # Merge Extasy fields into enriched_profile without
+                    # clobbering anything already there (existing data wins).
+                    merged = {**enriched_profile, **(existing.enriched_profile or {})}
+                    if merged != (existing.enriched_profile or {}):
+                        existing.enriched_profile = merged
+                        changed = True
+
+                    # Upgrade ticket type only if the new one is higher tier
+                    upgraded_tier = False
+                    if _tier_index(ticket_type) > _tier_index(existing.ticket_type):
+                        existing.ticket_type = ticket_type
+                        upgraded_tier = True
+                        changed = True
+
+                    if changed:
+                        existing.updated_at = datetime.utcnow()
+                        await db.flush()
+                        if upgraded_tier:
+                            upgraded += 1
+                        else:
+                            backfilled += 1
+                    else:
+                        skipped += 1
+                else:
+                    attendee = Attendee(
+                        name=name,
+                        email=email,
+                        company=company,
+                        title="",
+                        ticket_type=ticket_type,
+                        interests=[],
+                        goals=None,
+                        company_website=company_website or None,
+                        enriched_profile=enriched_profile,
+                    )
+                    # Top-level columns that aren't on the ORM class but exist
+                    # in the schema (added via Alembic). Set via __dict__ so
+                    # SQLAlchemy passes them through on INSERT.
+                    if country_iso3:
+                        attendee.country_iso3 = country_iso3
+                    attendee.extasy_order_id = order_id
+                    db.add(attendee)
+                    await db.flush()   # get the auto-assigned UUID
+                    inserted_ids.append(str(attendee.id))
+                    inserted += 1
+        except IntegrityError as exc:
+            # Rare race: SELECT didn't find the row but INSERT hit the unique
+            # index. Savepoint already rolled back; outer transaction is healthy.
+            # Next sync run will SELECT successfully and update normally.
+            logger.warning(
+                "extasy_sync: integrity conflict on order %s (email=%s) — savepoint rolled back, will reconcile next run: %s",
+                order_id, email, exc,
+            )
+            errors += 1
+        except Exception as exc:
+            logger.error("extasy_sync: error processing order %s: %s", order_id, exc)
+            errors += 1
+
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        logger.error("extasy_sync: final commit failed, rolled back: %s", exc)
+        raise
 
     result_stats = {
         "total_fetched":  total_fetched,
         "valid_count":    len(valid_orders),
         "inserted":       inserted,
+        "backfilled":     backfilled,
         "upgraded":       upgraded,
         "skipped":        skipped,
         "errors":         errors,

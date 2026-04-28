@@ -1,6 +1,6 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-04-24 (LinkedIn discovery + scrape, Grid URL-fallback, full re-enrichment — 60% LinkedIn coverage, 31% Grid)
+**Last updated:** 2026-04-28 (extasy_sync three-bug fix in flight: silent skip + ORM-blind columns + session poisoning. 107 ticket holders properly linked, was 81. Awaiting commit + deploy.)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · **Railway** (backend) · **Resend** (email) · Netlify (frontend)
 
 ---
@@ -40,6 +40,8 @@
 - **Profile photos** — user-uploaded only; AttendeeAvatar falls back to ui-avatars styled initials when no photo is set
 - **Ferd outreach sheet sync (`POT Attendees` tab)** — Google Apps Script bound to `PoT26_Master_Email_Database_v3` polls Supabase via the read-only `attendees_sync` view every hour; mirrors 86 attendees into a `POT Attendees` tab plus a `POT Sync Log` tab for run metadata. Never touches `MERGED - All Investors` (which Ferd's `mergeInvestorTabs()` rebuilds on every run). Read-only anon key scoped to 6 columns; no write-back to Supabase. Repo copy of script at `docs/integrations/sheets_sync/Code.gs`.
 - **Idempotent `ingest_extasy.py`** — `upsert_to_supabase()` now INSERTs new emails and PATCHes only Rhuna-authoritative fields (`extasy_order_id`, `extasy_ticket_code`, `extasy_ticket_name`, `phone_number`, `city`, `country_iso3`, `ticket_bought_at`, `ticket_type`) on existing rows via a diff-only PATCH. Enrichment data (`enriched_profile`, `ai_summary`, `embedding`, `interests`, `goals`, etc.) is never overwritten. Safe to re-run and safe to schedule.
+- **`extasy_sync` service hardened (2026-04-28, awaiting deploy)** — `app/services/extasy_sync.py` rewritten with per-row Postgres SAVEPOINT (`db.begin_nested()`) so a single bad row can't poison the whole batch (was causing every nightly run to insert zero rows). Also now backfills `extasy_order_id` + `country_iso3` + merges Extasy fields into `enriched_profile` on every existing-row match, even when the ticket type isn't an upgrade (was silently skipping). New `backfilled` counter in stats.
+- **Ticket holder export** — `backend/scripts/export_ticket_holders.py` produces `exports/ticket_holders_company_position.csv` (gitignored) for outreach lists. Pulls everyone with `extasy_order_id IS NOT NULL` from Supabase; uses `enriched_profile.linkedin.headline` as the position field when registration title is empty.
 
 ## Infrastructure
 
@@ -54,6 +56,9 @@
 
 ## Broken / Incomplete
 
+- **Extasy sync fix not yet deployed** — local fix verified (107 ticket holders properly linked, was 81), but Railway is still running the broken version. Until next push: `extasy_order_id` and `country_iso3` will not populate on production INSERT/UPDATE; the daily 02:00 UTC scheduler will continue logging 99-error cascades and inserting nothing. Also missing: an Alembic migration for the two columns (DB and ORM are aligned by hand at the moment).
+- **Multi-ticket buyers under-counted** — 132 valid Extasy orders → 107 unique buyer emails = 25 reassigned/multi-ticket purchases by a single buyer. Those secondary attendees are not represented as separate `attendees` rows. Matchmaker treats one row per buyer email.
+- **Dashboard has no `last_extasy_sync_at` indicator** — the sync silently failed for ~6 days before Karl's question surfaced it. The dashboard reads live from Extasy on every page load, so revenue/ticket counts always look fresh and mask the underlying Supabase drift.
 - **Email template design** — match intro email is functional but needs design polish for production use (layout, branding, content)
 - **Grid coverage ceiling** — 23/85 attendees (27%) verified by The Grid. Remaining 62 are companies genuinely not indexed by Grid (confirmed via name + URL + email-domain probes). Would need Grid to expand their index or manual canonical-name dict for edge cases.
 - **Attendee onboarding flow** — attendees like Pouneh Bligaard have Rhuna tickets but no user accounts on the platform. No self-serve path to get matches until emails are re-enabled or magic links are distributed.
@@ -85,17 +90,19 @@
 - **Deploy**: push to `main` → Railway auto-deploys backend, Netlify auto-deploys frontend (GitHub App relinked 2026-04-15)
 - **EC2 + RDS**: both decommissioned/stopped. RDS snapshot: `pot-matchmaker-preretire-20260415-0757`
 
-## Current Numbers (2026-04-19)
+## Current Numbers (2026-04-28)
 
-- **85 attendees** in Supabase (after removing 6 seeds/test + merging 4 duplicate pairs)
-- **234 matches** at avg score 0.713 (10 deal_ready / 21 non_obvious / 203 complementary)
-- **23 Grid-verified** (27% coverage — confirmed ceiling via name + URL + email-domain probes)
-- **Rhuna/Extasy**: 189 total orders, 102 valid (99 paid + 3 redeemed), ~€64k revenue
+- **107 ticket holders** in Supabase with `extasy_order_id` properly linked (was 81 before today's backfill)
+- **116 attendees** total (ticket holders + speakers + nominees)
+- **234 matches** at avg score 0.713 (last full re-rank: 2026-04-24)
+- **Rhuna/Extasy**: 253 total orders, 138 valid PAID/REDEEMED, 132 non-test, 107 unique buyer emails, ~€71.5k revenue
 - **All emails disabled** until platform opens to attendees
+- **Daily Extasy sync** — fires at 02:00 UTC on Railway but currently insert-zero due to bugs being fixed. Local fix verified, awaiting deploy.
 
 ## Current Focus
 
+- **Ship the extasy_sync fix** (uncommitted on `main`) → verify Railway → change cron to every 5h
+- **Add `last_extasy_sync_at` indicator** to admin dashboard so silent drift is detectable
 - Re-enable emails + attendee onboarding when platform is ready for attendees to sign in
 - Sponsor intelligence rollout — Victor pitching pilot reports
-- Schedule `ingest_extasy.py` on a cron for auto-sync
 - Align CEO dashboard with matchmaker dashboard revenue figures
