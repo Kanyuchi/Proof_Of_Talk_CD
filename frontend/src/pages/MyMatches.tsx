@@ -357,6 +357,18 @@ export default function MyMatches() {
                       </div>
                     )}
 
+                    {/* About this person — bio / AI summary */}
+                    {person.ai_summary && (
+                      <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                        <div className="text-xs text-white/40 font-medium mb-2 uppercase tracking-wider">
+                          About {person.name.split(" ")[0]}
+                        </div>
+                        <p className="text-sm text-white/60 leading-relaxed">
+                          {person.ai_summary}
+                        </p>
+                      </div>
+                    )}
+
                     {/* AI Explanation — collapsible if long */}
                     <div className="p-4 rounded-xl bg-[#E76315]/5 border border-[#E76315]/10">
                       <div className="flex items-center gap-2 text-xs text-[#E76315] font-medium mb-2">
