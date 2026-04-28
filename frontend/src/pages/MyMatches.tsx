@@ -358,10 +358,10 @@ export default function MyMatches() {
                     )}
 
                     {/* About this person — bio / AI summary */}
-                    {person.ai_summary && (
+                    {person?.ai_summary && (
                       <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                         <div className="text-xs text-white/40 font-medium mb-2 uppercase tracking-wider">
-                          About {person.name.split(" ")[0]}
+                          About {person.name?.split(" ")[0] ?? "this attendee"}
                         </div>
                         <p className="text-sm text-white/60 leading-relaxed">
                           {person.ai_summary}
