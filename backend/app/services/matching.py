@@ -217,6 +217,14 @@ class MatchingEngine:
         return False
 
     def _is_candidate_eligible(self, attendee: Attendee, candidate: Attendee) -> bool:
+        # Drop POT / X Ventures organiser staff from candidate sets — they're
+        # not real attendees from a matchmaker perspective. Zohair + Victor
+        # are allowlisted (see staff_filter.ALLOWED_NAMES) so they remain
+        # matchable in both directions.
+        from app.services.staff_filter import is_internal_staff
+        if is_internal_staff(candidate):
+            return False
+
         # Respect each side's explicit exclusions.
         attendee_exclusions = self._norm_set(getattr(attendee, "not_looking_for", []))
         candidate_exclusions = self._norm_set(getattr(candidate, "not_looking_for", []))
