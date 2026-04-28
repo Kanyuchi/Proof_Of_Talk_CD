@@ -24,9 +24,9 @@ class AttendeeCreate(BaseModel):
 class AttendeeResponse(BaseModel):
     id: UUID
     name: str
-    email: str
-    company: str
-    title: str
+    email: str | None = None
+    company: str | None = None
+    title: str | None = None
     ticket_type: str
     interests: list[str]
     goals: str | None
