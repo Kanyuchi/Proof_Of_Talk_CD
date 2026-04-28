@@ -15,7 +15,7 @@
 ## Soon
 
 - **Align CEO dashboard with Rhuna** — CEO dash reads from stale Google Sheet, matchmaker reads Extasy live. Talk to Steffie about shared definitions. Optionally point CEO dash at Extasy API directly.
-- **Multi-ticket buyer modeling** — 25 valid Extasy orders are reassigned/multi-ticket purchases by a single buyer. Currently those secondary attendees aren't represented in `attendees` (one-row-per-buyer-email). Decide whether to model per-ticket-holder or stay buyer-centric.
+- **Reassigned-ticket attendee onboarding** — 23 reassigned tickets exist on Extasy where the buyer purchased extra passes for colleagues. Decision (2026-04-28): **do not auto-create skeleton attendee rows** — Extasy `tickets.ticketOwners` is too sparse to be useful (often just `"Journalist 1"`, `"Francesco"` first-name-only, `"Steffi Press Pass test"`; no email, no company, no LinkedIn). Auto-creating would pollute the matchmaker with 18+ ghost rows that match no one. Instead: (a) build a buyer-facing flow on the magic-link page — "You bought N tickets, tell us about your N-1 colleagues (name, email, LinkedIn)" and only create rows once the buyer fills real data, or (b) let the colleague self-register on the matchmaking app. Until either path is built, ~23 paying conference attendees remain invisible to the matchmaker by design.
 - **AI Meeting Prep Briefs** — generate formal briefing doc per scheduled meeting (partially done via concierge chat)
 - **Session Matchmaking** — match attendees to conference sessions based on goals/intent
 - **Matchmaking Lunch Algorithm** — group attendees into optimised lunch tables
