@@ -34,6 +34,9 @@ const matchScoreColor: Record<string, string> = {
 export default function Attendees() {
   const { data, isLoading } = useAttendees();
   const attendees = data?.attendees ?? [];
+  // Show the unpaginated total from the API rather than the rendered list
+  // length (which was capped at the page-size limit).
+  const totalAttendees = data?.total ?? attendees.length;
   const { user } = useAuth();
   const { data: matchData } = useMatches(user?.attendee_id ?? undefined);
 
@@ -79,7 +82,7 @@ export default function Attendees() {
         <div>
           <h1 className="text-3xl font-bold">Attendees</h1>
           <p className="text-white/50 mt-1">
-            {attendees.length} decision-makers registered
+            {isLoading ? "Loading…" : `${totalAttendees} decision-makers registered`}
           </p>
         </div>
       </div>
