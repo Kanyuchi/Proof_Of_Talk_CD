@@ -584,3 +584,23 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - Outputs: `backend/exports/grid_unmatched_triage.md` (human-readable, send to Grid team after manual scrub) + `.csv` (batch-friendly).
 - Known false positives in HIGH (manual scrub before sending): `vanlanschotkempen.com` (bank, "bitcoin" keyword caught a single attendee bio), `undp.org` (UN agency), `drofa-ra.co.uk` (PR agency for crypto clients), `arabbank.ch` (traditional bank).
 - Genuinely Grid-worthy at first glance: castlelabs.io, mpmlabs.xyz, eternax.ai, flight3.xyz, youhodler.com, kula.com, theqrl.org, dragonflydigitalassets.fund, sakurafinance.com, ~25 others.
+
+## 2026-04-29 19:55 — Closed Supabase RLS advisor warning
+
+### What
+Migration `f3a8c5d29014` — `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` on the 9 matchmaker-owned public tables that had RLS off (`alembic_version, attendees, conversations, grid_audit_runs, matches, messages, thread_posts, threads, users`). No policies added — the `anon` role has nothing to do here.
+
+### Why
+Supabase advisor flagged `rls_disabled_in_public` (email "Critical Issue: Table publicly accessible"). With RLS off + tables granted to `anon`, anyone with the project URL + anon key could read/edit/delete. Frontend doesn't use the anon key (verified — no `@supabase/supabase-js` imports), backend uses `postgres` role via `DATABASE_URL` which bypasses RLS as table owner. Locking anon out is safe.
+
+### NOT touched (deliberately)
+`cold_outreach`, `nominations`, `speakers` — RLS already on with intentional anon policies (1000 Minds shared tables in the same Supabase project, not ours).
+
+### Verified
+- `alembic upgrade head` applied cleanly.
+- All public tables now `rowsecurity = true`.
+- `SELECT COUNT(*) FROM attendees` as postgres role: 130 rows — owner bypasses RLS, backend unaffected.
+
+### Important follow-ups
+- **Rotate the Supabase DB password** — it leaked into Claude's terminal output during diagnosis (stripped only the literal "PASSWORD" keyword from the .env line, not the value). Fresh password via Supabase Dashboard → Database → Reset Password, then update `.env` + Railway env vars.
+- The Supabase advisor warning email may take up to ~1h to re-evaluate and clear.
