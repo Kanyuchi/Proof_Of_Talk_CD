@@ -13,6 +13,7 @@ from app.core.database import Base
 from app.models.attendee import Attendee, Match  # noqa: F401 - ensure models are registered
 from app.models.user import User  # noqa: F401
 from app.models.message import Conversation, Message  # noqa: F401
+from app.models.grid_audit_run import GridAuditRun  # noqa: F401
 
 settings = get_settings()
 config = context.config

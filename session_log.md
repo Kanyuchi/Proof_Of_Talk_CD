@@ -551,3 +551,28 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - `docs/mockups/match-dossier.html` — new
 - `backend/scripts/grid_backfill_domains.py` — new
 - `backend/exports/grid_domain_coverage.csv` — refreshed
+## 2026-04-29 18:50 — Daily Grid audit wired into Railway scheduler
+
+### What
+- New `grid_audit_runs` table — one row per daily audit, with totals + new-matches list + unmatched-domains list. Migration `e1f2d4a36789`.
+- New service `app/services/grid_audit.py` — runs the audit using the same URL-search primitive as `enrich_from_grid()`, persists a row via SQLAlchemy, exposes `last_audit()` for the admin dashboard.
+- New scheduler job in `app/main.py`: 02:30 UTC daily, after Extasy (02:00) and speakers (02:15). Logs structured summary on each run.
+
+### Why
+- `scripts/grid_domain_audit.py` was a manual one-off. Numbers went stale (5 days). Wiring into the Railway scheduler that already runs the daily Extasy + speakers sync gives us a daily fresh row, addressable from the dashboard.
+
+### Verified
+- `alembic upgrade head` applied cleanly.
+- End-to-end smoke test via `run_and_persist()`: 83 domains, 24 matched, 32/100 attendees covered, duration 74.56s, row persisted (id 733a186b…), `last_audit()` readback works.
+- `new_matches=0` — confirms today's earlier backfill landed cleanly across the 3 domains discovered in the previous run.
+
+### Files touched
+- `backend/alembic/versions/e1f2d4a36789_add_grid_audit_runs.py` — new
+- `backend/alembic/env.py` — register GridAuditRun model
+- `backend/app/models/grid_audit_run.py` — new
+- `backend/app/services/grid_audit.py` — new
+- `backend/app/main.py` — third scheduler job
+
+### Not yet
+- Admin dashboard surface for the audit history. The data is queryable via `last_audit()` but no UI yet — defer.
+- Task 3: triage the 59 unmatched domains.

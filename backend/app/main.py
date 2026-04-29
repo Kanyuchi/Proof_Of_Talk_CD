@@ -44,16 +44,31 @@ async def _daily_speakers_sync():
     except Exception as exc:
         logger.error("scheduler: daily speakers sync failed", error=str(exc))
 
+async def _daily_grid_audit():
+    try:
+        from app.services.grid_audit import run_and_persist
+        summary = await run_and_persist()
+        logger.info("scheduler: daily grid audit complete",
+                    matched_domains=summary["matched_domains"],
+                    total_domains=summary["total_domains"],
+                    matched_attendees=summary["matched_attendees"],
+                    total_attendees=summary["total_attendees"],
+                    new_matches=len(summary["new_matches"]))
+    except Exception as exc:
+        logger.error("scheduler: daily grid audit failed", error=str(exc))
+
 scheduler = AsyncIOScheduler()
 # Run every day at 02:00 UTC — after midnight registrations settle
 scheduler.add_job(_daily_extasy_sync, CronTrigger(hour=2, minute=0, timezone="UTC"))
 # Speakers sync at 02:15 UTC — after Extasy sync completes
 scheduler.add_job(_daily_speakers_sync, CronTrigger(hour=2, minute=15, timezone="UTC"))
+# Grid coverage audit at 02:30 UTC — after both sync jobs settle
+scheduler.add_job(_daily_grid_audit, CronTrigger(hour=2, minute=30, timezone="UTC"))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
-    logger.info("scheduler: started — extasy sync 02:00 UTC, speakers sync 02:15 UTC")
+    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30 (UTC)")
     yield
     scheduler.shutdown(wait=False)
     logger.info("scheduler: stopped")
