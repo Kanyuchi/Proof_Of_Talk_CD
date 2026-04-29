@@ -1,0 +1,60 @@
+domain,company,classification,reason,n_attendees,signals,verticals
+dragonflydigitalassets.fund,Dragonflydigitalassets,HIGH,"Web3-native signals: crypto, decentralised",2,crypto;decentralised,decentralized_finance;tokenisation_of_finance
+kula.com,Kula,HIGH,"Web3-native signals: blockchain, crypto, exchange, rwa, tokeniz",2,blockchain;crypto;exchange;rwa;tokeniz;web3,ecosystem_and_foundations;infrastructure_and_scaling
+mpmlabs.xyz,Mpmlabs,HIGH,"Web3-native signals: blockchain, decentralized, real-world asset, tokeniz, web3",2,blockchain;decentralized;real-world asset;tokeniz;web3,tokenisation_of_finance
+arabbank.ch,Arabbank,HIGH,Web3-native signals: blockchain,1,blockchain,decentralized_finance;tokenisation_of_finance
+astrid.global,Astrid,HIGH,Web3-native signals: crypto,1,crypto,ai_depin_frontier_tech;decentralized_ai
+aureliusaligned.ai,Aureliusaligned,HIGH,"Web3-native signals: blockchain, crypto, decentralized",1,blockchain;crypto;decentralized,decentralized_ai;infrastructure_and_scaling
+babslabs.io,Babslabs,HIGH,"Web3-native signals: crypto, onchain, web3",1,crypto;onchain;web3,ai_depin_frontier_tech;ecosystem_and_foundations;infrastructure_and_scaling
+castlelabs.io,Castlelabs,HIGH,"Web3-native signals: crypto, dao, defi, web3",1,crypto;dao;defi;web3,decentralized_finance;ecosystem_and_foundations;infrastructure_and_scaling
+clearstreet.io,Clearstreet,HIGH,"Web3-native signals: bitcoin, blockchain, custody, defi, on-chain",1,bitcoin;blockchain;custody;defi;on-chain;tokeniz,infrastructure_and_scaling
+coineasy.xyz,Coineasy,HIGH,"Web3-native signals: crypto, web3",1,crypto;web3,culture_media_gaming;ecosystem_and_foundations;infrastructure_and_scaling
+cryptocoulisses.com,Cryptocoulisses,HIGH,"Web3-native signals: bitcoin, blockchain, crypto, web3",1,bitcoin;blockchain;crypto;web3,culture_media_gaming
+cryptomondayslondon.com,Cryptomondayslondon,HIGH,Web3-native signals: crypto,1,crypto,decentralized_finance
+decentric.media,Decentric,HIGH,"Web3-native signals: decentralized, defi",1,decentralized;defi,ai_depin_frontier_tech;culture_media_gaming;decentralized_ai
+dexlaboratory.com,Dexlaboratory,HIGH,"Web3-native signals: blockchain, web3",1,blockchain;web3,decentralized_finance;infrastructure_and_scaling;tokenisation_of_finance
+drofa-ra.co.uk,Drofa Ra,HIGH,"Web3-native signals: blockchain, crypto, web3",1,blockchain;crypto;web3,culture_media_gaming;ecosystem_and_foundations
+eternax.ai,Eternax,HIGH,"Web3-native signals: blockchain, crypto, on-chain, rwa, stablecoin",1,blockchain;crypto;on-chain;rwa;stablecoin;tokeniz,infrastructure_and_scaling
+exp.science,Exp,HIGH,"Web3-native signals: blockchain, nft",1,blockchain;nft,ai_depin_frontier_tech;decentralized_ai;ecosystem_and_foundations
+flight3.xyz,Flight3,HIGH,"Web3-native signals: crypto, defi, solana, web3",1,crypto;defi;solana;web3,ai_depin_frontier_tech;culture_media_gaming;ecosystem_and_foundations
+ibcgroup.io,Ibcgroup,HIGH,Web3-native signals: web3,1,web3,culture_media_gaming;ecosystem_and_foundations
+insigniatech.xyz,Insigniatech,HIGH,Web3-native signals: decentralized,1,decentralized,ai_depin_frontier_tech;decentralized_ai
+metagraph.inc,Metagraph,HIGH,Web3-native signals: rwa,1,rwa,ai_depin_frontier_tech;ecosystem_and_foundations;infrastructure_and_scaling
+monolythic.com,Monolythic,HIGH,"Web3-native signals: defi, web3",1,defi;web3,ecosystem_and_foundations;infrastructure_and_scaling
+phosphor.co,Phosphor,HIGH,Web3-native signals: defi,1,defi,ai_depin_frontier_tech;infrastructure_and_scaling
+rayleigh.re,Rayleigh,HIGH,Web3-native signals: web3,1,web3,decentralized_finance;infrastructure_and_scaling
+sakurafinance.com,Sakurafinance,HIGH,"Web3-native signals: on-chain, stablecoin",1,on-chain;stablecoin,decentralized_finance;tokenisation_of_finance
+stsdigital.io,Stsdigital,HIGH,Web3-native signals: rwa,1,rwa,decentralized_finance;tokenisation_of_finance
+swarm124.com,Swarm124,HIGH,"Web3-native signals: blockchain, on-chain",1,blockchain;on-chain,ai_depin_frontier_tech;infrastructure_and_scaling
+taoweave.ai,Taoweave,HIGH,Web3-native signals: decentralized,1,decentralized,decentralized_ai
+theqrl.org,Theqrl,HIGH,"Web3-native signals: crypto, decentralized",1,crypto;decentralized,ai_depin_frontier_tech;infrastructure_and_scaling
+thiqwave.com,Thiqwave,HIGH,"Web3-native signals: custody, stablecoin",1,custody;stablecoin,decentralized_finance;infrastructure_and_scaling
+trustedstake.ai,Trustedstake,HIGH,Web3-native signals: staking,1,staking,decentralized_ai;decentralized_finance
+undp.org,Undp,HIGH,Web3-native signals: web3,1,web3,ai_depin_frontier_tech;ecosystem_and_foundations
+vanlanschotkempen.com,Vanlanschotkempen,HIGH,Web3-native signals: bitcoin,1,bitcoin,decentralized_finance;tokenisation_of_finance
+venturalabs.ai,Venturalabs,HIGH,Web3-native signals: decentralized,1,decentralized,ai_depin_frontier_tech;decentralized_ai;infrastructure_and_scaling
+wealth3capital.com,Wealth3Capital,HIGH,"Web3-native signals: blockchain, on-chain, web3",1,blockchain;on-chain;web3,decentralized_finance;tokenisation_of_finance
+yelay.io,Yelay,HIGH,Web3-native signals: web3,1,web3,decentralized_finance;tokenisation_of_finance
+youhodler.com,Youhodler,HIGH,"Web3-native signals: crypto, web3",1,crypto;web3,decentralized_finance;tokenisation_of_finance
+atos.net,Atos,MED,"Web3-adjacent: vertical ai_depin_frontier_tech,decentralized_ai,infrastructure_and_scaling + consulting, digital asset, digital assets",2,consulting;digital asset;digital assets,ai_depin_frontier_tech;decentralized_ai;infrastructure_and_scaling
+aztecai.ai,Aztecai,MED,"Web3 vertical tag (ecosystem_and_foundations,infrastructure_and_scaling) but no descriptive Web3 keywords",1,,ecosystem_and_foundations;infrastructure_and_scaling
+babelbit.ai,Babelbit,MED,"Web3 vertical tag (ai_depin_frontier_tech,decentralized_ai,infrastructure_and_scaling) but no descriptive Web3 keywords",1,,ai_depin_frontier_tech;decentralized_ai;infrastructure_and_scaling
+bridevalleypartners.com,Bridevalleypartners,MED,"Web3-adjacent: vertical decentralized_finance,tokenisation_of_finance + digital asset, digital assets, fintech",1,digital asset;digital assets;fintech,decentralized_finance;tokenisation_of_finance
+crowdform.co.uk,Crowdform,MED,"Web3 vertical tag (culture_media_gaming,ecosystem_and_foundations,infrastructure_and_scaling) but no descriptive Web3 keywords",1,,culture_media_gaming;ecosystem_and_foundations;infrastructure_and_scaling
+de-ath.net,De Ath,MED,"Web3 vertical tag (ai_depin_frontier_tech,infrastructure_and_scaling) but no descriptive Web3 keywords",1,,ai_depin_frontier_tech;infrastructure_and_scaling
+halley86.com,Halley86,MED,"Web3-adjacent: vertical decentralized_finance,infrastructure_and_scaling + venture capital",1,venture capital,decentralized_finance;infrastructure_and_scaling
+libertefinance.io,Libertefinance,MED,"Web3 vertical tag (decentralized_finance,tokenisation_of_finance) but no descriptive Web3 keywords",1,,decentralized_finance;tokenisation_of_finance
+luxen-wealth.ae,Luxen Wealth,MED,"Web3-adjacent: vertical decentralized_finance,tokenisation_of_finance + consulting, family office",1,consulting;family office,decentralized_finance;tokenisation_of_finance
+newatlantis.io,Newatlantis,MED,"Web3 vertical tag (decentralized_finance,tokenisation_of_finance) but no descriptive Web3 keywords",1,,decentralized_finance;tokenisation_of_finance
+reef.pl,Reef,MED,"Web3 vertical tag (decentralized_finance,infrastructure_and_scaling) but no descriptive Web3 keywords",1,,decentralized_finance;infrastructure_and_scaling
+secureb4.global,Secureb4,MED,"Web3 vertical tag (ai_depin_frontier_tech,decentralized_ai) but no descriptive Web3 keywords",1,,ai_depin_frontier_tech;decentralized_ai
+talanoa.me,Talanoa,MED,Web3 vertical tag (ai_depin_frontier_tech) but no descriptive Web3 keywords,1,,ai_depin_frontier_tech
+vlmkt.com.br,Vlmkt,MED,"Web3 vertical tag (ecosystem_and_foundations,infrastructure_and_scaling) but no descriptive Web3 keywords",1,,ecosystem_and_foundations;infrastructure_and_scaling
+wello.ai,Wello,MED,"Web3 vertical tag (ai_depin_frontier_tech,culture_media_gaming) but no descriptive Web3 keywords",1,,ai_depin_frontier_tech;culture_media_gaming
+speaker.proofoftalk.io,,LOW,Generic platform / academic / non-company domain,5,,
+xlides.com,Xlides,LOW,Traditional firm with possible Web3 interest (venture capital),2,venture capital,
+alpscapital.io,Alpscapital,LOW,No Web3 signals found in available enrichment,1,,
+google.com,,LOW,Generic platform / academic / non-company domain,1,,
+iheartmedia.com,,LOW,Generic platform / academic / non-company domain,1,,
+kcl.ac.uk,,LOW,Generic platform / academic / non-company domain,1,,
+launchub.com,Launchub,LOW,Traditional firm with possible Web3 interest (venture capital),1,venture capital,

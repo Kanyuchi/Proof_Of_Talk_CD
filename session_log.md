@@ -576,3 +576,11 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 ### Not yet
 - Admin dashboard surface for the audit history. The data is queryable via `last_audit()` but no UI yet — defer.
 - Task 3: triage the 59 unmatched domains.
+
+## 2026-04-29 19:05 — Triage of unmatched audit domains
+
+- New `backend/scripts/grid_unmatched_triage.py` — pulls the latest `grid_audit_runs.unmatched_domains` list, fetches each domain's attendee enrichment from Supabase, classifies via keyword + vertical-tag heuristics into HIGH / MED / LOW.
+- Latest run (59 unmatched): HIGH=37, MED=15, LOW=7.
+- Outputs: `backend/exports/grid_unmatched_triage.md` (human-readable, send to Grid team after manual scrub) + `.csv` (batch-friendly).
+- Known false positives in HIGH (manual scrub before sending): `vanlanschotkempen.com` (bank, "bitcoin" keyword caught a single attendee bio), `undp.org` (UN agency), `drofa-ra.co.uk` (PR agency for crypto clients), `arabbank.ch` (traditional bank).
+- Genuinely Grid-worthy at first glance: castlelabs.io, mpmlabs.xyz, eternax.ai, flight3.xyz, youhodler.com, kula.com, theqrl.org, dragonflydigitalassets.fund, sakurafinance.com, ~25 others.
