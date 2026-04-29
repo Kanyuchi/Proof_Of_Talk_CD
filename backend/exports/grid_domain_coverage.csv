@@ -1,0 +1,84 @@
+domain,attendee_count,had_grid_before,grid_slug,grid_name,grid_profile_url,matched_url,profile_type,sector,match_strategy
+alpscapital.io,1,False,,,,,,,
+arabbank.ch,1,False,,,,,,,
+astrid.global,1,False,,,,,,,
+atos.net,2,False,,,,,,,
+aureliusaligned.ai,1,False,,,,,,,
+aztecai.ai,1,True,,,,,,,
+babelbit.ai,1,False,,,,,,,
+babslabs.io,1,True,,,,,,,
+bridevalleypartners.com,1,False,,,,,,,
+bundesblock.de,1,False,blockchain_bundesverband,Blockchain Bundesverband,https://thegrid.id/profiles/blockchain_bundesverband,https://bundesblock.de,non_profit,Industry Bodies & Trade Associations,url_contains
+carbon-ratings.com,1,True,crypto_carbon_ratings_institute,Crypto Carbon Ratings Institute,https://thegrid.id/profiles/crypto_carbon_ratings_institute,https://carbon-ratings.com,company,Data & Analytics,url_contains
+cardanofoundation.org,1,True,cardano,Cardano,https://thegrid.id/profiles/cardano,https://cardanofoundation.org/en/terms-and-conditions,network,Blockchain Platforms,url_contains
+castlelabs.io,1,False,,,,,,,
+centrifuge.io,1,True,centrifuge,Centrifuge,https://thegrid.id/profiles/centrifuge,https://centrifuge.io,company,Finance,url_contains
+clearstreet.io,1,False,,,,,,,
+coineasy.xyz,1,False,,,,,,,
+coinshares.com,1,True,coinshares,CoinShares,https://thegrid.id/profiles/coinshares,https://coinshares.com,company,Finance,url_contains
+crowdform.co.uk,1,False,,,,,,,
+cryptocoulisses.com,1,False,,,,,,,
+cryptomondayslondon.com,1,False,,,,,,,
+de-ath.net,1,False,,,,,,,
+decentric.media,1,False,,,,,,,
+dexlaboratory.com,1,True,,,,,,,
+digital-euro-association.de,1,False,digital_euro_association,Digital Euro Association,https://thegrid.id/profiles/digital_euro_association,https://home.digital-euro-association.de,project,Industry Bodies & Trade Associations,url_contains
+dragonflydigitalassets.fund,2,False,,,,,,,
+dreadnoughtsolutions.com,1,True,dreadnought_solutions,Dreadnought Solutions,https://thegrid.id/profiles/dreadnought_solutions,https://dreadnoughtsolutions.com,company,Accounting and Legal,url_contains
+drofa-ra.co.uk,1,False,,,,,,,
+eternax.ai,1,False,,,,,,,
+exp.science,1,False,,,,,,,
+flight3.xyz,1,False,,,,,,,
+genventures.xyz,1,True,generative_ventures,Generative Ventures,https://thegrid.id/profiles/generative_ventures,https://www.genventures.xyz,investor,Venture Capital,url_contains
+google.com,1,True,,,,,,,
+gunnercooke.com,2,True,gunnercooke,gunnercooke,https://thegrid.id/profiles/gunnercooke,https://gunnercooke.com,company,Accounting and Legal,url_contains
+halley86.com,1,False,,,,,,,
+ibcgroup.io,1,False,,,,,,,
+iheartmedia.com,1,False,,,,,,,
+insigniatech.xyz,1,False,,,,,,,
+kcl.ac.uk,1,False,,,,,,,
+kraken.com,1,True,kraken,Kraken,https://thegrid.id/profiles/kraken,https://blog.kraken.com,company,Finance,url_contains
+kucoin.com,1,True,kucoin,KuCoin,https://thegrid.id/profiles/kucoin,https://www.kucoin.com,company,Finance,url_contains
+kula.com,2,False,,,,,,,
+launchub.com,1,False,,,,,,,
+libertefinance.io,1,False,,,,,,,
+luxen-wealth.ae,1,False,,,,,,,
+meridyan.xyz,1,True,meridyan,Meridyan,https://thegrid.id/profiles/meridyan,https://meridyan.xyz,company,Infrastructure,url_contains
+metagraph.inc,1,False,,,,,,,
+monolythic.com,1,False,,,,,,,
+mpmlabs.xyz,2,False,,,,,,,
+newatlantis.io,1,False,,,,,,,
+phosphor.co,1,False,,,,,,,
+proofoftalk.io,4,True,proof_of_talk,Proof of Talk,https://thegrid.id/profiles/proof_of_talk,https://www.proofoftalk.io,company,Community & Events,url_contains
+rayleigh.re,1,False,,,,,,,
+reef.pl,1,False,,,,,,,
+rulespark.com,1,True,rulespark,RuleSpark,https://thegrid.id/profiles/rulespark,https://rulespark.com,company,Accounting and Legal,url_contains
+sakurafinance.com,1,False,,,,,,,
+sandbox.game,1,True,the_sandbox,The Sandbox,https://thegrid.id/profiles/the_sandbox,https://www.sandbox.game,company,Gaming,url_contains
+secureb4.global,1,False,,,,,,,
+softstack.io,1,True,softstack,SoftStack,https://thegrid.id/profiles/softstack,https://softstack.io,company,Service Provider,url_contains
+speaker.proofoftalk.io,5,True,,,,,,,
+stablecoinstandard.com,1,False,stablecoin_standard,Stablecoin Standard,https://thegrid.id/profiles/stablecoin_standard,https://stablecoinstandard.com,project,Industry Bodies & Trade Associations,url_contains
+stake.capital,1,True,stake_capital_group,Stake Capital Group,https://thegrid.id/profiles/stake_capital_group,https://www.stake.capital,investor,Venture Capital,url_contains
+stsdigital.io,1,False,,,,,,,
+summ.com,1,True,summ,Summ,https://thegrid.id/profiles/summ,https://summ.com,company,Accounting and Legal,url_contains
+sundaebar.ai,1,True,sundae_bar,sundae_bar,https://thegrid.id/profiles/sundae_bar,https://www.sundaebar.ai,company,Data & Analytics,url_contains
+swarm124.com,1,False,,,,,,,
+talanoa.me,1,False,,,,,,,
+taoweave.ai,1,False,,,,,,,
+theblock.co,1,True,the_block,The Block,https://thegrid.id/profiles/the_block,https://www.theblock.co,company,Media,url_contains
+theqrl.org,1,False,,,,,,,
+thiqwave.com,1,False,,,,,,,
+trustedstake.ai,1,False,,,,,,,
+ubyx.xyz,1,True,ubyx,Ubyx,https://thegrid.id/profiles/ubyx,https://www.ubyx.xyz,company,Payments,url_contains
+undp.org,1,False,,,,,,,
+vanlanschotkempen.com,1,False,,,,,,,
+venturalabs.ai,1,False,,,,,,,
+vlmkt.com.br,1,False,,,,,,,
+wealth3capital.com,1,False,,,,,,,
+wello.ai,1,False,,,,,,,
+womenincrypto.org,1,True,the_association_for_women_in_crypto,The Association For Women In Crypto,https://thegrid.id/profiles/the_association_for_women_in_crypto,https://www.womenincrypto.org,project,Community & Events,url_contains
+xlides.com,2,False,,,,,,,
+xventures.de,5,True,xventures,XVentures,https://thegrid.id/profiles/xventures,https://xventures.de,investor,Venture Capital,url_contains
+yelay.io,1,False,,,,,,,
+youhodler.com,1,False,,,,,,,

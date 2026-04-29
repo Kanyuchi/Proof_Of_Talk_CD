@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Match Dossier — Proof of Talk 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500&family=Poppins:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink:        #1a1410;
+      --ink-soft:   #3a2f26;
+      --paper:      #f6efe2;
+      --paper-2:    #efe5d9;
+      --paper-3:    #e8dcc8;
+      --gold:       #b08545;
+      --gold-lt:    #d6b27a;
+      --gold-dk:    #8a6730;
+      --orange:     #E76315;
+      --orange-lt:  #FF833A;
+      --rule:       rgba(26,20,16,0.18);
+      --rule-soft:  rgba(26,20,16,0.10);
+      --serif:      'Playfair Display', 'Cormorant Garamond', serif;
+      --serif-soft: 'Cormorant Garamond', 'Playfair Display', serif;
+      --sans:       'Poppins', system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #2a221a;
+      font-family: var(--sans);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    .stage {
+      max-width: 880px;
+      margin: 48px auto;
+      padding: 0 24px;
+    }
+
+    /* ------- Paper / dossier sheet ------- */
+    .dossier {
+      position: relative;
+      background:
+        radial-gradient(ellipse at top left, rgba(176,133,69,0.07), transparent 55%),
+        radial-gradient(ellipse at bottom right, rgba(176,133,69,0.06), transparent 60%),
+        linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+      padding: 64px 72px 56px;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,0.6) inset,
+        0 0 0 1px rgba(176,133,69,0.18),
+        0 30px 60px -20px rgba(0,0,0,0.55),
+        0 60px 120px -40px rgba(0,0,0,0.45);
+      border-radius: 2px;
+    }
+
+    /* subtle paper grain */
+    .dossier::before {
+      content: "";
+      position: absolute; inset: 0;
+      pointer-events: none;
+      background-image:
+        radial-gradient(rgba(58,47,38,0.04) 1px, transparent 1px),
+        radial-gradient(rgba(58,47,38,0.03) 1px, transparent 1px);
+      background-size: 3px 3px, 5px 5px;
+      background-position: 0 0, 1px 2px;
+      mix-blend-mode: multiply;
+      opacity: 0.55;
+      border-radius: inherit;
+    }
+
+    /* gilt corner ornaments */
+    .corner {
+      position: absolute;
+      width: 56px; height: 56px;
+      border: 1px solid var(--gold);
+      opacity: 0.55;
+    }
+    .corner.tl { top: 18px; left: 18px;  border-right: none; border-bottom: none; }
+    .corner.tr { top: 18px; right: 18px; border-left: none;  border-bottom: none; }
+    .corner.bl { bottom: 18px; left: 18px;  border-right: none; border-top: none; }
+    .corner.br { bottom: 18px; right: 18px; border-left: none;  border-top: none; }
+
+    /* ------- Header ------- */
+    .ribbon {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--sans);
+      font-size: 10.5px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .ribbon .seal {
+      font-family: var(--serif);
+      font-style: italic;
+      letter-spacing: 0.06em;
+      text-transform: none;
+      color: var(--gold-dk);
+      font-size: 13px;
+    }
+
+    .titleblock {
+      text-align: center;
+      padding: 40px 0 8px;
+    }
+    .titleblock .eyebrow {
+      font-family: var(--serif-soft);
+      font-style: italic;
+      color: var(--gold-dk);
+      font-size: 16px;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+    }
+    .titleblock h1 {
+      font-family: var(--serif);
+      font-weight: 800;
+      font-size: 64px;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      margin: 0;
+      color: var(--ink);
+    }
+    .titleblock h1 .amp {
+      font-style: italic;
+      font-weight: 500;
+      color: var(--orange);
+      padding: 0 6px;
+    }
+    .titleblock .meta {
+      margin-top: 18px;
+      font-family: var(--sans);
+      font-size: 11px;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+
+    .gilt-rule {
+      display: flex; align-items: center; justify-content: center;
+      gap: 14px;
+      margin: 30px 0 36px;
+    }
+    .gilt-rule .line {
+      flex: 1; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold) 30%, var(--gold) 70%, transparent);
+    }
+    .gilt-rule .diamond {
+      width: 8px; height: 8px;
+      background: var(--gold);
+      transform: rotate(45deg);
+    }
+
+    /* ------- Subjects ------- */
+    .subjects {
+      display: grid;
+      grid-template-columns: 1fr 56px 1fr;
+      gap: 0;
+      align-items: stretch;
+    }
+    .subject { padding: 6px 4px 0; }
+    .subject .badge {
+      display: inline-block;
+      font-family: var(--sans);
+      font-size: 9.5px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--gold-dk);
+      border: 1px solid var(--gold);
+      padding: 4px 10px;
+      margin-bottom: 14px;
+    }
+    .subject.right { text-align: right; }
+    .subject.right .badge { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+    .portrait {
+      width: 132px; height: 132px;
+      border-radius: 50%;
+      background: var(--paper-3);
+      border: 1px solid var(--gold);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 8px 18px -8px rgba(0,0,0,0.25);
+      margin-bottom: 18px;
+      position: relative;
+    }
+    .subject.right .portrait { margin-left: auto; }
+    .portrait::after {
+      content: "";
+      position: absolute; inset: 6px;
+      border-radius: 50%;
+      border: 1px dashed rgba(176,133,69,0.35);
+    }
+    .portrait .initials {
+      font-family: var(--serif);
+      font-size: 44px;
+      font-weight: 600;
+      color: var(--ink);
+      letter-spacing: 0.02em;
+    }
+
+    .subject h2 {
+      font-family: var(--serif);
+      font-weight: 700;
+      font-size: 28px;
+      line-height: 1.1;
+      margin: 0 0 4px;
+      color: var(--ink);
+    }
+    .subject .role {
+      font-family: var(--serif-soft);
+      font-style: italic;
+      font-size: 17px;
+      color: var(--ink-soft);
+      margin-bottom: 4px;
+    }
+    .subject .company {
+      font-family: var(--sans);
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gold-dk);
+    }
+
+    .subject .bio {
+      margin-top: 16px;
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--ink-soft);
+    }
+    .subject .signals {
+      margin-top: 14px;
+      font-family: var(--sans);
+      font-size: 11px;
+      color: var(--ink-soft);
+    }
+    .subject .signals dt {
+      font-size: 9.5px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--gold-dk);
+      margin-top: 8px;
+    }
+    .subject .signals dd { margin: 2px 0 0; line-height: 1.5; }
+
+    .center-mark {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .center-mark .vrule {
+      position: absolute; top: 12px; bottom: 12px;
+      width: 1px;
+      background: linear-gradient(180deg, transparent, var(--gold) 20%, var(--gold) 80%, transparent);
+    }
+    .center-mark .glyph {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: var(--paper);
+      border: 1px solid var(--gold);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 24px;
+      color: var(--orange);
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 0 0 4px var(--paper);
+    }
+
+    /* ------- Verdict ------- */
+    .verdict {
+      margin: 46px 0 8px;
+      padding: 30px 36px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.0));
+      border-top: 1px solid var(--gold);
+      border-bottom: 1px solid var(--gold);
+      position: relative;
+    }
+    .verdict .label {
+      position: absolute;
+      top: -10px; left: 50%; transform: translateX(-50%);
+      background: var(--paper);
+      padding: 0 14px;
+      font-family: var(--sans);
+      font-size: 10px;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+      color: var(--gold-dk);
+    }
+    .verdict blockquote {
+      margin: 0;
+      font-family: var(--serif);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 22px;
+      line-height: 1.45;
+      color: var(--ink);
+      text-align: center;
+    }
+    .verdict blockquote::before {
+      content: "“";
+      font-family: var(--serif);
+      font-size: 56px;
+      color: var(--gold);
+      line-height: 0;
+      vertical-align: -16px;
+      margin-right: 6px;
+    }
+    .verdict blockquote::after {
+      content: "”";
+      font-family: var(--serif);
+      font-size: 56px;
+      color: var(--gold);
+      line-height: 0;
+      vertical-align: -28px;
+      margin-left: 6px;
+    }
+    .verdict .attribution {
+      text-align: center;
+      margin-top: 16px;
+      font-family: var(--sans);
+      font-size: 10.5px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+    }
+
+    /* ------- Anatomy / metrics ------- */
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin: 48px 0 18px;
+    }
+    .section-head .num {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 16px;
+      color: var(--gold-dk);
+      letter-spacing: 0.04em;
+      min-width: 28px;
+    }
+    .section-head h3 {
+      font-family: var(--serif);
+      font-weight: 700;
+      font-size: 22px;
+      margin: 0;
+      color: var(--ink);
+      letter-spacing: 0.01em;
+    }
+    .section-head .line {
+      flex: 1; height: 1px;
+      background: var(--rule);
+    }
+
+    .anatomy {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      column-gap: 28px;
+      row-gap: 18px;
+      align-items: center;
+    }
+    .anatomy .name {
+      font-family: var(--serif-soft);
+      font-style: italic;
+      font-size: 16px;
+      color: var(--ink);
+    }
+    .anatomy .name small {
+      display: block;
+      font-style: normal;
+      font-family: var(--sans);
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gold-dk);
+      margin-top: 2px;
+    }
+    .bar {
+      position: relative;
+      height: 6px;
+      background: var(--paper-3);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar .fill {
+      position: absolute; top: 0; left: 0; bottom: 0;
+      background: linear-gradient(90deg, var(--gold-dk), var(--gold-lt));
+      border-radius: 999px;
+    }
+    .bar.accent .fill {
+      background: linear-gradient(90deg, var(--orange), var(--orange-lt));
+    }
+    .anatomy .value {
+      grid-column: 2;
+      margin-top: -6px;
+      font-family: var(--serif);
+      font-size: 14px;
+      font-style: italic;
+      color: var(--ink-soft);
+      display: flex; justify-content: space-between;
+    }
+    .anatomy .value .num-big {
+      font-family: var(--serif);
+      font-style: normal;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--ink);
+      letter-spacing: 0.04em;
+    }
+
+    /* ------- Shared terrain (chips) ------- */
+    .terrain {
+      display: flex; flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      font-family: var(--sans);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border: 1px solid var(--gold);
+      color: var(--ink);
+      background: rgba(255,255,255,0.4);
+      border-radius: 2px;
+    }
+    .chip.solid {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+    }
+
+    /* ------- Synergies + Acts ------- */
+    .twocol {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+    }
+    .synergy {
+      font-family: var(--serif-soft);
+      font-style: italic;
+      font-size: 17px;
+      line-height: 1.5;
+      color: var(--ink);
+      padding-left: 14px;
+      border-left: 2px solid var(--gold);
+      margin: 0 0 14px;
+    }
+
+    .acts { list-style: none; padding: 0; margin: 0; counter-reset: act; }
+    .acts li {
+      counter-increment: act;
+      display: grid;
+      grid-template-columns: 38px 1fr;
+      align-items: baseline;
+      padding: 12px 0;
+      border-bottom: 1px dashed var(--rule-soft);
+    }
+    .acts li:last-child { border-bottom: none; }
+    .acts li::before {
+      content: counter(act, upper-roman) ".";
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 18px;
+      color: var(--gold-dk);
+    }
+    .acts li span {
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--ink);
+    }
+
+    /* ------- Setting ------- */
+    .setting {
+      margin-top: 16px;
+      padding: 22px 26px;
+      background: var(--ink);
+      color: var(--paper);
+      border-radius: 2px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+    }
+    .setting .field .k {
+      font-family: var(--sans);
+      font-size: 9.5px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold-lt);
+      margin-bottom: 6px;
+    }
+    .setting .field .v {
+      font-family: var(--serif);
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--paper);
+      line-height: 1.25;
+    }
+    .setting .field .v em {
+      font-style: italic;
+      font-weight: 400;
+      color: var(--gold-lt);
+    }
+
+    /* ------- Footer ------- */
+    .footer {
+      margin-top: 56px;
+      padding-top: 20px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+    }
+    .footer .wordmark {
+      font-family: var(--serif);
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 0.04em;
+      color: var(--ink);
+    }
+    .footer .wordmark span { color: var(--orange); }
+    .footer .wordmark small {
+      display: block;
+      font-family: var(--serif-soft);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 13px;
+      color: var(--ink-soft);
+      letter-spacing: 0.02em;
+      margin-top: 2px;
+    }
+    .footer .stamp {
+      text-align: right;
+      font-family: var(--sans);
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--ink-soft);
+      line-height: 1.7;
+    }
+    .footer .stamp .conf {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 4px 10px;
+      border: 1px solid var(--gold);
+      color: var(--gold-dk);
+      letter-spacing: 0.18em;
+    }
+
+    /* ------- Print ------- */
+    @media print {
+      html, body { background: white; }
+      .stage { margin: 0; padding: 0; max-width: none; }
+      .dossier { box-shadow: none; padding: 36px 44px; }
+    }
+
+    @media (max-width: 720px) {
+      .stage { padding: 0 12px; margin: 24px auto; }
+      .dossier { padding: 36px 24px; }
+      .titleblock h1 { font-size: 42px; }
+      .subjects { grid-template-columns: 1fr; }
+      .center-mark { padding: 24px 0; }
+      .center-mark .vrule { display: none; }
+      .subject.right { text-align: left; }
+      .subject.right .portrait { margin-left: 0; }
+      .anatomy { grid-template-columns: 1fr; }
+      .twocol { grid-template-columns: 1fr; gap: 16px; }
+      .setting { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <article class="dossier">
+      <span class="corner tl"></span>
+      <span class="corner tr"></span>
+      <span class="corner bl"></span>
+      <span class="corner br"></span>
+
+      <!-- Ribbon -->
+      <div class="ribbon">
+        <span>Dossier № 0042</span>
+        <span class="seal">Salon des Rencontres</span>
+        <span>02 · 06 · 2026</span>
+      </div>
+
+      <!-- Title -->
+      <header class="titleblock">
+        <div class="eyebrow">A curated introduction, prepared for</div>
+        <h1>Zohair <span class="amp">&amp;</span> Victor</h1>
+        <div class="meta">Deal-Ready · Overall 0.78 · Confidence 0.80</div>
+      </header>
+
+      <div class="gilt-rule">
+        <span class="line"></span>
+        <span class="diamond"></span>
+        <span class="line"></span>
+      </div>
+
+      <!-- Subjects -->
+      <section class="subjects">
+        <div class="subject">
+          <span class="badge">VIP · Founder</span>
+          <div class="portrait"><span class="initials">ZD</span></div>
+          <h2>Zohair Dehnadi</h2>
+          <div class="role">Chief Executive Officer</div>
+          <div class="company">Proof of Talk</div>
+          <p class="bio">
+            Founding partner and host of Europe's premier Web3 &amp; AI gathering. Building the room he wishes existed —
+            decision-makers, builders, and capital, in one palace, for two days.
+          </p>
+          <dl class="signals">
+            <dt>Sectors</dt>
+            <dd>Investment &amp; Capital Markets · Infrastructure &amp; Scaling · Tokenisation of Finance</dd>
+            <dt>Intent</dt>
+            <dd>Seeking partnerships · Raising capital · Deal-making</dd>
+            <dt>In their words</dt>
+            <dd><em>“Meet future business partners.”</em></dd>
+          </dl>
+        </div>
+
+        <div class="center-mark">
+          <span class="vrule"></span>
+          <span class="glyph">&amp;</span>
+        </div>
+
+        <div class="subject right">
+          <span class="badge">VIP · Investor</span>
+          <div class="portrait"><span class="initials">VB</span></div>
+          <h2>Victor Blas</h2>
+          <div class="role">Head of Investment</div>
+          <div class="company">X Ventures</div>
+          <p class="bio">
+            Early-stage Web3 &amp; blockchain investor running X Ventures' DeAI accelerator. Writes first cheques where
+            the thesis is unproven and the team is right.
+          </p>
+          <dl class="signals">
+            <dt>Sectors</dt>
+            <dd>Investment &amp; Capital Markets · Tokenisation of Finance · Infrastructure &amp; Scaling</dd>
+            <dt>Intent</dt>
+            <dd>Deploying capital · Deal-making · Seeking partnerships</dd>
+            <dt>In their words</dt>
+            <dd><em>“I want to meet early-stage start-ups.”</em></dd>
+          </dl>
+        </div>
+      </section>
+
+      <!-- Verdict -->
+      <section class="verdict">
+        <span class="label">The Curator's Verdict</span>
+        <blockquote>
+          Victor is actively deploying capital into early-stage institutional custody and Layer-2 infrastructure —
+          the exact territory Zohair is building inside. Both arrive deal-ready: one with a thesis and a cheque,
+          the other with a thesis and a need. A short conversation here can save a long quarter elsewhere.
+        </blockquote>
+        <div class="attribution">— GPT-4o, on behalf of the Matchmaker</div>
+      </section>
+
+      <!-- Anatomy -->
+      <div class="section-head">
+        <span class="num">I.</span>
+        <h3>Anatomy of the Match</h3>
+        <span class="line"></span>
+      </div>
+      <div class="anatomy">
+        <div class="name">Embedding similarity<small>Semantic overlap</small></div>
+        <div class="bar"><span class="fill" style="width: 61%"></span></div>
+        <div class="value"><span>How alike they read on paper.</span><span class="num-big">0.61</span></div>
+
+        <div class="name">Complementary score<small>What one has, the other wants</small></div>
+        <div class="bar"><span class="fill" style="width: 85%"></span></div>
+        <div class="value"><span>Sectors, intent, and ICP signal-keyword overlap.</span><span class="num-big">0.85</span></div>
+
+        <div class="name">Overall score<small>Ranked verdict</small></div>
+        <div class="bar accent"><span class="fill" style="width: 78%"></span></div>
+        <div class="value"><span>Final ordering across all 196 matches.</span><span class="num-big">0.78</span></div>
+      </div>
+
+      <!-- Shared terrain -->
+      <div class="section-head">
+        <span class="num">II.</span>
+        <h3>Shared Terrain</h3>
+        <span class="line"></span>
+      </div>
+      <div class="terrain">
+        <span class="chip solid">Investment &amp; Capital Markets</span>
+        <span class="chip solid">Infrastructure &amp; Scaling</span>
+        <span class="chip">Tokenisation of Finance</span>
+        <span class="chip">Layer-2 / Custody</span>
+        <span class="chip">Institutional Web3</span>
+      </div>
+
+      <!-- Synergies + Acts -->
+      <div class="section-head">
+        <span class="num">III.</span>
+        <h3>Synergies &amp; Suggested Acts</h3>
+        <span class="line"></span>
+      </div>
+      <div class="twocol">
+        <div>
+          <p class="synergy">Capital deployment for blockchain infrastructure.</p>
+          <p class="synergy">Strategic partnerships in tokenisation, with a bias to institutional rails.</p>
+          <p class="synergy">A founding-partner relationship — beyond a single cheque.</p>
+        </div>
+        <ol class="acts">
+          <li><span>Discuss potential investment in blockchain infrastructure projects.</span></li>
+          <li><span>Explore co-investment opportunities in tokenisation start-ups.</span></li>
+          <li><span>Evaluate Layer-2 solutions for institutional custody.</span></li>
+        </ol>
+      </div>
+
+      <!-- Setting -->
+      <div class="section-head">
+        <span class="num">IV.</span>
+        <h3>The Setting</h3>
+        <span class="line"></span>
+      </div>
+      <div class="setting">
+        <div class="field">
+          <div class="k">Where</div>
+          <div class="v">Salon Denon<br/><em>Louvre Palace, Paris</em></div>
+        </div>
+        <div class="field">
+          <div class="k">When</div>
+          <div class="v">Day One · 16:20<br/><em>Twenty quiet minutes</em></div>
+        </div>
+        <div class="field">
+          <div class="k">Format</div>
+          <div class="v">Standing introduction<br/><em>followed by a private aside</em></div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <div class="wordmark">
+          PROOF OF TALK <span>·</span> 2026
+          <small>The Louvre Palace · 02–03 June</small>
+        </div>
+        <div class="stamp">
+          Match ID&nbsp;&nbsp;POT-2026-0042<br/>
+          Generated&nbsp;&nbsp;29 April 2026<br/>
+          <span class="conf">Confidence 0.80</span>
+        </div>
+      </footer>
+    </article>
+  </div>
+</body>
+</html>

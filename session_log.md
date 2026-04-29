@@ -530,3 +530,24 @@ Append-only. Never delete entries. Oldest at top, newest at bottom.
 - Verify on Railway after deploy that the scheduler now logs `pipeline complete`.
 - Change `main.py:49` from `CronTrigger(hour=2, minute=0)` to `IntervalTrigger(hours=5)` per Karl's request — only after fixed sync confirmed working in production.
 - Add `last_extasy_sync_at` timestamp to admin dashboard for drift visibility.
+
+## 2026-04-29 17:40 — Match dossier mockup + Grid coverage backfill
+
+### Match dossier mockup
+- `docs/mockups/match-dossier.html` — single-file Louvre-themed dossier presenting one match (Zohair ↔ Victor, deal_ready 0.78). Cream paper, gilt rules, Playfair + Poppins, no code change. Inspiration: proofoftalk.io (fetch was 403-blocked by Cloudflare; used in-repo brand tokens from `frontend/src/index.css` instead).
+
+### Grid coverage audit + backfill
+- Re-ran `backend/scripts/grid_domain_audit.py` (was 5 days stale — manual one-off, not scheduled).
+  - 24 Apr → 29 Apr: 72→83 domains, 88→100 attendees on company emails, 21→24 Grid matches. Coverage rate flat at 32% of company-email attendees (~9 attendees on personal/gmail-style domains are excluded by design).
+  - Three new Grid profiles surfaced by URL-contains search that the original name-based enrichment missed: `bundesblock.de` → Blockchain Bundesverband, `digital-euro-association.de` → Digital Euro Association, `stablecoinstandard.com` → Stablecoin Standard.
+- New script `backend/scripts/grid_backfill_domains.py` — surgical, idempotent backfill for specific email domains. Reuses `enrich_from_grid()` so the resulting `enriched_profile.grid` shape is identical to the main pipeline.
+  - Dry-run, then live run: 3/3 attendees patched (Daniela Boback, Manuel Müller, Christian Walker), all sector "Industry Bodies & Trade Associations". Verified by direct Supabase query.
+- Refreshed `backend/exports/grid_domain_coverage.csv` (24 → 29 April).
+
+### Root cause of staleness
+- `grid_domain_audit.py` is a manual command. There is no scheduler invoking it. Will be addressed next.
+
+### Files touched
+- `docs/mockups/match-dossier.html` — new
+- `backend/scripts/grid_backfill_domains.py` — new
+- `backend/exports/grid_domain_coverage.csv` — refreshed
