@@ -604,3 +604,43 @@ Supabase advisor flagged `rls_disabled_in_public` (email "Critical Issue: Table 
 ### Important follow-ups
 - **Rotate the Supabase DB password** — it leaked into Claude's terminal output during diagnosis (stripped only the literal "PASSWORD" keyword from the .env line, not the value). Fresh password via Supabase Dashboard → Database → Reset Password, then update `.env` + Railway env vars.
 - The Supabase advisor warning email may take up to ~1h to re-evaluate and clear.
+
+## 2026-04-30 — Three daily-sync gaps closed: match refresh, ticket_bought_at, grid audit 401
+
+### What
+Daily sync audit revealed three issues at 02:00–02:30 UTC; all three fixed and verified.
+
+1. **Daily match refresh job didn't exist.** Despite docs claiming a 02:00 cron, the scheduler in `app/main.py` only had Extasy/speakers/grid-audit. New attendees from each day's sync got embeddings but no matches. Last matches were generated 2026-04-28; the 5 Rhuna arrivals from this morning had zero.
+   - Added `refresh_matches_for_new_attendees()` in `app/services/matching.py`: finds attendees with embeddings but no entries in `matches`, runs the 3-stage pipeline for each. Preserves accept/decline state on existing matches (unlike `generate_all_matches()` which wipes the table).
+   - Added `_daily_match_refresh()` scheduler hook at 02:45 UTC (after grid audit at 02:30).
+   - Smoke test: 12 attendees processed, 49 matches created. The 5 Rhuna arrivals from today now have 5–8 matches each at avg score 0.71–0.74.
+
+2. **`ticket_bought_at` never populated by the scheduled sync.** `app/services/extasy_sync.py` (the service the scheduler calls) wasn't writing the column, even though the standalone `scripts/ingest_extasy.py` does. Worse, the column wasn't declared on the SQLAlchemy ORM, so even after I added the assignment, SQLAlchemy ignored it on UPDATE.
+   - Declared `ticket_bought_at: Mapped[datetime | None]` with `DateTime(timezone=True)` on the `Attendee` ORM (alongside `extasy_order_id` and `country_iso3`).
+   - Added `_parse_extasy_dt()` helper in `extasy_sync.py` (parses Extasy's space-separated format to UTC-aware datetime).
+   - Set `ticket_bought_at` on the new-row INSERT branch and the existing-row backfill branch.
+   - Smoke test: 47 backfilled in one run; coverage went 81/128 → 128/128. Latest timestamp now reflects today's order at 15:57 UTC.
+
+3. **Grid audit logged 0/0/0 today — root cause: 401 on Supabase REST.** `grid_audit._fetch_attendee_domains()` was using `SUPABASE_SERVICE_ROLE_KEY` against `/rest/v1/attendees`. Yesterday's RLS migration likely involved a key rotation that wasn't reflected in Railway's env vars.
+   - Refactored `_fetch_attendee_domains()` from sync `httpx.Client` + REST → async SQLAlchemy session via `async_session()`. Eliminates the service-role-key dependency entirely (one less secret to keep in sync, and we use the same DB connection pool as the rest of the app).
+   - Smoke test: today's failed audit row replaced with a green run — 85 domains, 25 matched (1 new since yesterday), 105 attendees, 34 matched. Duration 76s.
+   - Side-effect: the sync function is now properly async, no more event-loop blocking.
+
+### Why now
+Karl-style question — "did today's sync run?" — surfaced the gaps. The failure modes were silent (matches table was the only smoking gun, and only because we knew where to look). Without these three fixes, every daily sync would continue partially-working and partially-silent.
+
+### Files touched
+- `backend/app/main.py` — added `_daily_match_refresh()` + 02:45 UTC scheduler entry
+- `backend/app/services/matching.py` — added `refresh_matches_for_new_attendees()`
+- `backend/app/services/extasy_sync.py` — added `_parse_extasy_dt()`; set `ticket_bought_at` on insert + backfill
+- `backend/app/models/attendee.py` — declared `ticket_bought_at` ORM column
+- `backend/app/services/grid_audit.py` — refactored `_fetch_attendee_domains()` to SQLAlchemy; dropped `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` reads
+
+### Verified
+- Local smoke tests for all three (above).
+- Production state after smoke: 128/128 ticket holders have `ticket_bought_at`; 5 new attendees have matches; grid_audit_runs latest row green (id `1890fdae…`).
+
+### Not yet
+- Railway deploy: pushed (next commit). Tomorrow 02:00–02:45 UTC will be the first scheduler-driven proof.
+- `SUPABASE_SERVICE_ROLE_KEY` env var on Railway is now unused by app code; safe to leave or remove. CLI scripts under `backend/scripts/` still use it — refresh from Supabase dashboard if running them locally.
+- Alembic migration for `ticket_bought_at` column declaration not strictly needed (column already exists in DB from `supabase_setup.sql`); ORM-only change. Same pattern as `extasy_order_id` + `country_iso3`.

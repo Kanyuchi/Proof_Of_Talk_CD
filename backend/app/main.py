@@ -57,6 +57,16 @@ async def _daily_grid_audit():
     except Exception as exc:
         logger.error("scheduler: daily grid audit failed", error=str(exc))
 
+async def _daily_match_refresh():
+    try:
+        from app.core.database import async_session
+        from app.services.matching import refresh_matches_for_new_attendees
+        async with async_session() as db:
+            result = await refresh_matches_for_new_attendees(db)
+        logger.info("scheduler: daily match refresh complete", **result)
+    except Exception as exc:
+        logger.error("scheduler: daily match refresh failed", error=str(exc))
+
 scheduler = AsyncIOScheduler()
 # Run every day at 02:00 UTC — after midnight registrations settle
 scheduler.add_job(_daily_extasy_sync, CronTrigger(hour=2, minute=0, timezone="UTC"))
@@ -64,11 +74,14 @@ scheduler.add_job(_daily_extasy_sync, CronTrigger(hour=2, minute=0, timezone="UT
 scheduler.add_job(_daily_speakers_sync, CronTrigger(hour=2, minute=15, timezone="UTC"))
 # Grid coverage audit at 02:30 UTC — after both sync jobs settle
 scheduler.add_job(_daily_grid_audit, CronTrigger(hour=2, minute=30, timezone="UTC"))
+# Match refresh at 02:45 UTC — fills in matches for new attendees from
+# Extasy/speakers syncs without disturbing existing accept/decline state
+scheduler.add_job(_daily_match_refresh, CronTrigger(hour=2, minute=45, timezone="UTC"))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
-    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30 (UTC)")
+    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, match refresh 02:45 (UTC)")
     yield
     scheduler.shutdown(wait=False)
     logger.info("scheduler: stopped")

@@ -91,6 +91,18 @@ def _tier_index(ticket_type: TicketType) -> int:
         return 0
 
 
+def _parse_extasy_dt(s: str | None) -> datetime | None:
+    """Parse Extasy `createdAtUtc` (e.g. '2026-02-12 15:52:44.692113') to a
+    UTC-aware datetime suitable for the `ticket_bought_at` timestamptz column.
+    """
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace(" ", "T")).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
 # ── Main sync function ─────────────────────────────────────────────────────────
 
 async def sync_extasy_to_db(db: AsyncSession) -> dict:
@@ -144,6 +156,7 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
         ticket_type              = _map_ticket_type(ticket_name)
         company, company_website = _infer_company(email)
         country_iso3             = order.get("countryIso3Code") or None
+        ticket_bought_at         = _parse_extasy_dt(order.get("createdAtUtc"))
 
         enriched_profile = {
             "source":          "extasy",
@@ -177,6 +190,9 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
                         changed = True
                     if not getattr(existing, "country_iso3", None) and country_iso3:
                         existing.country_iso3 = country_iso3
+                        changed = True
+                    if not getattr(existing, "ticket_bought_at", None) and ticket_bought_at:
+                        existing.ticket_bought_at = ticket_bought_at
                         changed = True
 
                     # Merge Extasy fields into enriched_profile without
@@ -220,6 +236,8 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
                     if country_iso3:
                         attendee.country_iso3 = country_iso3
                     attendee.extasy_order_id = order_id
+                    if ticket_bought_at:
+                        attendee.ticket_bought_at = ticket_bought_at
                     db.add(attendee)
                     await db.flush()   # get the auto-assigned UUID
                     inserted_ids.append(str(attendee.id))

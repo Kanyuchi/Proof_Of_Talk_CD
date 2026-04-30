@@ -18,7 +18,6 @@ Both paths use the same Grid GraphQL primitives so coverage numbers agree.
 """
 
 import logging
-import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,6 +32,7 @@ from sqlalchemy import select, desc
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 from app.core.database import async_session
+from app.models.attendee import Attendee
 from app.models.grid_audit_run import GridAuditRun
 from app.services.grid_enrichment import (
     GRID_GRAPHQL_URL,
@@ -41,9 +41,6 @@ from app.services.grid_enrichment import (
 )
 
 logger = logging.getLogger(__name__)
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
 # Personal-email domains where a "company" Grid lookup is meaningless.
 # Mirrors GENERIC_DOMAINS in scripts/grid_domain_audit.py.
@@ -56,53 +53,27 @@ GENERIC_DOMAINS = frozenset({
 GRID_API_DELAY_SECONDS = 0.5  # be polite to thegrid.id
 
 
-def _sb_headers() -> dict:
-    return {
-        "apikey": SUPABASE_SERVICE_ROLE_KEY,
-        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
-    }
-
-
-def _fetch_attendee_domains() -> list[dict]:
+async def _fetch_attendee_domains() -> list[dict]:
     """Group attendee emails by domain. Returns
     [{'domain': 'x.com', 'attendee_count': N, 'has_grid': bool}].
-    """
-    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set")
 
-    url = f"{SUPABASE_URL}/rest/v1/attendees"
-    attendees = []
-    offset = 0
-    page_size = 200
-    with httpx.Client(timeout=30) as client:
-        while True:
-            resp = client.get(
-                url,
-                headers=_sb_headers(),
-                params={
-                    "select": "email,enriched_profile",
-                    "offset": offset,
-                    "limit": page_size,
-                },
-            )
-            resp.raise_for_status()
-            batch = resp.json()
-            if not batch:
-                break
-            attendees.extend(batch)
-            if len(batch) < page_size:
-                break
-            offset += page_size
+    Uses the SQLAlchemy session (DATABASE_URL) rather than Supabase REST so
+    we don't depend on SUPABASE_SERVICE_ROLE_KEY staying in sync with key
+    rotations on Railway.
+    """
+    async with async_session() as session:
+        result = await session.execute(select(Attendee.email, Attendee.enriched_profile))
+        rows = result.all()
 
     buckets: dict[str, dict] = {}
-    for a in attendees:
-        email = (a.get("email") or "").lower()
+    for email, enriched_profile in rows:
+        email = (email or "").lower()
         if "@" not in email:
             continue
         domain = email.split("@")[1]
         if domain in GENERIC_DOMAINS:
             continue
-        ep = a.get("enriched_profile") or {}
+        ep = enriched_profile or {}
         has_grid = bool(ep.get("grid"))
         bucket = buckets.setdefault(domain, {"domain": domain, "attendee_count": 0, "has_grid": False})
         bucket["attendee_count"] += 1
@@ -159,7 +130,7 @@ async def run_grid_audit() -> dict:
     started = time.monotonic()
     run_at = datetime.now(timezone.utc)
 
-    domains = _fetch_attendee_domains()
+    domains = await _fetch_attendee_domains()
     rows: list[dict] = []
     new_matches: list[dict] = []
     unmatched: list[str] = []

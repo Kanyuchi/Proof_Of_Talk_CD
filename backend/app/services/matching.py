@@ -821,3 +821,40 @@ async def run_matching_pipeline(db: AsyncSession, top_k: int = 10) -> int:
     """Run the full matching pipeline and return generated match count."""
     engine = MatchingEngine(db)
     return await engine.generate_all_matches(top_k=top_k)
+
+
+async def refresh_matches_for_new_attendees(db: AsyncSession, top_k: int = 10) -> dict:
+    """Generate matches only for attendees that don't appear in `matches` yet.
+
+    Used by the daily scheduler to fill in matches for new Rhuna/speakers
+    arrivals without disturbing accept/decline state on existing matches.
+    """
+    admin_ids_subq = select(User.attendee_id).where(
+        User.is_admin.is_(True),
+        User.attendee_id.isnot(None),
+    )
+    matched_a = select(Match.attendee_a_id)
+    matched_b = select(Match.attendee_b_id)
+    result = await db.execute(
+        select(Attendee).where(
+            Attendee.embedding.isnot(None),
+            ~Attendee.id.in_(admin_ids_subq),
+            ~Attendee.id.in_(matched_a),
+            ~Attendee.id.in_(matched_b),
+        )
+    )
+    targets = result.scalars().all()
+
+    engine = MatchingEngine(db)
+    total_new_matches = 0
+    for attendee in targets:
+        matches = await engine.generate_matches_for_attendee(
+            attendee.id, top_k, clear_existing=False
+        )
+        total_new_matches += len(matches)
+        await asyncio.sleep(0)
+
+    return {
+        "attendees_processed": len(targets),
+        "matches_created": total_new_matches,
+    }

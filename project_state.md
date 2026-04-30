@@ -1,6 +1,6 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-04-28 (extasy_sync three-bug fix in flight: silent skip + ORM-blind columns + session poisoning. 107 ticket holders properly linked, was 81. Awaiting commit + deploy.)
+**Last updated:** 2026-04-30 (daily-sync gaps closed: 02:45 UTC match refresh job added, `ticket_bought_at` ORM column declared + populated by `extasy_sync` (128/128 coverage), `grid_audit` refactored off Supabase REST onto SQLAlchemy. Awaiting Railway deploy + 02:00 UTC verification tomorrow.)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · **Railway** (backend) · **Resend** (email) · Netlify (frontend)
 
 ---
@@ -56,7 +56,7 @@
 
 ## Broken / Incomplete
 
-- **Extasy sync fix not yet deployed** — local fix verified (107 ticket holders properly linked, was 81), but Railway is still running the broken version. Until next push: `extasy_order_id` and `country_iso3` will not populate on production INSERT/UPDATE; the daily 02:00 UTC scheduler will continue logging 99-error cascades and inserting nothing. Also missing: an Alembic migration for the two columns (DB and ORM are aligned by hand at the moment).
+- **Daily-sync fixes shipped locally, awaiting Railway deploy** — Three issues fixed and smoke-tested 2026-04-30: (a) added 02:45 UTC `_daily_match_refresh()` (was missing despite docs); (b) declared `ticket_bought_at` on the ORM and wired into `extasy_sync` (128/128 coverage now); (c) refactored `grid_audit` off Supabase REST → SQLAlchemy (eliminates 401 from key rotation). Local Supabase already reflects the fixes via smoke runs. Until next push, Railway will continue running yesterday's code, and tomorrow's 02:00 cycle will produce the same gaps as today.
 - **Reassigned ticket holders not in matchmaker (decided 2026-04-28)** — 23 reassigned Extasy tickets exist where buyers purchased extra passes for colleagues. We confirmed the data quality is too poor to auto-create rows (`ticketOwners` is sparse: "Journalist 1", first names only, no email/company/LinkedIn). **Decision**: don't auto-create skeleton rows that would pollute the attendees list with un-matchable ghosts. Path forward = either a buyer-facing magic-link flow ("name your colleagues") OR colleague self-registration. Until built, those ~23 attendees won't get matches.
 - **Dashboard has no `last_extasy_sync_at` indicator** — the sync silently failed for ~6 days before Karl's question surfaced it. The dashboard reads live from Extasy on every page load, so revenue/ticket counts always look fresh and mask the underlying Supabase drift.
 - **Email template design** — match intro email is functional but needs design polish for production use (layout, branding, content)

@@ -55,6 +55,7 @@ class Attendee(Base):
     # just JSONB) so PostgREST/Supabase can filter on them directly.
     extasy_order_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     country_iso3: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    ticket_bought_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # AI-generated fields
     ai_summary: Mapped[str] = mapped_column(Text, nullable=True)  # AI-generated profile summary
