@@ -1,6 +1,6 @@
 # Project State — POT Matchmaker
 
-**Last updated:** 2026-05-01 (LinkedIn enrichment redesigned: `linkedin-api` library path removed (LinkedIn 403'd it). Manual Playwright script is now the primary tool, defaults to skipping already-enriched attendees. Dashboard surfaces `pending_linkedin_enrichment` count with an amber banner pointing to the script. Daily cron no longer blocks on LinkedIn — Grid/match-refresh always run. 2026-04-30 daily-sync fixes verified live earlier today.)
+**Last updated:** 2026-05-01 (LinkedIn redesign shipped + Playwright run + bad-URL cleanup + weekly reminder routine + Phase 2 return-visit plan validated against competitor research. See `whats_next.md` `## Phase 2 build order`. Top of queue: free-slot visibility on match cards — Brella's signature mechanic, the calendar is the killer return-driver across all major competitors.)
 **Stack:** Python 3.12 / FastAPI / SQLAlchemy async · React 18 / TypeScript / Vite / Tailwind · **Supabase PostgreSQL** + pgvector · OpenAI (text-embedding-3-small + gpt-4o) · **Railway** (backend) · **Resend** (email) · Netlify (frontend)
 
 ---

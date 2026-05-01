@@ -672,3 +672,27 @@ Splitting LinkedIn enrichment off the daily auto-sync means: (a) the cron is nev
 - Run the Playwright script (`python scripts/linkedin_scrape.py`) to clear today's 8-attendee queue. Manual, operator-driven by design.
 - `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` env vars on Railway are now unused by app code (kept locally for the legacy `scripts/enrich_and_embed.py`). Safe to remove from Railway whenever convenient.
 - `scripts/enrich_and_embed.py` still has its own copy of `_get_linkedin_client` — out of scope for this change. Will fail silently the same way the service path did until cleaned up.
+
+## 2026-05-01 — Playwright run + bad-URL cleanup + weekly reminder routine + Phase 2 plan
+
+### Playwright run (operator-driven, ~18:00 local)
+- Logged in manually; script processed the 8 pending attendees in ~5 min.
+- Result: **1 wrong-person enrichment** (Alexandra Lloyd matched to "Immigrant Justice Corp Attorney" — not the YouHodler attendee), **7 "private/blocked"** outcomes mostly because the auto-resolved URLs were garbage.
+- Reverted Alexandra's enrichment via SQL: `UPDATE attendees SET enriched_profile = enriched_profile - 'linkedin' - 'linkedin_summary' - 'linkedin_enriched_at' WHERE email = 'alexandra@youhodler.com'`.
+- Nulled out 2 obviously-bogus 1-4-char vanity URLs (`/in/th` Tom Horner, `/in/to` Tommi Vuorenmaa) — these came from `enrichment.py`'s URL-resolution heuristic, which previously accepted any `status_code in (200, 403)` as "verified" and stamped onto rows during past auto-runs.
+- Pending queue: 8 → 6 (the remaining 6 are longer first-last-slug guesses; could be private profiles owned by the right person, or wrong-person URLs we'll clear after a future Playwright pass returns "private/blocked" again).
+- Final dashboard counters: 142 total / 100 with URL / 94 with data / 6 pending.
+
+### Weekly reminder routine
+- Created `trig_014y5YF5MyAHgVG4CQ2e2c9a` — Mondays 08:02 UTC (09:02 BST). Queries Supabase for the current pending-LinkedIn-enrichment count and posts a one-line reminder. Read-only, Bash + Read tools, Supabase MCP attached. URL: https://claude.ai/code/routines/trig_014y5YF5MyAHgVG4CQ2e2c9a
+
+### Phase 2 strategy + research
+- Shaun shifted focus: what makes attendees open the matchmaking app twice (return-visit drivers).
+- Spawned a research agent on competitive matchmaking apps (Brella, Grip, Whova, Bizzabo, Cvent, Hopin, Sched, Swapcard, EventMobi) — see `whats_next.md` `## Phase 2 build order` for the full validated plan and competitor citations.
+- **Confirmed**: emails re-enable next week, so Phase 2 features can assume mutual-match emails fire.
+- **Headline shifts from initial draft**: profile-views counter killed (no B2B competitor surfaces it; surveillance vibes); sector pulse moved from in-app to email-only; "what changed" simplified to drop rank-movement language; **5 new features added** that the research surfaced (free-slot visibility, mutual-match in-app inbox, pre-event countdown/checklist, "who else from your sector", auto-rebook on cancel).
+- Top of the build queue: **free-slot visibility on match cards** — Brella signature, single highest lift because the calendar is the killer return-driver in every competitor.
+
+### Why no implementation today
+- Context budget: at ~133% during Phase 2 planning. Started a fresh build-session on Monday to ship #1 (free-slot visibility) end-to-end rather than half-build it now.
+- Living plan persisted in `whats_next.md` so any session can pick it up cold.

@@ -6,11 +6,38 @@
 
 ## Now
 
-1. **Run the Playwright LinkedIn scraper to clear the pending queue** — dashboard shows 8 attendees with `linkedin_url` set but no scraped data. From `backend/`: `source .venv/bin/activate && python scripts/linkedin_scrape.py` — log in when the browser pops up, the script scrapes only the 8 (default skips already-enriched). Repeat ad-hoc whenever the dashboard counter starts climbing again.
-2. **Change Extasy sync cadence to every 5h** — now that 2026-04-30 fixes are live, edit `backend/app/main.py:62` from `CronTrigger(hour=2, minute=0)` to `IntervalTrigger(hours=5)` per Karl's request. (Keep speakers/grid/match jobs on daily 02:15/02:30/02:45 — only Extasy needs the higher cadence.) Validate after one cycle that all three downstream jobs still fire correctly.
-3. **Add `last_extasy_sync_at` to admin dashboard** — surface the timestamp of the most recent successful sync so silent drift is detectable next time. The April 28 silent-failure incident only surfaced because Karl asked about ticket-holder counts; a "Last sync: Xh ago" indicator would have caught it weeks earlier.
-4. **Open platform to attendees** — re-enable emails (remove `return` lines in `email.py` — 7 functions), decide on attendee onboarding flow (magic link distribution vs self-registration vs Rhuna webhook auto-create). Pouneh Bligaard already asking via LinkedIn. Blocked on Rhuna webhook go-live (Sveat says next week).
-5. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); internal staff now excluded from candidates; reports run as background jobs (no more 504). Next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors.
+1. **Phase 2 — return-visit features (next major build)** — research validated 2026-05-01 (see `## Phase 2 build order` below). Start with **Free-slot visibility on match cards** (Brella's signature mechanic, the calendar is the killer return-driver). Email is being re-enabled next week so Phase 2 features can assume mutual-match emails will fire.
+2. **Run the Playwright LinkedIn scraper when queue grows** — dashboard shows pending count + amber banner. After today's cleanup the pending queue is **6** (was 8). Run `cd backend && source .venv/bin/activate && python scripts/linkedin_scrape.py` ad-hoc when count climbs. Weekly Monday 09:00 BST routine `trig_014y5YF5MyAHgVG4CQ2e2c9a` will remind.
+3. **Change Extasy sync cadence to every 5h** — now that 2026-04-30 fixes are live, edit `backend/app/main.py:62` from `CronTrigger(hour=2, minute=0)` to `IntervalTrigger(hours=5)` per Karl's request. (Keep speakers/grid/match jobs on daily 02:15/02:30/02:45 — only Extasy needs the higher cadence.) Validate after one cycle that all three downstream jobs still fire correctly.
+4. **Add `last_extasy_sync_at` to admin dashboard** — surface the timestamp of the most recent successful sync so silent drift is detectable next time. The April 28 silent-failure incident only surfaced because Karl asked about ticket-holder counts; a "Last sync: Xh ago" indicator would have caught it weeks earlier.
+5. **Open platform to attendees** — re-enable emails (remove `return` lines in `email.py` — 7 functions, scheduled for next week), decide on attendee onboarding flow (magic link distribution vs self-registration vs Rhuna webhook auto-create). Pouneh Bligaard already asking via LinkedIn. Blocked on Rhuna webhook go-live (Sveat says next week).
+6. **Sponsor intelligence rollout** — 3 pilot reports generated (Zircuit, BitGo, CertiK); internal staff now excluded from candidates; reports run as background jobs (no more 504). Next: Victor reviews and pitches; build Priority boost tier; scale to all 24 sponsors.
+
+## Phase 2 build order — return-visit features (research-validated 2026-05-01)
+
+Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return visits** per attendee, not DAU. The calendar is the killer return-driver across all major competitors (Brella, Grip, Whova, Bizzabo, Cvent, Hopin, Sched, Swapcard). Email re-enables next week so build assuming mutual-match emails will fire.
+
+**Build in this order — each is independent enough to ship one-by-one:**
+
+1. **Free-slot visibility on match cards** (Brella signature, table stakes for B2B). Show match's available slots inline on the match card; one-click book. Removes back-and-forth. Backend: slot model + availability API. Frontend: inline slot picker on match card. Pushes "interested" → "booked" in one click. Highest single lift on the calendar = return-visit chain.
+
+2. **Mutual-match in-app inbox + alert** ("Marcus also picked you"). Highest-value re-entry trigger. The mutual-match email already exists (disabled) — add an in-app "Mutual interest" inbox/badge so it works without email too. Includes the small "X new matches since last visit" delta on the matches page.
+
+3. **Pre-event countdown + checklist on the home page** ("Event in 32 days. Profile 80%. Top matches scheduled: 0/5. Threads joined: 0/3"). Combines deadline + progress + identity. No competitor risk; checklist framing is well-proven onboarding pattern.
+
+4. **"Who else is going from your sector"** view (Grip pre-event prospecting pattern). High signal for VCs/founders deciding meeting priorities. We already have `vertical_tags` and `enriched_profile.grid` — this is mostly a new view + filter.
+
+5. **Auto-rebook on cancellation** (Grip/Swapcard). Critical for 2-day events (lost slots = lost ROI). Defer until #1 ships — they share infrastructure.
+
+**Email side (when emails re-enable next week):** add weekly **sector pulse** digest (themed per vertical, "DeFi this week: 7 new attendees, 4 deal-ready signals"). Don't build an in-app surface for it — research showed pulse-style content is an email-only winner.
+
+**Killed from earlier draft:**
+- ❌ Profile views counter — no B2B event app surfaces it; surveillance vibes among professional peers about to meet IRL; dead-end engagement (can't act on it without breaking mutual-interest norm). If we want a similar dopamine, reframe as actionable: "X people you haven't reviewed expressed interest" — that's just #2 above.
+- ❌ "What changed" with rank movement ("3 climbed, 2 dropped") — exposes scoring volatility, looks arbitrary. Keep only "3 new matches" framing.
+
+**Confirmed anti-patterns (do NOT build):** push notifications (no mobile app), gamification beyond progress bar, social-feed/stories, leaderboards/points, random-attendee chat. Cheap-feeling for a Louvre Palace audience.
+
+**Research sources:** Brella, Grip, Whova, Bizzabo, Cvent Attendee Hub, Hopin/RingCentral, Sched, Swapcard, EventMobi product pages + Mapyourshow on app-adoption timing. Vendor performance claims (Brella's "4x retention", Grip's "300% better recommendations") are marketing-page numbers, treat as directional only.
 
 ## Soon
 
