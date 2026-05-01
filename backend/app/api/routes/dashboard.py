@@ -611,6 +611,18 @@ async def revenue_stats(
     total_db = len(attendees)
     with_goals = sum(1 for a in attendees if a.goals)
     with_linkedin = sum(1 for a in attendees if a.linkedin_url)
+    # `with_linkedin_data`: actually have a scraped headline. `pending_linkedin_enrichment`:
+    # have a URL but the Playwright script hasn't been run on them yet. Surfaces the
+    # silent-fail mode that bit us 2026-04-29 → 2026-05-01.
+    with_linkedin_data = sum(
+        1 for a in attendees
+        if ((a.enriched_profile or {}).get("linkedin") or {}).get("headline")
+    )
+    pending_linkedin_enrichment = sum(
+        1 for a in attendees
+        if a.linkedin_url
+        and not ((a.enriched_profile or {}).get("linkedin") or {}).get("headline")
+    )
     with_twitter = sum(1 for a in attendees if a.twitter_handle)
     with_website = sum(1 for a in attendees if a.company_website)
     with_grid = sum(1 for a in attendees if (a.enriched_profile or {}).get("grid", {}).get("grid_name"))
@@ -656,6 +668,8 @@ async def revenue_stats(
             "total": total_db,
             "with_goals": with_goals,
             "with_linkedin": with_linkedin,
+            "with_linkedin_data": with_linkedin_data,
+            "pending_linkedin_enrichment": pending_linkedin_enrichment,
             "with_twitter": with_twitter,
             "with_website": with_website,
             "with_grid": with_grid,

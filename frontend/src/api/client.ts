@@ -192,7 +192,7 @@ export async function getRevenueStats(): Promise<{
   revenue: { total: number; avg_ticket_price: number; paid_tickets: number; comp_tickets: number; by_type: { type: string; count: number; revenue: number }[] };
   growth: { week: string; registrations: number }[];
   source_breakdown: { extasy: number; speakers_1000minds: number; seed: number; other: number; total: number };
-  profile_completeness: { total: number; with_goals: number; with_linkedin: number; with_twitter: number; with_website: number; with_grid: number; with_photo: number; with_targets: number };
+  profile_completeness: { total: number; with_goals: number; with_linkedin: number; with_linkedin_data: number; pending_linkedin_enrichment: number; with_twitter: number; with_website: number; with_grid: number; with_photo: number; with_targets: number };
 }> {
   const { data } = await api.get("/dashboard/revenue");
   return data;

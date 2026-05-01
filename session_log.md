@@ -644,3 +644,31 @@ Karl-style question — "did today's sync run?" — surfaced the gaps. The failu
 - Railway deploy: pushed (next commit). Tomorrow 02:00–02:45 UTC will be the first scheduler-driven proof.
 - `SUPABASE_SERVICE_ROLE_KEY` env var on Railway is now unused by app code; safe to leave or remove. CLI scripts under `backend/scripts/` still use it — refresh from Supabase dashboard if running them locally.
 - Alembic migration for `ticket_bought_at` column declaration not strictly needed (column already exists in DB from `supabase_setup.sql`); ORM-only change. Same pattern as `extasy_order_id` + `country_iso3`.
+
+## 2026-05-01 — LinkedIn enrichment redesign: rip out linkedin-api, lean on Playwright
+
+### What
+Today's daily-sync verification surfaced that LinkedIn enrichment had been silently 0% for three days (2026-04-29 → 2026-05-01: 0/20 new arrivals enriched). Live test against today's only new arrival (Daniel Schwarz) confirmed: `linkedin-api` library can still authenticate but every profile-detail fetch returns 403. Account flagged.
+
+After discussion with Shaun: **remove the linkedin-api path entirely; make manual Playwright the primary tool; keep cookie-Voyager as best-effort fallback; surface the silent-fail mode on the dashboard.**
+
+### Changes
+- **`backend/app/services/enrichment.py`** — Removed `_get_linkedin_client()` singleton, `_enrich_linkedin_api()` (the 403'd path), and `_enrich_linkedin()` (defunct Proxycurl). Simplified `_verify_linkedin_identifier` to use only the Voyager cookie. Updated `enrich_attendee` so LinkedIn enrichment only runs when `LINKEDIN_LI_AT_COOKIE` is set; saves resolved URLs to `attendee.linkedin_url` even when the fetch fails so the dashboard can link out and the Playwright script's later pass benefits.
+- **`backend/scripts/linkedin_scrape.py`** — New `_is_already_enriched()` helper (checks `enriched_profile.linkedin.headline`); default behavior now skips already-enriched attendees. New `--include-enriched` flag re-scrapes everyone with a URL when needed. Existing `--dry-run`, `--limit`, `--discover`, `--only-missing` flags unchanged.
+- **`backend/app/api/routes/dashboard.py`** — Two new fields on `profile_completeness`: `with_linkedin_data` (counts attendees with a real scraped headline, not just a URL) and `pending_linkedin_enrichment` (have URL but no scraped data — the queue for the next Playwright run).
+- **`frontend/src/api/client.ts` + `Dashboard.tsx`** — Type updated; "LinkedIn URL" + "LinkedIn data" now shown as separate progress bars; amber alert banner appears below the Profile Quality bars whenever `pending_linkedin_enrichment > 0`, telling the operator to run the Playwright script.
+- **`backend/tests/test_enrichment.py`** — Two Proxycurl-specific tests removed (tested deleted code).
+
+### Why
+Splitting LinkedIn enrichment off the daily auto-sync means: (a) the cron is never blocked on a manual login, (b) downstream Grid + match refresh always run, (c) operator runs the Playwright script on their own cadence when at the laptop, (d) the next 02:45 UTC match refresh picks up newly-enriched attendees automatically.
+
+### Verified
+- Local smoke test of dashboard counters: 142 total / 102 with URL / 94 with data / **8 pending** — actionable.
+- Playwright script `--help` shows new flag; default-skip logic doesn't break existing flags.
+- Frontend `npm run build` passes (CSS warning is preexisting, unrelated).
+- `python3 -c 'import ast; ast.parse(...)'` clean on all edited Python files.
+
+### Not yet
+- Run the Playwright script (`python scripts/linkedin_scrape.py`) to clear today's 8-attendee queue. Manual, operator-driven by design.
+- `LINKEDIN_EMAIL` + `LINKEDIN_PASSWORD` env vars on Railway are now unused by app code (kept locally for the legacy `scripts/enrich_and_embed.py`). Safe to remove from Railway whenever convenient.
+- `scripts/enrich_and_embed.py` still has its own copy of `_get_linkedin_client` — out of scope for this change. Will fail silently the same way the service path did until cleaned up.

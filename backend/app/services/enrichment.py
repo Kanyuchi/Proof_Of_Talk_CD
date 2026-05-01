@@ -10,29 +10,11 @@ from app.core.config import get_settings
 settings = get_settings()
 logger = structlog.get_logger()
 
-# Singleton linkedin-api client — initialized lazily on first use
-_linkedin_client = None
-_linkedin_client_failed = False
-
-
-def _get_linkedin_client():
-    """Get or create the linkedin-api client (singleton, synchronous)."""
-    global _linkedin_client, _linkedin_client_failed
-    if _linkedin_client is not None:
-        return _linkedin_client
-    if _linkedin_client_failed:
-        return None
-    if not settings.LINKEDIN_EMAIL or not settings.LINKEDIN_PASSWORD:
-        return None
-    try:
-        from linkedin_api import Linkedin
-        _linkedin_client = Linkedin(settings.LINKEDIN_EMAIL, settings.LINKEDIN_PASSWORD)
-        logger.info("linkedin_api_authenticated", email=settings.LINKEDIN_EMAIL)
-        return _linkedin_client
-    except Exception as e:
-        _linkedin_client_failed = True
-        logger.error("linkedin_api_auth_failed", error=str(e))
-        return None
+# LinkedIn enrichment in this service relies on the LINKEDIN_LI_AT_COOKIE
+# Voyager fallback. The previous `linkedin-api` library path was removed
+# 2026-05-01 — LinkedIn started 403'ing profile fetches and the account got
+# flagged. Bulk LinkedIn enrichment now happens via the manual Playwright
+# script at scripts/linkedin_scrape.py (browser pop-up + manual login).
 
 
 class EnrichmentService:
@@ -55,30 +37,32 @@ class EnrichmentService:
         enriched = dict(attendee.enriched_profile or {})
 
         # --- LinkedIn enrichment ---
-        # Step 1: resolve URL if not already stored
-        linkedin_url = attendee.linkedin_url
-        if not linkedin_url and (settings.LINKEDIN_EMAIL or settings.LINKEDIN_LI_AT_COOKIE):
-            linkedin_url = await self._find_linkedin_url_by_email(attendee.email, attendee.name or "")
-        if not linkedin_url and (settings.LINKEDIN_EMAIL or settings.LINKEDIN_LI_AT_COOKIE) and attendee.name and attendee.company:
-            linkedin_url = await self._find_linkedin_url_by_name(attendee.name, attendee.company)
+        # Bulk LinkedIn enrichment is owned by the Playwright script
+        # (scripts/linkedin_scrape.py) — manual, browser-driven, requires the
+        # operator at the laptop. The daily auto-sync skips LinkedIn unless a
+        # fresh LINKEDIN_LI_AT_COOKIE is set, in which case the Voyager
+        # fallback runs as a best-effort fill-in.
+        if settings.LINKEDIN_LI_AT_COOKIE:
+            linkedin_url = attendee.linkedin_url
+            if not linkedin_url:
+                linkedin_url = await self._find_linkedin_url_by_email(attendee.email, attendee.name or "")
+            if not linkedin_url and attendee.name and attendee.company:
+                linkedin_url = await self._find_linkedin_url_by_name(attendee.name, attendee.company)
 
-        # Step 2: fetch profile data
-        # Priority: linkedin-api library (free, auto-auth) → Voyager cookies (manual fallback)
-        if linkedin_url:
-            linkedin_data = None
-            linkedin_data = await self._enrich_linkedin_api(linkedin_url)
-            if not linkedin_data and settings.LINKEDIN_LI_AT_COOKIE:
-                linkedin_data = await self._enrich_linkedin_voyager(linkedin_url)
-            if linkedin_data:
+            if linkedin_url:
+                # Save the URL even if the fetch fails — useful for the
+                # Playwright script's later pass and for clickable dashboard links.
                 if not attendee.linkedin_url:
                     attendee.linkedin_url = linkedin_url
-                enriched["linkedin"] = linkedin_data
-                enriched["linkedin_summary"] = self._summarize_linkedin(linkedin_data)
-                enriched["linkedin_enriched_at"] = datetime.utcnow().isoformat()
-                # Auto-populate photo_url from LinkedIn if not already set
-                pic = linkedin_data.get("profile_pic_url")
-                if pic and not attendee.photo_url:
-                    attendee.photo_url = pic
+
+                linkedin_data = await self._enrich_linkedin_voyager(linkedin_url)
+                if linkedin_data:
+                    enriched["linkedin"] = linkedin_data
+                    enriched["linkedin_summary"] = self._summarize_linkedin(linkedin_data)
+                    enriched["linkedin_enriched_at"] = datetime.utcnow().isoformat()
+                    pic = linkedin_data.get("profile_pic_url")
+                    if pic and not attendee.photo_url:
+                        attendee.photo_url = pic
 
         if attendee.twitter_handle and settings.TWITTER_BEARER_TOKEN:
             twitter_data = await self._enrich_twitter(attendee.twitter_handle)
@@ -190,36 +174,11 @@ class EnrichmentService:
     async def _verify_linkedin_identifier(self, identifier: str) -> bool:
         """Return True if the given public identifier resolves to a real LinkedIn profile.
 
-        Uses linkedin-api's session cookies if available, falls back to manual Voyager cookies.
+        Uses the manually-set Voyager cookie. Returns False if no cookie is set
+        (fine — bulk LinkedIn enrichment runs via the Playwright script).
         """
-        headers = None
-
-        # Try linkedin-api session cookies first
-        client = _get_linkedin_client()
-        if client:
-            try:
-                cookies = client.client.session.cookies
-                li_at = cookies.get("li_at", domain=".linkedin.com") or cookies.get("li_at")
-                csrf = cookies.get("JSESSIONID", domain=".linkedin.com") or cookies.get("JSESSIONID")
-                if li_at:
-                    csrf_clean = csrf.strip('"') if csrf else ""
-                    headers = {
-                        "Cookie": f'li_at={li_at}; JSESSIONID="{csrf_clean}"',
-                        "csrf-token": csrf_clean,
-                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-                        "Accept": "application/vnd.linkedin.normalized+json+2.1",
-                        "x-restli-protocol-version": "2.0.0",
-                    }
-            except Exception:
-                pass
-
-        # Fallback: manual Voyager cookies
-        if not headers and settings.LINKEDIN_LI_AT_COOKIE:
-            headers = self._voyager_headers()
-
-        if not headers:
+        if not settings.LINKEDIN_LI_AT_COOKIE:
             return False
-
         try:
             resp = await self.http_client.get(
                 "https://www.linkedin.com/voyager/api/identity/dash/profiles",
@@ -228,135 +187,13 @@ class EnrichmentService:
                     "memberIdentity": identifier,
                     "decorationId": "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-86",
                 },
-                headers=headers,
+                headers=self._voyager_headers(),
                 follow_redirects=True,
             )
             await asyncio.sleep(1)  # Rate limit
             return resp.status_code in (200, 403)
         except Exception:
             return False
-
-    async def _enrich_linkedin_api(self, linkedin_url: str) -> dict | None:
-        """Fetch LinkedIn profile data using linkedin-api's authenticated session
-        with the dash/profiles endpoint (the old profileView endpoint returns 410).
-
-        Uses linkedin-api only for auth/session management, then calls the working
-        dash endpoint directly via the library's session cookies.
-        """
-        client = _get_linkedin_client()
-        if not client:
-            return None
-        try:
-            match = re.search(r"/in/([^/?#]+)", linkedin_url)
-            if not match:
-                logger.warning("linkedin_api_bad_url", url=linkedin_url)
-                return None
-            profile_id = match.group(1).rstrip("/")
-
-            # Use the library's authenticated session to call the dash endpoint
-            def _fetch_dash_profile(pid: str) -> dict | None:
-                cookies = client.client.session.cookies
-                li_at = cookies.get("li_at", domain=".linkedin.com") or cookies.get("li_at")
-                csrf = cookies.get("JSESSIONID", domain=".linkedin.com") or cookies.get("JSESSIONID")
-                if not li_at:
-                    return None
-                csrf_clean = csrf.strip('"') if csrf else ""
-                headers = {
-                    "Cookie": f'li_at={li_at}; JSESSIONID="{csrf_clean}"',
-                    "csrf-token": csrf_clean,
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                    "Accept": "application/vnd.linkedin.normalized+json+2.1",
-                    "x-restli-protocol-version": "2.0.0",
-                    "x-li-lang": "en_US",
-                }
-                resp = httpx.get(
-                    "https://www.linkedin.com/voyager/api/identity/dash/profiles",
-                    params={
-                        "q": "memberIdentity",
-                        "memberIdentity": pid,
-                        "decorationId": "com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-86",
-                    },
-                    headers=headers,
-                    follow_redirects=True,
-                    timeout=15,
-                )
-                if resp.status_code not in (200, 403):
-                    return None
-                return resp.json()
-
-            loop = asyncio.get_event_loop()
-            data = await loop.run_in_executor(None, _fetch_dash_profile, profile_id)
-            if not data:
-                return None
-
-            # Rate-limit: 3s pause between LinkedIn requests
-            await asyncio.sleep(3)
-
-            included = data.get("included", [])
-            if not included:
-                # 403 (private) or empty — return minimal stub
-                logger.info("linkedin_profile_private_or_empty", profile=profile_id)
-                return {"headline": None, "summary": None, "experiences": [], "skills": [],
-                        "education": [], "source": "linkedin_api_private"}
-
-            # Parse the dash response (same format as _enrich_linkedin_voyager)
-            profile_obj = next(
-                (i for i in included if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Profile"), {}
-            )
-            positions = [
-                i for i in included
-                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Position"
-            ]
-            skills_list = [
-                i for i in included
-                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Skill"
-            ]
-            educations = [
-                i for i in included
-                if i.get("$type") == "com.linkedin.voyager.dash.identity.profile.Education"
-            ]
-
-            experiences = [
-                {"title": pos.get("title"), "company": pos.get("companyName"), "description": pos.get("description")}
-                for pos in positions[:5]
-            ]
-            skills = [s.get("name") for s in skills_list[:15] if s.get("name")]
-            education = [
-                {"school": edu.get("schoolName"), "degree": edu.get("degreeName"), "field": edu.get("fieldOfStudy")}
-                for edu in educations[:3]
-            ]
-
-            # Extract photo URL
-            profile_pic_url = None
-            try:
-                vector_image = (
-                    profile_obj.get("profilePicture", {})
-                    .get("displayImageReference", {})
-                    .get("vectorImage", {})
-                )
-                root_url = vector_image.get("rootUrl", "")
-                artifacts = vector_image.get("artifacts", [])
-                if root_url and artifacts:
-                    largest = max(artifacts, key=lambda a: a.get("width", 0))
-                    profile_pic_url = root_url + largest.get("fileIdentifyingUrlPathSegment", "")
-            except Exception:
-                pass
-
-            logger.info("linkedin_api_enriched", profile_id=profile_id)
-            return {
-                "headline": profile_obj.get("headline"),
-                "summary": profile_obj.get("summary"),
-                "profile_pic_url": profile_pic_url,
-                "experiences": experiences,
-                "skills": skills,
-                "education": education,
-                "industry": profile_obj.get("industryName"),
-                "location": profile_obj.get("geoLocationName"),
-                "source": "linkedin_api",
-            }
-        except Exception as e:
-            logger.error("linkedin_api_enrichment_error", error=str(e), url=linkedin_url)
-            return None
 
     async def _enrich_linkedin_voyager(self, linkedin_url: str) -> dict | None:
         """
@@ -455,46 +292,6 @@ class EnrichmentService:
             }
         except Exception as e:
             logger.error("linkedin_voyager_error", error=str(e), url=linkedin_url)
-            return None
-
-    @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=5))
-    async def _enrich_linkedin(self, linkedin_url: str) -> dict | None:
-        """Fetch LinkedIn profile data via Proxycurl API."""
-        try:
-            response = await self.http_client.get(
-                "https://nubela.co/proxycurl/api/v2/linkedin",
-                params={"linkedin_profile_url": linkedin_url},
-                headers={"Authorization": f"Bearer {settings.PROXYCURL_API_KEY}"},
-            )
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    "headline": data.get("headline"),
-                    "summary": data.get("summary"),
-                    "profile_pic_url": data.get("profile_pic_url"),
-                    "experiences": [
-                        {
-                            "title": exp.get("title"),
-                            "company": exp.get("company"),
-                            "description": exp.get("description"),
-                        }
-                        for exp in (data.get("experiences") or [])[:5]
-                    ],
-                    "skills": data.get("skills", [])[:15],
-                    "education": [
-                        {
-                            "school": edu.get("school"),
-                            "degree": edu.get("degree_name"),
-                            "field": edu.get("field_of_study"),
-                        }
-                        for edu in (data.get("education") or [])[:3]
-                    ],
-                    "follower_count": data.get("follower_count"),
-                }
-            logger.warning("linkedin_enrichment_failed", status=response.status_code, url=linkedin_url)
-            return None
-        except Exception as e:
-            logger.error("linkedin_enrichment_error", error=str(e), url=linkedin_url)
             return None
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=5))

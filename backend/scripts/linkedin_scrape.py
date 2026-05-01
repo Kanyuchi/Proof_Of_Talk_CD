@@ -270,7 +270,15 @@ async def discover_linkedin_url(page, name: str, company: str) -> str | None:
     return await _search_linkedin(page, name, name)
 
 
-async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False):
+def _is_already_enriched(attendee: dict) -> bool:
+    """An attendee is 'already enriched' if their enriched_profile.linkedin
+    has a real headline (not the empty stub returned for private/403 profiles).
+    """
+    li = (attendee.get("enriched_profile") or {}).get("linkedin") or {}
+    return bool(li.get("headline"))
+
+
+async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False):
     print("=== LinkedIn Profile Scraper (Playwright) ===\n")
 
     # Fetch attendees
@@ -284,6 +292,18 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
         attendees_with_url = fetch_attendees(with_url_only=True)
         attendees_without_url = []
         print(f"  Attendees with LinkedIn URL: {len(attendees_with_url)}")
+
+    # Default: skip attendees who already have non-stub LinkedIn data —
+    # cheaper, kinder to LinkedIn rate limits, and the common case.
+    # Override with --include-enriched to force re-scrape.
+    if not include_enriched:
+        before_with = len(attendees_with_url)
+        before_without = len(attendees_without_url)
+        attendees_with_url = [a for a in attendees_with_url if not _is_already_enriched(a)]
+        attendees_without_url = [a for a in attendees_without_url if not _is_already_enriched(a)]
+        skipped_enriched = (before_with - len(attendees_with_url)) + (before_without - len(attendees_without_url))
+        if skipped_enriched:
+            print(f"  Skipping {skipped_enriched} already-enriched (use --include-enriched to re-scrape)")
 
     # In discover mode, process discovery candidates first, then existing URLs
     if only_missing:
@@ -439,8 +459,9 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=None, help="Max profiles to process")
     parser.add_argument("--discover", action="store_true", help="Also try to find URLs for attendees without one")
     parser.add_argument("--only-missing", action="store_true", help="Only process attendees without linkedin_url (retry failed discoveries, skip the ones we already have)")
+    parser.add_argument("--include-enriched", action="store_true", help="Re-scrape attendees who already have LinkedIn data (default: skip them)")
     args = parser.parse_args()
 
     # --only-missing implies --discover
     discover = args.discover or args.only_missing
-    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing))
+    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing, include_enriched=args.include_enriched))

@@ -96,41 +96,7 @@ class TestWebsiteScraping:
         assert result is None
 
 
-class TestLinkedInEnrichment:
-    @pytest.mark.asyncio
-    async def test_linkedin_success(self, enrichment_service):
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "headline": "CEO at VaultBridge",
-            "summary": "Fintech leader",
-            "experiences": [{"title": "CEO", "company": "VaultBridge", "description": "Leading custody"}],
-            "skills": ["Blockchain"],
-            "education": [{"school": "MIT", "degree_name": "MS", "field_of_study": "CS"}],
-            "follower_count": 5000,
-        }
-
-        with patch("app.services.enrichment.settings") as mock_settings:
-            mock_settings.PROXYCURL_API_KEY = "test-key"
-            with patch.object(
-                enrichment_service.http_client, "get", new_callable=AsyncMock, return_value=mock_response
-            ):
-                result = await enrichment_service._enrich_linkedin("https://linkedin.com/in/test")
-
-        assert result is not None
-        assert result["headline"] == "CEO at VaultBridge"
-        assert len(result["experiences"]) == 1
-
-    @pytest.mark.asyncio
-    async def test_linkedin_failure(self, enrichment_service):
-        mock_response = MagicMock()
-        mock_response.status_code = 403
-
-        with patch("app.services.enrichment.settings") as mock_settings:
-            mock_settings.PROXYCURL_API_KEY = "test-key"
-            with patch.object(
-                enrichment_service.http_client, "get", new_callable=AsyncMock, return_value=mock_response
-            ):
-                result = await enrichment_service._enrich_linkedin("https://linkedin.com/in/test")
-
-        assert result is None
+# Proxycurl-based LinkedIn tests removed 2026-05-01 — Proxycurl was sunset
+# (returns 410) and the linkedin-api fallback was retired after LinkedIn
+# started 403'ing the account. Bulk LinkedIn enrichment now lives in the
+# manual Playwright script at scripts/linkedin_scrape.py.

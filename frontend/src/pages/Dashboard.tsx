@@ -581,7 +581,8 @@ export default function Dashboard() {
               <div className="space-y-2">
                 {[
                   { label: "Goals", value: revenueData.profile_completeness.with_goals, color: "bg-emerald-500" },
-                  { label: "LinkedIn", value: revenueData.profile_completeness.with_linkedin, color: "bg-blue-500" },
+                  { label: "LinkedIn URL", value: revenueData.profile_completeness.with_linkedin, color: "bg-blue-500" },
+                  { label: "LinkedIn data", value: revenueData.profile_completeness.with_linkedin_data, color: "bg-blue-700" },
                   { label: "Twitter", value: revenueData.profile_completeness.with_twitter, color: "bg-sky-500" },
                   { label: "Website", value: revenueData.profile_completeness.with_website, color: "bg-[#E76315]" },
                   { label: "Grid", value: revenueData.profile_completeness.with_grid, color: "bg-purple-500" },
@@ -603,6 +604,11 @@ export default function Dashboard() {
                   );
                 })}
               </div>
+              {revenueData.profile_completeness.pending_linkedin_enrichment > 0 && (
+                <div className="mt-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+                  {revenueData.profile_completeness.pending_linkedin_enrichment} attendee{revenueData.profile_completeness.pending_linkedin_enrichment === 1 ? "" : "s"} pending LinkedIn enrichment — run <code className="text-amber-200">scripts/linkedin_scrape.py</code> when at the laptop.
+                </div>
+              )}
             </div>
           </div>
         </>
