@@ -696,3 +696,14 @@ Splitting LinkedIn enrichment off the daily auto-sync means: (a) the cron is nev
 ### Why no implementation today
 - Context budget: at ~133% during Phase 2 planning. Started a fresh build-session on Monday to ship #1 (free-slot visibility) end-to-end rather than half-build it now.
 - Living plan persisted in `whats_next.md` so any session can pick it up cold.
+
+## 2026-05-01 (later) — Phase 2 #1: Free-slot visibility on match cards
+
+- **Backend** — `app/services/slots.py` (new): `CONFERENCE_SLOTS` mirror of frontend constant (27 thirty-min slots across June 2 + 3), plus `busy_slots_for(attendee)`, `mutual_free_slots(a, b, limit=4)`, `has_conflict(attendee, when)` helpers. Naive UTC datetimes match the existing `meeting_time` storage format.
+- **Backend** — `MatchResponse.mutual_free_slots: list[datetime]` added to `app/schemas/attendee.py`. Populated in both `GET /matches/{attendee_id}` and `GET /matches/m/{token}` only when the match is mutual and not yet booked. Avoids extra round-trips: the existing match list endpoint now ships everything the UI needs to render free-slot chips.
+- **Backend** — `PATCH /matches/{match_id}/schedule` now rejects with **409 Conflict** if either party already has a meeting at the requested time (skipped on idempotent re-save of the same time). Stops two attendees double-booking the same slot via the now-faster one-click path.
+- **Frontend** — `Match.mutual_free_slots?: string[]` on the Match type; `formatSlotChip(iso)` helper renders compact "Mon 09:30" labels.
+- **Frontend** — `MyMatches.tsx`: above the existing "Save a preferred time for Paris" expander on every mutual-match card, a new "Both free at — tap to book" panel renders up to 4 chips. One click books. Existing expander stays for overflow ("See all times" when chips are present, original copy when not).
+- **Frontend** — `useScheduleMeeting` hook now also invalidates the matches query on 409 so a stale chip disappears the moment the slot is taken by another match.
+- **Smoke tests** — `python -c` import + slot-helper sanity (27 slots, busy-set filtering correct); `tsc -b && vite build` passes; backend route imports clean. Full pytest skipped (pytest not in venv). Acceptable per smoke-test policy because the change is contained behind a defaulted-empty field and a 409 branch.
+- **Out of scope (deliberate)** — admin `AttendeeMatches` view: chips not surfaced because admins don't book. Briefing page: read-only, no booking flow. `MagicMatches` magic-link page: would require a separate `PATCH /matches/m/{token}/schedule` endpoint — Phase 2 #1 stays auth-only for now.

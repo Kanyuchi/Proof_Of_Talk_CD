@@ -16,6 +16,7 @@ from app.schemas.attendee import (
     redact_for_privacy,
 )
 from app.services.matching import MatchingEngine
+from app.services.slots import mutual_free_slots, has_conflict
 from app.core.deps import require_auth, require_admin
 from app.models.user import User
 
@@ -74,6 +75,8 @@ async def get_matches(
             is_mutual = match.status_a == "accepted" and match.status_b == "accepted"
             att_dict = AttendeeResponse.model_validate(matched).model_dump()
             resp.matched_attendee = AttendeeResponse(**redact_for_privacy(att_dict, is_mutual_match=is_mutual))
+            if is_mutual and not match.meeting_time:
+                resp.mutual_free_slots = await mutual_free_slots(db, attendee_id, other_id)
         match_responses.append(resp)
 
     return MatchListResponse(matches=match_responses, attendee_id=attendee_id)
@@ -123,6 +126,8 @@ async def get_matches_by_magic_link(
             is_mutual = match.status_a == "accepted" and match.status_b == "accepted"
             att_dict = AttendeeResponse.model_validate(matched).model_dump()
             resp.matched_attendee = AttendeeResponse(**redact_for_privacy(att_dict, is_mutual_match=is_mutual))
+            if is_mutual and not match.meeting_time:
+                resp.mutual_free_slots = await mutual_free_slots(db, attendee.id, other_id)
         match_responses.append(resp)
 
     return MatchListResponse(matches=match_responses, attendee_id=attendee.id)
@@ -342,6 +347,19 @@ async def schedule_meeting(
             status_code=400,
             detail="Meeting time can only be set on mutually accepted matches",
         )
+
+    # Reject if either party already has a meeting at that time. Use a different
+    # status code (409 Conflict) so the frontend can distinguish from validation
+    # errors and show a "slot just got taken" message.
+    for other_id in (match.attendee_a_id, match.attendee_b_id):
+        if await has_conflict(db, other_id, data.meeting_time):
+            # Skip if the conflict is *this* match (idempotent re-save)
+            if match.meeting_time == data.meeting_time:
+                continue
+            raise HTTPException(
+                status_code=409,
+                detail="That slot is no longer free for both of you — pick another time",
+            )
 
     match.meeting_time = data.meeting_time
     match.meeting_location = data.meeting_location or "Louvre Palace, Paris — TBD at venue"

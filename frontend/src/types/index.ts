@@ -52,6 +52,8 @@ export interface Match {
   explanation_confidence: number | null;
   created_at: string;
   matched_attendee?: Attendee;
+  // Slots both parties are free for. Populated server-side on mutual matches with no booking yet.
+  mutual_free_slots?: string[];
 }
 
 export interface DashboardStats {

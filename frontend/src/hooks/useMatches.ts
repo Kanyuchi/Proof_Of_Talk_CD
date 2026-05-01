@@ -63,6 +63,13 @@ export function useScheduleMeeting(attendeeId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["matches", attendeeId] });
     },
+    onError: (err: unknown) => {
+      // 409 = the slot was just taken by another match; refresh so the stale chip disappears.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 409) {
+        queryClient.invalidateQueries({ queryKey: ["matches", attendeeId] });
+      }
+    },
   });
 }
 

@@ -10,7 +10,7 @@ import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedbac
 import { useSendMatchMessage } from "../hooks/useMessages";
 import { useState } from "react";
 import {
-  CONFERENCE_SLOTS, slotToISO, formatMeetingTime, downloadICS,
+  CONFERENCE_SLOTS, slotToISO, formatMeetingTime, formatSlotChip, downloadICS,
   matchTypeConfig, ticketIcons, buildIcebreaker, twitterUrl,
 } from "../utils/matchHelpers";
 import { verticalDisplayName } from "../utils/verticals";
@@ -559,7 +559,35 @@ export default function MyMatches() {
                                 </button>
                               </div>
                             ) : (
-                              <div className="rounded-xl border border-white/10 overflow-hidden">
+                              <div className="space-y-2">
+                                {match.mutual_free_slots && match.mutual_free_slots.length > 0 && (
+                                  <div className="p-3 rounded-xl bg-[#E76315]/5 border border-[#E76315]/20">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Clock className="w-3.5 h-3.5 text-[#E76315]" />
+                                      <span className="text-xs font-medium text-[#E76315]">
+                                        Both free at — tap to book
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {match.mutual_free_slots.slice(0, 4).map((iso) => (
+                                        <button
+                                          key={iso}
+                                          onClick={() =>
+                                            scheduleMeeting.mutate({
+                                              matchId: match.id,
+                                              meeting_time: iso,
+                                            })
+                                          }
+                                          disabled={scheduleMeeting.isPending}
+                                          className="px-3 py-2 rounded-lg text-xs font-mono bg-white/5 border border-white/10 text-white/70 hover:bg-[#E76315]/15 hover:border-[#E76315]/40 hover:text-[#E76315] transition-all min-h-[44px] flex items-center justify-center disabled:opacity-50"
+                                        >
+                                          {formatSlotChip(iso)}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="rounded-xl border border-white/10 overflow-hidden">
                                 <button
                                   onClick={() => {
                                     setSchedulingMatchId(isScheduling ? null : match.id);
@@ -568,7 +596,11 @@ export default function MyMatches() {
                                   className="w-full flex items-center gap-2 px-4 py-2.5 bg-white/[0.02] text-sm text-white/50 hover:text-[#E76315] hover:bg-[#E76315]/5 transition-all text-left"
                                 >
                                   <Clock className="w-4 h-4" />
-                                  {isScheduling ? "Cancel" : "Save a preferred time for Paris"}
+                                  {isScheduling
+                                    ? "Cancel"
+                                    : match.mutual_free_slots && match.mutual_free_slots.length > 0
+                                    ? "See all times"
+                                    : "Save a preferred time for Paris"}
                                 </button>
 
                                 {isScheduling && (
@@ -628,6 +660,7 @@ export default function MyMatches() {
                                     )}
                                   </div>
                                 )}
+                                </div>
                               </div>
                             )}
 

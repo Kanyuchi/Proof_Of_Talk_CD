@@ -30,6 +30,17 @@ export function formatMeetingTime(iso: string): string {
   });
 }
 
+/** Compact slot label for one-click-book chips, e.g. "Mon 09:30". */
+export function formatSlotChip(iso: string): string {
+  // Slots come from the backend as naive ISO strings ("2026-06-02T09:00:00").
+  // Treat them as wall-clock — `new Date(iso)` parses naive ISO as local time.
+  const d = new Date(iso);
+  const day = d.getDate() === 2 ? "Mon" : "Tue";
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${day} ${hh}:${mm}`;
+}
+
 export function downloadICS(
   meetingTime: string,
   _attendeeName: string,

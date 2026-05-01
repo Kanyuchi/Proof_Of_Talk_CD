@@ -102,6 +102,9 @@ class MatchResponse(BaseModel):
 
     # Populated in the endpoint
     matched_attendee: AttendeeResponse | None = None
+    # Slots where both parties are currently free — surfaced on the match card
+    # for one-click booking. Only populated for mutually-accepted matches.
+    mutual_free_slots: list[datetime] = []
 
     model_config = {"from_attributes": True}
 
