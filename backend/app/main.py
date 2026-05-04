@@ -38,11 +38,19 @@ async def _daily_extasy_sync():
 
 async def _daily_speakers_sync():
     try:
-        from app.services.speakers_sync import sync_and_enrich
-        result = await sync_and_enrich()
-        logger.info("scheduler: daily speakers sync complete", **result)
+        # New path: pulls the master Google Sheet (source of truth for ops).
+        # Replaces the old speakers_sync.py path which read from the near-
+        # empty Supabase `speakers` table.
+        from app.services.speakers_sheet_sync import sync_speakers_sheet
+        result = await sync_speakers_sheet(fetch=True)
+        logger.info("scheduler: daily speakers sheet sync complete",
+                    inserted=result.get("inserted", 0),
+                    patched=result.get("patched", 0),
+                    noop=result.get("noop", 0),
+                    errors=result.get("errors", 0),
+                    total=result.get("total", 0))
     except Exception as exc:
-        logger.error("scheduler: daily speakers sync failed", error=str(exc))
+        logger.error("scheduler: daily speakers sheet sync failed", error=str(exc))
 
 async def _daily_grid_audit():
     try:

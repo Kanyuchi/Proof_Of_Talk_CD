@@ -707,3 +707,35 @@ Splitting LinkedIn enrichment off the daily auto-sync means: (a) the cron is nev
 - **Frontend** — `useScheduleMeeting` hook now also invalidates the matches query on 409 so a stale chip disappears the moment the slot is taken by another match.
 - **Smoke tests** — `python -c` import + slot-helper sanity (27 slots, busy-set filtering correct); `tsc -b && vite build` passes; backend route imports clean. Full pytest skipped (pytest not in venv). Acceptable per smoke-test policy because the change is contained behind a defaulted-empty field and a 409 branch.
 - **Out of scope (deliberate)** — admin `AttendeeMatches` view: chips not surfaced because admins don't book. Briefing page: read-only, no booking flow. `MagicMatches` magic-link page: would require a separate `PATCH /matches/m/{token}/schedule` endpoint — Phase 2 #1 stays auth-only for now.
+
+## 2026-05-04 — Master speaker sheet ingested (143 new SPEAKER/VIP attendees)
+
+### What landed
+- **`backend/scripts/ingest_speakers_sheet.py`** (new) — CLI for upserting the POT26 master Speaker Tracking Google Sheet (sheet ID `1DJJ5vQ-…`) into `attendees`. Default reads `backend/data/pot_speakers_master.csv`; `--fetch` pulls fresh from Google before ingesting; `--dry-run` previews. Maps Category="Jury*"→VIP, else→SPEAKER. Bio→`goals`, LinkedIn URL→`linkedin_url`, Twitter URL→`twitter_handle`. Dedup by email then by name+company.
+- **`backend/data/pot_speakers_master.csv`** (new) — committed snapshot of the master sheet (177 lines incl. header preamble; 144 valid speaker rows).
+- **`backend/app/services/speakers_sheet_sync.py`** (new) — async wrapper that imports the script's `run()` and offloads to `asyncio.to_thread`. Used by the daily cron and the admin dashboard endpoint.
+- **`backend/app/main.py`** — `_daily_speakers_sync()` cron at 02:15 UTC switched from `app.services.speakers_sync` (read 1000 Minds Supabase `speakers` table — only 8 rows) to `app.services.speakers_sheet_sync.sync_speakers_sheet(fetch=True)` (pulls fresh Google Sheet).
+- **`backend/app/api/routes/dashboard.py`** — `POST /dashboard/sync-speakers` swapped to the new path.
+
+### Email cleanup heuristics
+The master sheet's "Speaker / Moderator E-Mail" column has two recurring data-quality problems:
+1. **Multiple emails crammed into one cell** (newline- or whitespace-separated). Fix: `pick_speaker_email()` splits on `\s,;` and picks the candidate whose local-part matches the speaker's name. Critical bug along the way: original `parse_csv` used `csv_text.splitlines()`, which strips embedded newlines inside quoted cells — switched to `io.StringIO` so e.g. `rodrigo@…\ncaroline@…` parses as two candidates instead of one concatenated junk string.
+2. **EA / colleague email in the speaker column** (e.g. `lplatt@mgroupsc.com` for Steven Goldfeder). Fix: `email_belongs_to()` requires the local-part to contain the first or last name (≥3 chars) or match a `f.last`/`flast` initials pattern. Short alphabetic local-parts (≤3 chars) only pass when the first letter matches an initial — catches typos like `7@nazare.io`. Rejected cells fall back to a `{slug}@speaker.proofoftalk.io` placeholder and the original cell value is recorded under `enriched_profile.suspicious_email_in_sheet` for ops to audit.
+
+### Run results
+- **Dry-run**: 144 inserts, 0 errors. ~70 placeholder emails (48 sheet cells were empty + 22 wrong-person cells we rejected); ~74 real emails accepted.
+- **Live ingest**: **143 inserts, 1 unchanged** (Xavier Gomez — already in the DB from Jessica's earlier sync), **0 errors**.
+- **DB state after ingest**: 315 attendees total (was 172). Breakdown: 132 SPEAKER, 129 DELEGATE, 54 VIP. Of the 22 "suspicious_email_in_sheet" rows, the speaker is matchable by name; ops should audit and overwrite the placeholder with the real email when they have it.
+
+### Why we replaced Jessica's sync path instead of running both
+The old `speakers_sync.py` reads `speakers` table where `is_live = true` — only 8 rows, all already in `attendees`. The Google Sheet is an order-of-magnitude richer (144 speakers with bios, LinkedIn URLs, Twitter, conference categories) and is the source of truth ops actually maintains. Keeping both syncs would just mean a redundant 02:15 read of an empty table; the 8 existing speakers stay in `attendees` untouched. Per Shaun: "replace Jessica's with the new file and retain the speakers from Jessica's list" — the existing 8 rows are not deleted, the cron just stops re-reading her table.
+
+### Verified
+- `from app.services.speakers_sheet_sync import sync_speakers_sheet` imports clean.
+- `from app.main import app` boots clean (cron registration unchanged in shape).
+- DB row count went 172 → 315 with no errors; 0 enum-mismatch failures despite the model declaring lowercase `TicketType` values while the Postgres enum stores uppercase (the script writes uppercase strings via REST, matching what `ingest_extasy.py` already does).
+
+### Not yet
+- Run enrichment + match-gen for the 143 new attendees (kicked off in background).
+- The old `app/services/speakers_sync.py` file is left in place — no caller references it after this change. Will delete in a follow-up once we're confident the new path runs cleanly through one cron cycle.
+- 22 suspicious-email rows: ops to audit `enriched_profile.suspicious_email_in_sheet` against the master sheet and patch real emails by hand.

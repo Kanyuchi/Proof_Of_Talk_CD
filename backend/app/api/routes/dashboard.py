@@ -360,9 +360,9 @@ async def sync_speakers(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    """Admin: pull speakers from 1000 Minds table and upsert into attendees for matching."""
-    from app.services.speakers_sync import sync_speakers_to_attendees
-    result = await sync_speakers_to_attendees(db)
+    """Admin: pull master speaker sheet from Google and upsert into attendees."""
+    from app.services.speakers_sheet_sync import sync_speakers_sheet
+    result = await sync_speakers_sheet(fetch=True)
     return {"status": "completed", **result}
 
 
