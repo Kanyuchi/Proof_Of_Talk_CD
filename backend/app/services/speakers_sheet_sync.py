@@ -41,6 +41,44 @@ async def sync_speakers_sheet(fetch: bool = True) -> dict:
     def _go() -> dict:
         return run(csv_path=DEFAULT_CSV, fetch=fetch, dry_run=False)
 
-    stats = await asyncio.to_thread(_go)
+    status = "ok"
+    try:
+        stats = await asyncio.to_thread(_go)
+    except Exception as exc:
+        status = "error"
+        logger.exception("speakers_sheet_sync: failed")
+        stats = {"error": str(exc)}
+        await _write_heartbeat("speakers_sheet_sync", status, stats)
+        raise
+
+    if stats.get("errors", 0) > 0:
+        status = "partial"
+    await _write_heartbeat("speakers_sheet_sync", status, stats)
     logger.info("speakers_sheet_sync: complete", extra={"stats": stats})
     return stats
+
+
+async def _write_heartbeat(job_name: str, status: str, stats: dict) -> None:
+    """Mirror the extasy_sync heartbeat: upsert sync_status so the dashboard
+    can show 'Last sync: Xh ago' for speakers too."""
+    import json as _json
+    from sqlalchemy import text as _text
+    try:
+        from app.core.database import async_session
+        # Drop noisy / large fields before persisting
+        log_stats = {k: v for k, v in stats.items() if k != "new_ids"}
+        async with async_session() as db:
+            await db.execute(
+                _text("""
+                    INSERT INTO sync_status (job_name, last_run_at, last_status, stats)
+                    VALUES (:job, NOW(), :status, CAST(:stats AS JSONB))
+                    ON CONFLICT (job_name) DO UPDATE SET
+                        last_run_at = NOW(),
+                        last_status = EXCLUDED.last_status,
+                        stats = EXCLUDED.stats
+                """),
+                {"job": job_name, "status": status, "stats": _json.dumps(log_stats)},
+            )
+            await db.commit()
+    except Exception as exc:
+        logger.warning("speakers_sheet_sync: heartbeat write failed: %s", exc)
