@@ -178,7 +178,7 @@ async def sync_extasy_to_db() -> dict:
                 chunk_start, chunk_start + len(chunk) - 1, exc,
             )
 
-    return {
+    stats = {
         "total_fetched":  total_fetched,
         "valid_count":    len(valid_orders),
         "inserted":       inserted,
@@ -189,6 +189,41 @@ async def sync_extasy_to_db() -> dict:
         "chunks_failed":  chunks_failed,
         "inserted_ids":   inserted_ids,
     }
+
+    # Record the run regardless of partial errors — `chunks_failed > 0`
+    # tells the dashboard the run was degraded but at least it ran.
+    overall_status = "ok" if chunks_failed == 0 else "partial"
+    try:
+        await _record_sync_status("extasy_sync", overall_status, stats)
+    except Exception as exc:
+        logger.warning("extasy_sync: failed to persist sync_status row: %s", exc)
+
+    return stats
+
+
+async def _record_sync_status(job_name: str, status: str, stats: dict) -> None:
+    """UPSERT a row into sync_status so the dashboard can show
+    'Last sync: Xh ago'. Uses its own session so a broken main-pipeline
+    session can't prevent the heartbeat from being recorded."""
+    import json as _json
+    from sqlalchemy import text as _text
+    from app.core.database import async_session
+
+    log_stats = {k: v for k, v in stats.items() if k != "inserted_ids"}
+
+    async with async_session() as db:
+        await db.execute(
+            _text("""
+                INSERT INTO sync_status (job_name, last_run_at, last_status, stats)
+                VALUES (:job, NOW(), :status, CAST(:stats AS JSONB))
+                ON CONFLICT (job_name) DO UPDATE SET
+                    last_run_at = NOW(),
+                    last_status = EXCLUDED.last_status,
+                    stats = EXCLUDED.stats
+            """),
+            {"job": job_name, "status": status, "stats": _json.dumps(log_stats)},
+        )
+        await db.commit()
 
 
 async def _process_order_chunk(

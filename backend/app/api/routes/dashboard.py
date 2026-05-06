@@ -345,6 +345,21 @@ async def trigger_matching(
     }
 
 
+@router.get("/sync-status")
+async def sync_status(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_auth),
+):
+    """Return last-run heartbeat for each scheduled sync job. Lets the
+    dashboard surface 'Last sync: Xh ago' badges so silent-drift
+    failures (the May 5-6 incident) are visible the next morning."""
+    from sqlalchemy import text as _text
+    rows = (await db.execute(
+        _text("SELECT job_name, last_run_at, last_status, stats FROM sync_status ORDER BY job_name")
+    )).mappings().all()
+    return {"jobs": [dict(r) for r in rows]}
+
+
 @router.post("/sync-extasy")
 async def sync_extasy(
     _admin: User = Depends(require_admin),
