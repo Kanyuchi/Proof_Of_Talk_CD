@@ -27,64 +27,107 @@ structlog.configure(
 )
 logger = structlog.get_logger(__name__)
 
+# ── Scheduler heartbeat wrapper ───────────────────────────────────────────────
+# Every cron job runs through _run_with_heartbeat so that the sync_status
+# table always records last_run_at + status + stats — even if the job
+# raises an unhandled exception. This is what makes silent-drift failures
+# (May 5-6 incident) impossible to miss: the dashboard surfaces stale
+# timestamps the next morning instead of us having to dig through Railway
+# logs after the fact.
+async def _run_with_heartbeat(job_name: str, coro_factory):
+    """Run a cron job and unconditionally write a sync_status heartbeat.
+
+    `coro_factory` is a zero-arg callable returning a fresh coroutine each
+    call (so we can re-await on retry without RuntimeError). Returns the
+    job's result dict on success, None on failure.
+    """
+    import json as _json
+    from sqlalchemy import text as _text
+    from app.core.database import async_session
+
+    status = "ok"
+    stats: dict = {}
+    error_msg: str | None = None
+    try:
+        result = await coro_factory()
+        stats = result if isinstance(result, dict) else {"result": str(result)}
+        if stats.get("errors", 0) > 0 or stats.get("chunks_failed", 0) > 0:
+            status = "partial"
+        logger.info(f"scheduler: {job_name} complete", status=status, **{k: v for k, v in stats.items() if k != "inserted_ids"})
+    except Exception as exc:
+        status = "error"
+        error_msg = f"{type(exc).__name__}: {exc}"
+        stats = {"error": error_msg}
+        logger.error(f"scheduler: {job_name} failed", error=error_msg)
+
+    # Heartbeat write in its own session — a poisoned scheduler event loop
+    # or a broken main-pipeline session can't suppress this.
+    log_stats = {k: v for k, v in stats.items() if k != "inserted_ids"}
+    try:
+        async with async_session() as db:
+            await db.execute(
+                _text("""
+                    INSERT INTO sync_status (job_name, last_run_at, last_status, stats)
+                    VALUES (:job, NOW(), :status, CAST(:stats AS JSONB))
+                    ON CONFLICT (job_name) DO UPDATE SET
+                        last_run_at = NOW(),
+                        last_status = EXCLUDED.last_status,
+                        stats = EXCLUDED.stats
+                """),
+                {"job": job_name, "status": status, "stats": _json.dumps(log_stats)},
+            )
+            await db.commit()
+    except Exception as exc:
+        logger.error(f"scheduler: {job_name} heartbeat write failed", error=str(exc))
+
+
 # ── Daily Extasy sync + enrichment job ────────────────────────────────────────
 async def _daily_extasy_sync():
-    try:
-        from app.services.extasy_sync import sync_and_enrich
-        result = await sync_and_enrich()
-        logger.info("scheduler: daily extasy sync complete", **result)
-    except Exception as exc:
-        logger.error("scheduler: daily extasy sync failed", error=str(exc))
+    from app.services.extasy_sync import sync_and_enrich
+    await _run_with_heartbeat("daily_extasy_sync", sync_and_enrich)
 
 async def _daily_speakers_sync():
-    try:
-        # New path: pulls the master Google Sheet (source of truth for ops).
-        # Replaces the old speakers_sync.py path which read from the near-
-        # empty Supabase `speakers` table.
-        from app.services.speakers_sheet_sync import sync_speakers_sheet
-        result = await sync_speakers_sheet(fetch=True)
-        logger.info("scheduler: daily speakers sheet sync complete",
-                    inserted=result.get("inserted", 0),
-                    patched=result.get("patched", 0),
-                    noop=result.get("noop", 0),
-                    errors=result.get("errors", 0),
-                    total=result.get("total", 0))
-    except Exception as exc:
-        logger.error("scheduler: daily speakers sheet sync failed", error=str(exc))
+    from app.services.speakers_sheet_sync import sync_speakers_sheet
+    await _run_with_heartbeat("daily_speakers_sync", lambda: sync_speakers_sheet(fetch=True))
 
 async def _daily_grid_audit():
-    try:
-        from app.services.grid_audit import run_and_persist
+    from app.services.grid_audit import run_and_persist
+    async def _go():
         summary = await run_and_persist()
-        logger.info("scheduler: daily grid audit complete",
-                    matched_domains=summary["matched_domains"],
-                    total_domains=summary["total_domains"],
-                    matched_attendees=summary["matched_attendees"],
-                    total_attendees=summary["total_attendees"],
-                    new_matches=len(summary["new_matches"]))
-    except Exception as exc:
-        logger.error("scheduler: daily grid audit failed", error=str(exc))
+        return {
+            "matched_domains":   summary["matched_domains"],
+            "total_domains":     summary["total_domains"],
+            "matched_attendees": summary["matched_attendees"],
+            "total_attendees":   summary["total_attendees"],
+            "new_matches":       len(summary["new_matches"]),
+        }
+    await _run_with_heartbeat("daily_grid_audit", _go)
 
 async def _daily_match_refresh():
-    try:
-        from app.core.database import async_session
-        from app.services.matching import refresh_matches_for_new_attendees
+    from app.core.database import async_session
+    from app.services.matching import refresh_matches_for_new_attendees
+    async def _go():
         async with async_session() as db:
-            result = await refresh_matches_for_new_attendees(db)
-        logger.info("scheduler: daily match refresh complete", **result)
-    except Exception as exc:
-        logger.error("scheduler: daily match refresh failed", error=str(exc))
+            return await refresh_matches_for_new_attendees(db)
+    await _run_with_heartbeat("daily_match_refresh", _go)
+
+# coalesce + max_instances + misfire_grace_time are the APScheduler-level
+# protections that catch the OTHER half of the May 5-6 failure: container
+# restarts that miss the cron window, or jobs that stack up after a bad
+# night. coalesce=True collapses missed runs into one, max_instances=1
+# blocks overlapping runs, misfire_grace_time gives a 15-min window for
+# Railway to come back online before the run is dropped.
+_JOB_DEFAULTS = {
+    "coalesce":           True,
+    "max_instances":      1,
+    "misfire_grace_time": 900,
+}
 
 scheduler = AsyncIOScheduler()
-# Run every day at 02:00 UTC — after midnight registrations settle
-scheduler.add_job(_daily_extasy_sync, CronTrigger(hour=2, minute=0, timezone="UTC"))
-# Speakers sync at 02:15 UTC — after Extasy sync completes
-scheduler.add_job(_daily_speakers_sync, CronTrigger(hour=2, minute=15, timezone="UTC"))
-# Grid coverage audit at 02:30 UTC — after both sync jobs settle
-scheduler.add_job(_daily_grid_audit, CronTrigger(hour=2, minute=30, timezone="UTC"))
-# Match refresh at 02:45 UTC — fills in matches for new attendees from
-# Extasy/speakers syncs without disturbing existing accept/decline state
-scheduler.add_job(_daily_match_refresh, CronTrigger(hour=2, minute=45, timezone="UTC"))
+scheduler.add_job(_daily_extasy_sync,   CronTrigger(hour=2, minute=0,  timezone="UTC"), **_JOB_DEFAULTS)
+scheduler.add_job(_daily_speakers_sync, CronTrigger(hour=2, minute=15, timezone="UTC"), **_JOB_DEFAULTS)
+scheduler.add_job(_daily_grid_audit,    CronTrigger(hour=2, minute=30, timezone="UTC"), **_JOB_DEFAULTS)
+scheduler.add_job(_daily_match_refresh, CronTrigger(hour=2, minute=45, timezone="UTC"), **_JOB_DEFAULTS)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
