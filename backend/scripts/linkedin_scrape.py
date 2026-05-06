@@ -248,6 +248,54 @@ async def _search_linkedin(page, query: str, name: str) -> str | None:
         return None
 
 
+def _company_signal_set(attendee: dict) -> set[str]:
+    """Build a set of lowercase tokens that should appear somewhere on the
+    real candidate's LinkedIn page (headline / current-experience company)
+    to verify they're actually the person we expected."""
+    signals: set[str] = set()
+    company = (attendee.get("company") or "").strip().lower()
+    if company:
+        # Strip common suffixes
+        for suffix in (" inc", " ltd", " llc", " gmbh", " ag", " sa", " plc", " corp", " group"):
+            if company.endswith(suffix):
+                company = company[: -len(suffix)].strip()
+        signals.add(company)
+        # Also add first significant word ("Coinbase Asset Management" → "coinbase")
+        first_word = company.split()[0] if company.split() else ""
+        if len(first_word) >= 4:
+            signals.add(first_word)
+
+    email = (attendee.get("email") or "").strip().lower()
+    if "@" in email:
+        domain = email.split("@", 1)[1]
+        slug = domain.split(".")[0].replace("-", "")  # xbto.com → xbto
+        if slug and slug not in {"gmail", "yahoo", "hotmail", "outlook", "icloud", "proton", "protonmail"}:
+            signals.add(slug)
+    return {s for s in signals if len(s) >= 3}
+
+
+def _verify_company_match(scraped: dict, signals: set[str]) -> tuple[bool, str | None]:
+    """Return (matched, evidence_string). True if any signal token appears in
+    the scraped headline or in any of the top experiences' company/title."""
+    if not signals:
+        # No company signal to verify against — fall back to accepting
+        # (the existing first/last-name verification on _search_linkedin
+        # already filtered to plausible candidates).
+        return True, "no_company_signal"
+    haystack = " ".join([
+        (scraped.get("headline") or ""),
+        (scraped.get("summary") or "")[:300],
+        " ".join(
+            f"{e.get('title','')} {e.get('company','') or ''}"
+            for e in (scraped.get("experiences") or [])[:3]
+        ),
+    ]).lower()
+    for s in signals:
+        if s in haystack:
+            return True, f"signal '{s}' matched"
+    return False, f"no signal in {sorted(signals)} matched scraped data"
+
+
 async def discover_linkedin_url(page, name: str, company: str) -> str | None:
     """Find a LinkedIn profile by searching LinkedIn people-search.
 
@@ -278,7 +326,7 @@ def _is_already_enriched(attendee: dict) -> bool:
     return bool(li.get("headline"))
 
 
-async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False):
+async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False, verify_company: bool = False):
     print("=== LinkedIn Profile Scraper (Playwright) ===\n")
 
     # Fetch attendees
@@ -362,6 +410,7 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
             linkedin_url = attendee.get("linkedin_url")
 
             # Discovery mode for attendees without URL
+            url_was_discovered = False
             if not linkedin_url and discover:
                 print(f"  [{i+1}/{len(all_targets)}] {name} — discovering URL...")
                 linkedin_url = await discover_linkedin_url(
@@ -369,9 +418,14 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
                 )
                 if linkedin_url:
                     print(f"    Found: {linkedin_url}")
-                    discovered_count += 1
-                    if not dry_run:
-                        patch_attendee(attendee["id"], {"linkedin_url": linkedin_url})
+                    url_was_discovered = True
+                    # Patch URL only after company verification (below) when in
+                    # --verify-company mode. Without verification, we patch
+                    # immediately like before.
+                    if not verify_company:
+                        discovered_count += 1
+                        if not dry_run:
+                            patch_attendee(attendee["id"], {"linkedin_url": linkedin_url})
                 else:
                     print(f"    Not found")
                     skipped_count += 1
@@ -403,6 +457,22 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
                     skipped_count += 1
                     await asyncio.sleep(DELAY_SECONDS)
                     continue
+
+                # Company-signal verification: only enforced when this URL was
+                # auto-discovered AND --verify-company is on. URLs already on
+                # file are trusted (ops curated them).
+                if url_was_discovered and verify_company:
+                    signals = _company_signal_set(attendee)
+                    matched, evidence = _verify_company_match(data, signals)
+                    if not matched:
+                        print(f"    ❌ Company verify failed: {evidence}")
+                        skipped_count += 1
+                        await asyncio.sleep(DELAY_SECONDS)
+                        continue
+                    print(f"    🔎 Company verify ok: {evidence}")
+                    discovered_count += 1
+                    if not dry_run:
+                        patch_attendee(attendee["id"], {"linkedin_url": linkedin_url})
 
                 print(f"    ✅ {data['headline'][:60]}")
                 if data.get("experiences"):
@@ -458,10 +528,11 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing to Supabase")
     parser.add_argument("--limit", type=int, default=None, help="Max profiles to process")
     parser.add_argument("--discover", action="store_true", help="Also try to find URLs for attendees without one")
+    parser.add_argument("--verify-company", action="store_true", help="When discovering URLs, only accept candidates whose scraped LinkedIn page contains the attendee's company name or email-domain slug. Lower false-positive risk; recommended for any --discover run.")
     parser.add_argument("--only-missing", action="store_true", help="Only process attendees without linkedin_url (retry failed discoveries, skip the ones we already have)")
     parser.add_argument("--include-enriched", action="store_true", help="Re-scrape attendees who already have LinkedIn data (default: skip them)")
     args = parser.parse_args()
 
     # --only-missing implies --discover
     discover = args.discover or args.only_missing
-    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing, include_enriched=args.include_enriched))
+    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing, include_enriched=args.include_enriched, verify_company=args.verify_company))
