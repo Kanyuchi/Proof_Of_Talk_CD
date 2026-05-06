@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, DBAPIError, OperationalError, InterfaceError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attendee import Attendee, TicketType
@@ -105,14 +105,24 @@ def _parse_extasy_dt(s: str | None) -> datetime | None:
 
 # ── Main sync function ─────────────────────────────────────────────────────────
 
-async def sync_extasy_to_db(db: AsyncSession) -> dict:
+async def sync_extasy_to_db() -> dict:
     """
     Pull valid orders (PAID + REDEEMED) from Extasy and upsert into the
     attendees table.
 
+    Processes orders in CHUNK_SIZE batches, each in its own SQLAlchemy session.
+    If a chunk's connection drops mid-batch (Supabase pooler reset, network
+    blip, idle-timeout), only that chunk is lost — the next chunk opens a
+    fresh session and continues. This is what protects us from the Apr 28 /
+    May 5-6 silent-failure pattern where one connection drop poisoned the
+    rest of the loop with cascading "Can't reconnect until invalid
+    transaction is rolled back" errors.
+
     Returns a dict with sync stats:
         total_fetched, valid_count, inserted, upgraded, skipped, errors
     """
+    from app.core.database import async_session
+
     logger.info("extasy_sync: fetching orders from %s", ORDERS_URL)
 
     try:
@@ -129,10 +139,69 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
     backfilled    = 0
     skipped       = 0
     errors        = 0
+    chunks_failed = 0
     inserted_ids: list[str] = []
     seen_emails: set[str] = set()
 
-    for order in valid_orders:
+    # Chunk size of 30: small enough that a pooler drop loses ≤30 rows of
+    # progress, large enough that session-create overhead stays in the noise.
+    CHUNK_SIZE = 30
+
+    for chunk_start in range(0, len(valid_orders), CHUNK_SIZE):
+        chunk = valid_orders[chunk_start:chunk_start + CHUNK_SIZE]
+        try:
+            async with async_session() as db:
+                chunk_stats = await _process_order_chunk(
+                    db, chunk, seen_emails, inserted_ids,
+                )
+                inserted   += chunk_stats["inserted"]
+                upgraded   += chunk_stats["upgraded"]
+                backfilled += chunk_stats["backfilled"]
+                skipped    += chunk_stats["skipped"]
+                errors     += chunk_stats["errors"]
+                await db.commit()
+        except (DBAPIError, OperationalError, InterfaceError) as exc:
+            # Connection-level failure (pooler drop, server reset, asyncpg
+            # ConnectionDoesNotExistError, etc). Lose this chunk, keep going
+            # with a fresh session for the next one.
+            chunks_failed += 1
+            errors += len(chunk)
+            logger.error(
+                "extasy_sync: chunk %d-%d failed on connection error, will continue with fresh session: %s",
+                chunk_start, chunk_start + len(chunk) - 1, exc,
+            )
+        except Exception as exc:
+            chunks_failed += 1
+            errors += len(chunk)
+            logger.error(
+                "extasy_sync: chunk %d-%d unexpected failure: %s",
+                chunk_start, chunk_start + len(chunk) - 1, exc,
+            )
+
+    return {
+        "total_fetched":  total_fetched,
+        "valid_count":    len(valid_orders),
+        "inserted":       inserted,
+        "upgraded":       upgraded,
+        "backfilled":     backfilled,
+        "skipped":        skipped,
+        "errors":         errors,
+        "chunks_failed":  chunks_failed,
+        "inserted_ids":   inserted_ids,
+    }
+
+
+async def _process_order_chunk(
+    db: AsyncSession,
+    chunk: list[dict],
+    seen_emails: set[str],
+    inserted_ids: list[str],
+) -> dict:
+    """Process one chunk of orders within a single session. Per-row
+    SAVEPOINTs continue to isolate per-row data errors as before."""
+    inserted = upgraded = backfilled = skipped = errors = 0
+
+    for order in chunk:
         order_id    = order.get("id")
         ticket_name = (order.get("ticketNames") or "").split(",")[0].strip()
 
@@ -255,25 +324,13 @@ async def sync_extasy_to_db(db: AsyncSession) -> dict:
             logger.error("extasy_sync: error processing order %s: %s", order_id, exc)
             errors += 1
 
-    try:
-        await db.commit()
-    except Exception as exc:
-        await db.rollback()
-        logger.error("extasy_sync: final commit failed, rolled back: %s", exc)
-        raise
-
-    result_stats = {
-        "total_fetched":  total_fetched,
-        "valid_count":    len(valid_orders),
-        "inserted":       inserted,
-        "backfilled":     backfilled,
-        "upgraded":       upgraded,
-        "skipped":        skipped,
-        "errors":         errors,
-        "inserted_ids":   inserted_ids,
+    return {
+        "inserted":   inserted,
+        "upgraded":   upgraded,
+        "backfilled": backfilled,
+        "skipped":    skipped,
+        "errors":     errors,
     }
-    logger.info("extasy_sync: complete %s", {k: v for k, v in result_stats.items() if k != "inserted_ids"})
-    return result_stats
 
 
 # ── Sync + Enrich pipeline ─────────────────────────────────────────────────────
@@ -295,10 +352,18 @@ async def sync_and_enrich() -> dict:
 
     logger.info("sync_and_enrich: starting daily pipeline")
 
-    async with async_session() as db:
-        sync_stats = await sync_extasy_to_db(db)
+    # sync_extasy_to_db now manages its own per-chunk sessions internally so
+    # one connection drop can't poison the whole batch.
+    sync_stats = await sync_extasy_to_db()
 
     new_ids = sync_stats.get("inserted_ids", [])
+    logger.info(
+        "sync_and_enrich: extasy stats — fetched=%d valid=%d inserted=%d upgraded=%d backfilled=%d skipped=%d errors=%d chunks_failed=%d",
+        sync_stats.get("total_fetched", 0), sync_stats.get("valid_count", 0),
+        sync_stats.get("inserted", 0), sync_stats.get("upgraded", 0),
+        sync_stats.get("backfilled", 0), sync_stats.get("skipped", 0),
+        sync_stats.get("errors", 0), sync_stats.get("chunks_failed", 0),
+    )
     enriched_ok = 0
     enriched_errors = 0
 
