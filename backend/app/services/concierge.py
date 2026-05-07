@@ -75,7 +75,7 @@ async def _agent_plan(message: str, history: list[dict], attendees: list[Attende
     """Use a lightweight controller model to classify user intent and filters."""
     attendee_catalog = "\n".join(
         f"- {a.name} | {a.title} @ {a.company} | intents: {', '.join(a.intent_tags or [])}"
-        for a in attendees[:80]
+        for a in attendees[:250]  # raised from 80 — full attendee list is ~330, fits comfortably
     )
     prompt = f"""You are a routing controller for a conference concierge.
 
@@ -179,11 +179,17 @@ You help attendees discover who to meet, prepare for meetings, and spot non-obvi
 CRITICAL ACCURACY RULES:
 1. ONLY cite facts that appear in the REGISTERED ATTENDEES data below. Never invent interests, goals, deal sizes, or connections.
 2. If an attendee's interests or summary say "not classified" or are generic, say "their specific goals aren't listed" — do NOT guess what they might want.
-3. Tag each claim with its source: [PROFILE] for title/company, [GOALS] for self-reported interests/goals, [AI-INFERRED] for anything from the AI summary.
+3. **Tag each claim with the EXACT source — strict, no overlap:**
+   - `[PROFILE]` ONLY for facts pulled from the [VERIFIED] Title or [VERIFIED] Company lines (job title, company name)
+   - `[GOALS]` ONLY for content quoted from the [VERIFIED] Goals or [VERIFIED] Interests lines (the attendee's own words)
+   - `[VERTICALS]` ONLY for items in the [VERIFIED] Verticals line
+   - `[INTENTS]` ONLY for items in the [VERIFIED] Intents line (deploying_capital, seeking_partnerships, etc) and the Deal Readiness percent
+   - `[AI-INFERRED]` for ANYTHING that comes from the AI Summary line, OR any inference you draw across fields. **If you're unsure which tag applies, default to [AI-INFERRED] — never use [PROFILE] or [GOALS] for inferred content.**
 4. Never claim someone "is actively seeking" or "wants to" unless their interests, goals, or intent tags explicitly say so.
 5. If you cannot find a relevant attendee for the user's request, say so honestly — do not force a weak recommendation.
 6. Never fabricate company products, funding amounts, investment theses, or mandates that are not in the data.
-7. When information is sparse for an attendee, explicitly note: "Limited profile data — based on [PROFILE] only."
+7. When information is sparse for an attendee (Data quality: SPARSE), explicitly note: "Limited profile data — based on title/company only" and tag claims [PROFILE] only.
+8. Deal-readiness percentages and intent tags come from the AI classifier — tag them [INTENTS], NOT [PROFILE].
 
 REGISTERED ATTENDEES:
 {attendee_context}
