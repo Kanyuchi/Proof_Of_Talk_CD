@@ -1,11 +1,40 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { ChatMessage } from "../types";
-import { chatWithConcierge } from "../api/client";
+import { chatWithConcierge, fetchChatHistory, clearChatHistory } from "../api/client";
 
 export function useChat(attendeeId?: string) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // On mount (and when attendee changes), pull persisted history from the
+  // server. Backend writes every exchange to chat_messages so users can
+  // resume a conversation across sessions / devices.
+  useEffect(() => {
+    if (!attendeeId) return;
+    let cancelled = false;
+    setIsLoadingHistory(true);
+    fetchChatHistory()
+      .then(({ messages }) => {
+        if (cancelled) return;
+        setHistory(
+          messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          }))
+        );
+      })
+      .catch(() => {
+        // Silent — empty history is a fine fallback
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingHistory(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attendeeId]);
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -19,7 +48,7 @@ export function useChat(attendeeId?: string) {
         const { response } = await chatWithConcierge({
           message,
           attendee_id: attendeeId,
-          history: history, // send existing history (before current message)
+          history: history, // server-side history wins for authed users; this is a fallback
         });
         setHistory([...newHistory, { role: "assistant", content: response }]);
       } catch {
@@ -33,10 +62,17 @@ export function useChat(attendeeId?: string) {
     [history, attendeeId]
   );
 
-  const clearHistory = useCallback(() => {
+  const clearHistory = useCallback(async () => {
     setHistory([]);
     setError(null);
-  }, []);
+    if (attendeeId) {
+      try {
+        await clearChatHistory();
+      } catch {
+        // Best-effort — local UI is already cleared
+      }
+    }
+  }, [attendeeId]);
 
-  return { history, isLoading, error, sendMessage, clearHistory };
+  return { history, isLoading, isLoadingHistory, error, sendMessage, clearHistory };
 }

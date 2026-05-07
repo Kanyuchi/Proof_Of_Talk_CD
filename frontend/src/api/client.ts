@@ -382,6 +382,18 @@ export async function chatWithConcierge(body: {
   return data;
 }
 
+export async function fetchChatHistory(): Promise<{
+  messages: { role: "user" | "assistant"; content: string; created_at: string }[];
+}> {
+  const { data } = await api.get("/chat/history");
+  return data;
+}
+
+export async function clearChatHistory(): Promise<{ deleted: number }> {
+  const { data } = await api.delete("/chat/history");
+  return data;
+}
+
 // ── Messages ─────────────────────────────────────────────────────────
 
 export async function listConversations(): Promise<{ conversations: ConversationSummary[] }> {
