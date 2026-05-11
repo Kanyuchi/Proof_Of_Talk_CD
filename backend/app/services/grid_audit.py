@@ -22,9 +22,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import asyncio
 import httpx
 from dotenv import load_dotenv
 from sqlalchemy import select, desc
+from sqlalchemy.exc import DBAPIError, OperationalError, InterfaceError
 
 # Load .env so the service works whether invoked via uvicorn (env already
 # present), the APScheduler hook (env already present), or a one-off
@@ -61,9 +63,22 @@ async def _fetch_attendee_domains() -> list[dict]:
     we don't depend on SUPABASE_SERVICE_ROLE_KEY staying in sync with key
     rotations on Railway.
     """
-    async with async_session() as session:
-        result = await session.execute(select(Attendee.email, Attendee.enriched_profile))
-        rows = result.all()
+    # Retry once on a Supabase pooler disconnect (May 5-11 silent-fail pattern):
+    # connection drops mid-query, asyncpg surfaces ConnectionDoesNotExistError,
+    # we open a fresh session and try again. Without this the daily 02:30 UTC
+    # cron dies on this very first SELECT and nothing else in the audit runs.
+    rows = None
+    for attempt in (1, 2):
+        try:
+            async with async_session() as session:
+                result = await session.execute(select(Attendee.email, Attendee.enriched_profile))
+                rows = result.all()
+            break
+        except (DBAPIError, OperationalError, InterfaceError) as exc:
+            if attempt == 2:
+                raise
+            logger.warning("grid_audit: pooler disconnect on attendee fetch, retrying with fresh session: %s", exc)
+            await asyncio.sleep(1.0)
 
     buckets: dict[str, dict] = {}
     for email, enriched_profile in rows:

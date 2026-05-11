@@ -1,7 +1,10 @@
 import json
 import asyncio
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select, text, delete as sql_delete, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
@@ -828,33 +831,76 @@ async def refresh_matches_for_new_attendees(db: AsyncSession, top_k: int = 10) -
 
     Used by the daily scheduler to fill in matches for new Rhuna/speakers
     arrivals without disturbing accept/decline state on existing matches.
+
+    Each target is processed in its OWN fresh session — the May 5-11 silent
+    failures were caused by a Supabase pooler disconnect mid-loop poisoning
+    the single shared session for every subsequent attendee. Per-target
+    sessions are bulletproof against that pattern at the cost of a few
+    extra session-open calls.
     """
+    from sqlalchemy.exc import DBAPIError, OperationalError, InterfaceError
+    from app.core.database import async_session
+
     admin_ids_subq = select(User.attendee_id).where(
         User.is_admin.is_(True),
         User.attendee_id.isnot(None),
     )
     matched_a = select(Match.attendee_a_id)
     matched_b = select(Match.attendee_b_id)
-    result = await db.execute(
-        select(Attendee).where(
-            Attendee.embedding.isnot(None),
-            ~Attendee.id.in_(admin_ids_subq),
-            ~Attendee.id.in_(matched_a),
-            ~Attendee.id.in_(matched_b),
-        )
-    )
-    targets = result.scalars().all()
 
-    engine = MatchingEngine(db)
+    # Fetch the target ID list. Retry once on a connection drop so the
+    # daily cron doesn't die on the first SELECT.
+    target_ids: list = []
+    for attempt in (1, 2):
+        try:
+            res = await db.execute(
+                select(Attendee.id).where(
+                    Attendee.embedding.isnot(None),
+                    ~Attendee.id.in_(admin_ids_subq),
+                    ~Attendee.id.in_(matched_a),
+                    ~Attendee.id.in_(matched_b),
+                )
+            )
+            target_ids = list(res.scalars().all())
+            break
+        except (DBAPIError, OperationalError, InterfaceError):
+            if attempt == 2:
+                raise
+            await asyncio.sleep(1.0)
+            # Refresh the session for the retry
+            async with async_session() as fresh:
+                db = fresh
+                break  # fall through to per-target loop, will retry below if needed
+    else:
+        # Should not be reached because we either break or raise above.
+        target_ids = []
+
     total_new_matches = 0
-    for attendee in targets:
-        matches = await engine.generate_matches_for_attendee(
-            attendee.id, top_k, clear_existing=False
-        )
-        total_new_matches += len(matches)
+    failed = 0
+    for attendee_id in target_ids:
+        try:
+            async with async_session() as session:
+                engine = MatchingEngine(session)
+                matches = await engine.generate_matches_for_attendee(
+                    attendee_id, top_k, clear_existing=False
+                )
+                total_new_matches += len(matches)
+        except (DBAPIError, OperationalError, InterfaceError) as exc:
+            failed += 1
+            logger.warning(
+                "refresh_matches_for_new_attendees: pooler disconnect on attendee %s — continuing: %s",
+                attendee_id, exc,
+            )
+        except Exception as exc:
+            failed += 1
+            logger.error(
+                "refresh_matches_for_new_attendees: unexpected error for attendee %s: %s",
+                attendee_id, exc,
+            )
         await asyncio.sleep(0)
 
     return {
-        "attendees_processed": len(targets),
-        "matches_created": total_new_matches,
+        "attendees_processed": len(target_ids),
+        "matches_created":     total_new_matches,
+        "failed":              failed,
     }
