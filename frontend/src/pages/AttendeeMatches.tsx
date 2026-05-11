@@ -1,6 +1,7 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { verticalDisplayName } from "../utils/verticals";
 import GridOrgCard from "../components/GridOrgCard";
+import AttendeeAvatar from "../components/AttendeeAvatar";
 import {
   ArrowLeft, Check, X, Brain,
   Target, MessageSquare, Sparkles,
@@ -156,9 +157,7 @@ export default function AttendeeMatches() {
       {/* Attendee profile card */}
       <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
         <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#E76315]/20 to-[#D35400]/20 flex items-center justify-center text-[#E76315] font-bold text-2xl shrink-0">
-            {attendee.name[0]}
-          </div>
+          <AttendeeAvatar attendee={attendee} size="lg" />
           <div className="flex-1">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold">{attendee.name}</h1>
@@ -373,9 +372,7 @@ export default function AttendeeMatches() {
               <div className="p-5 space-y-4">
                 {person && (
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-white/5 to-white/10 flex items-center justify-center text-white/60 font-semibold">
-                      {person.name[0]}
-                    </div>
+                    <AttendeeAvatar attendee={person} size="md" />
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{person.name}</span>
@@ -442,6 +439,22 @@ export default function AttendeeMatches() {
                     <p className="text-sm text-white/60 leading-relaxed">{person.ai_summary}</p>
                   </div>
                 )}
+
+                {/* LinkedIn summary block (parity with the subject-attendee
+                    "Enriched Data" panel). Shows direct quotes from the
+                    scraped LinkedIn profile when present. */}
+                {user?.is_admin && (() => {
+                  const li = (person?.enriched_profile as Record<string, unknown> | undefined)?.linkedin_summary;
+                  if (typeof li !== "string" || !li) return null;
+                  return (
+                    <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                      <div className="flex items-center gap-2 text-xs text-blue-300 font-medium mb-2">
+                        <Linkedin className="w-3.5 h-3.5" /> LinkedIn
+                      </div>
+                      <p className="text-sm text-white/60 leading-relaxed">{li}</p>
+                    </div>
+                  );
+                })()}
 
                 {/* AI Explanation */}
                 <div className="p-4 rounded-xl bg-[#E76315]/5 border border-[#E76315]/10">

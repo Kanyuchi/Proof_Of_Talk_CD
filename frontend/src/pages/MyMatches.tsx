@@ -207,9 +207,7 @@ export default function MyMatches() {
                       return (
                         <div key={m.id} className="px-5 py-3 flex items-center gap-4 flex-wrap">
                           <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/50 font-semibold text-sm shrink-0">
-                              {person?.name[0]}
-                            </div>
+                            {person && <AttendeeAvatar attendee={person} size="sm" />}
                             <div className="min-w-0">
                               <div className="text-sm font-medium truncate">{person?.name}</div>
                               <div className="text-xs text-white/30 truncate">{person?.title} · {person?.company}</div>

@@ -8,6 +8,7 @@ import { useMatches } from "../hooks/useMatches";
 import { useAuth } from "../hooks/useAuth";
 import { verticalDisplayName } from "../utils/verticals";
 import EmptyState from "../components/EmptyState";
+import AttendeeAvatar from "../components/AttendeeAvatar";
 
 const ticketIcons: Record<string, React.ReactNode> = {
   vip: <Crown className="w-3.5 h-3.5 text-[#E76315]" />,
@@ -146,10 +147,9 @@ export default function Attendees() {
               to={`/attendees/${attendee.id}`}
               className="flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/10 hover:border-[#E76315]/30 hover:bg-white/[0.05] transition-all group overflow-hidden"
             >
-              {/* Avatar */}
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#E76315]/20 to-[#D35400]/20 flex items-center justify-center text-[#E76315] font-semibold text-lg shrink-0">
-                {attendee.name[0]}
-              </div>
+              {/* Avatar — uses AttendeeAvatar with full fallback chain
+                  (explicit photo_url → Gravatar → ui-avatars styled initials) */}
+              <AttendeeAvatar attendee={attendee} size="lg" />
 
               {/* Info */}
               <div className="flex-1 min-w-0">
