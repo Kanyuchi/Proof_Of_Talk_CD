@@ -103,6 +103,10 @@ async def _daily_grid_audit():
         }
     await _run_with_heartbeat("daily_grid_audit", _go)
 
+async def _daily_enrichment_sweep():
+    from app.services.enrichment_sweep import daily_enrichment_sweep
+    await _run_with_heartbeat("daily_enrichment_sweep", daily_enrichment_sweep)
+
 async def _daily_match_refresh():
     from app.core.database import async_session
     from app.services.matching import refresh_matches_for_new_attendees
@@ -124,10 +128,17 @@ _JOB_DEFAULTS = {
 }
 
 scheduler = AsyncIOScheduler()
-scheduler.add_job(_daily_extasy_sync,   CronTrigger(hour=2, minute=0,  timezone="UTC"), **_JOB_DEFAULTS)
-scheduler.add_job(_daily_speakers_sync, CronTrigger(hour=2, minute=15, timezone="UTC"), **_JOB_DEFAULTS)
-scheduler.add_job(_daily_grid_audit,    CronTrigger(hour=2, minute=30, timezone="UTC"), **_JOB_DEFAULTS)
-scheduler.add_job(_daily_match_refresh, CronTrigger(hour=2, minute=45, timezone="UTC"), **_JOB_DEFAULTS)
+scheduler.add_job(_daily_extasy_sync,       CronTrigger(hour=2, minute=0,  timezone="UTC"), **_JOB_DEFAULTS)
+scheduler.add_job(_daily_speakers_sync,     CronTrigger(hour=2, minute=15, timezone="UTC"), **_JOB_DEFAULTS)
+scheduler.add_job(_daily_grid_audit,        CronTrigger(hour=2, minute=30, timezone="UTC"), **_JOB_DEFAULTS)
+# Enrichment sweep at 03:00 UTC: re-scrapes any attendee with missing
+# website / Grid / AI summary / embedding data. Skips LinkedIn (manual
+# Playwright path). Closes the last automation gap so operators no
+# longer need to remember to run enrich_and_embed.py for new arrivals.
+scheduler.add_job(_daily_enrichment_sweep,  CronTrigger(hour=3, minute=0,  timezone="UTC"), **_JOB_DEFAULTS)
+# Match refresh moved to 03:30 UTC so it runs AFTER the enrichment
+# sweep finishes (was 02:45, before enrichment existed in the cron).
+scheduler.add_job(_daily_match_refresh,     CronTrigger(hour=3, minute=30, timezone="UTC"), **_JOB_DEFAULTS)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

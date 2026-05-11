@@ -608,7 +608,7 @@ async def process_attendee(
     return f"{name}: {', '.join(status_parts)} | patch={'ok' if ok else 'ERR'}"
 
 
-async def run(dry_run: bool, force: bool, scrape_only: bool, skip_linkedin: bool = False) -> None:
+async def run(dry_run: bool, force: bool, scrape_only: bool, skip_linkedin: bool = False) -> dict:
     print("=== POT Matchmaker — Batch Enrichment + Embedding ===\n")
 
     if not OPENAI_API_KEY and not scrape_only:
@@ -675,6 +675,7 @@ async def run(dry_run: bool, force: bool, scrape_only: bool, skip_linkedin: bool
             ok_count += 1
 
     print(f"\n{'DRY RUN ' if dry_run else ''}Done: {ok_count} ok, {err_count} errors / {len(attendees)} total")
+    return {"ok": ok_count, "errors": err_count, "total": len(attendees)}
 
 
 if __name__ == "__main__":
