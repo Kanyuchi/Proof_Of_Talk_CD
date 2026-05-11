@@ -150,9 +150,38 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                 }
             }
 
-            // Profile photo — any img with the person's name in alt text
+            // Profile photo — try the stable LinkedIn classes first, then
+            // alt-text match, then any media.licdn.com avatar-shaped img in
+            // the top-card region. LinkedIn rotates class names but keeps
+            // media.licdn.com profile-displayphoto URLs stable.
             let photoUrl = null;
-            if (name) {
+            const photoCandidates = [
+                ...document.querySelectorAll('img.pv-top-card-profile-picture__image'),
+                ...document.querySelectorAll('img.evi-image'),
+                ...document.querySelectorAll('button[aria-label*="profile photo" i] img'),
+                ...document.querySelectorAll('img[src*="profile-displayphoto"]'),
+            ];
+            for (const img of photoCandidates) {
+                if (img.src && img.src.startsWith('http')) {
+                    photoUrl = img.src;
+                    break;
+                }
+            }
+            // Fallback 1: any media.licdn.com URL that looks like an avatar
+            // (profile-displayphoto / profile-framedphoto). Excludes company
+            // logos and post images.
+            if (!photoUrl) {
+                const imgs = [...document.querySelectorAll('img[src*="media.licdn.com"]')];
+                for (const img of imgs) {
+                    const src = img.src || '';
+                    if (/profile-(displayphoto|framedphoto)/i.test(src) && img.width > 50) {
+                        photoUrl = src;
+                        break;
+                    }
+                }
+            }
+            // Fallback 2: original alt-text heuristic (kept for safety)
+            if (!photoUrl && name) {
                 const firstName = name.split(' ')[0];
                 const imgs = document.querySelectorAll('img');
                 for (const img of imgs) {
