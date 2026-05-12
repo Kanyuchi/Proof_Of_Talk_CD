@@ -14,21 +14,20 @@ const sizes = {
   lg: "w-14 h-14 text-base",
 };
 
-// Layer 1: explicit photo_url or enriched LinkedIn photo
+// Layer 1: ONLY the top-level photo_url column.
+//
+// We previously also read enriched_profile.linkedin.profile_pic_url /
+// photoUrl / photo_url, but that JSONB blob is set by the scraper and
+// can contain garbage (e.g. the operator's own nav avatar — May 11
+// incident polluted 99 rows with Shaun's photo via this JSONB path).
+//
+// photo_url is the canonical, deliberate column — Avatar trusts ONLY
+// that. If a future scraper bug pollutes JSONB again, the UI stays clean.
 function getExplicitPhoto(
   photoUrl: string | null | undefined,
-  enriched: Record<string, unknown>,
+  _enriched: Record<string, unknown>,
 ): string | null {
-  if (photoUrl) return photoUrl;
-  const candidates = [
-    enriched?.profile_photo_url,
-    enriched?.photo_url,
-    (enriched?.linkedin as Record<string, unknown>)?.profile_pic_url,
-    (enriched?.linkedin as Record<string, unknown>)?.photo_url,
-  ];
-  for (const c of candidates) {
-    if (typeof c === "string" && c.startsWith("http")) return c;
-  }
+  if (typeof photoUrl === "string" && photoUrl.startsWith("http")) return photoUrl;
   return null;
 }
 
