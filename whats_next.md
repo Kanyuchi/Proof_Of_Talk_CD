@@ -41,6 +41,11 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 
 ## Soon
 
+- **Improve LinkedIn enrichment depth** *(noted 2026-05-12 — Shaun flagged it)* — current scraper truncates the About section at 200 chars and doesn't click LinkedIn's "see more" expander, so attendee bios cut off mid-sentence ("…until I (my", "…and meaning. Fee"). Three fixes:
+  (a) bump truncation 200 → 1500 chars (`linkedin_scrape.py` line ~421)
+  (b) click `button[aria-label*="see more" i]` inside the About section before reading text
+  (c) anchor About-section scrape to `section[id*="about"]` instead of "first long `<p>`" heuristic
+  After fix, run `scripts/linkedin_scrape.py --include-enriched` to backfill richer bios for already-enriched profiles.
 - **2026-05-05 (after 02:30 UTC cron) — backfill Grid + website + LinkedIn for new speakers** — Wait for the nightly Grid audit (02:30 UTC) to sweep the 140 Grid-eligible new speakers, then run `cd backend && source .venv/bin/activate && python scripts/enrich_and_embed.py --skip-linkedin` to fill in any rows the cron didn't reach + scrape websites for those Grid surfaced. Finally run `python scripts/linkedin_scrape.py` (operator-driven, manual LinkedIn login) for the **37 new speakers with linkedin_url set**. Today's targeted enrichment did AI summary + embedding only (zero LinkedIn, zero website, only 7 Grid).
 - **Audit 22 suspicious-email speaker rows** — `enriched_profile.suspicious_email_in_sheet` flags rows where the master sheet's email column held a colleague/EA address (e.g. `lplatt@mgroupsc.com` for Steven Goldfeder). Those rows are matchable on placeholder emails today; ops should patch real emails when known. Query: `SELECT name, email, enriched_profile->>'suspicious_email_in_sheet' AS in_sheet FROM attendees WHERE enriched_profile ? 'suspicious_email_in_sheet';`.
 - **Delete `app/services/speakers_sync.py`** after one full cron cycle (02:15 UTC tomorrow) confirms `speakers_sheet_sync` runs cleanly. The old service has no remaining callers.

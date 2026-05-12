@@ -50,15 +50,18 @@ def sb_headers():
     }
 
 
-def fetch_attendees(with_url_only: bool = True) -> list[dict]:
+def fetch_attendees(with_url_only: bool = True, missing_photo_only: bool = False) -> list[dict]:
     url = f"{SUPABASE_URL}/rest/v1/attendees"
     params = {
-        "select": "id,name,email,company,title,linkedin_url,enriched_profile",
+        "select": "id,name,email,company,title,linkedin_url,photo_url,enriched_profile",
         "order": "created_at.asc",
         "limit": "500",
     }
     if with_url_only:
         params["linkedin_url"] = "not.is.null"
+    if missing_photo_only:
+        # PostgREST: photo_url is null OR empty string
+        params["photo_url"] = "is.null"
     with httpx.Client(timeout=30) as client:
         resp = client.get(url, headers=sb_headers(), params=params)
         resp.raise_for_status()
@@ -180,22 +183,30 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                 ...main.querySelectorAll('img[src*="profile-displayphoto"]'),
                 ...main.querySelectorAll('img[src*="profile-framedphoto"]'),
             ];
-            for (const img of candidates) {
-                const src = img.src || '';
-                if (!src.startsWith('http')) continue;
-                if (navAvatarSrcs.has(src)) continue;  // skip operator's own avatar
-                // Belt-and-braces: also verify alt or surrounding aria-label
-                // contains the target's first name. LinkedIn renders the
-                // profile photo with alt="<full name>" or a sibling button
-                // labelled "<name>'s profile photo".
-                const alt = (img.alt || '').toLowerCase();
-                const parentLabel = (img.closest('button, a')?.getAttribute('aria-label') || '').toLowerCase();
-                const matchesTarget =
-                    targetFirstName &&
-                    (alt.includes(targetFirstName) || parentLabel.includes(targetFirstName));
-                if (!matchesTarget && targetFirstName) continue;
-                photoUrl = src;
-                break;
+            // If we couldn't extract the target's name from the page title,
+            // refuse to set a photo at all. Without a name we have no way to
+            // distinguish the target's photo from the operator's nav avatar
+            // (May 12 Junhaeng Lee regression). Better to leave photo_url
+            // NULL than risk another mis-attribution.
+            if (!targetFirstName) {
+                photoUrl = null;
+            } else {
+                for (const img of candidates) {
+                    const src = img.src || '';
+                    if (!src.startsWith('http')) continue;
+                    if (navAvatarSrcs.has(src)) continue;  // skip operator's own avatar
+                    // Belt-and-braces: verify alt or surrounding aria-label
+                    // contains the target's first name. LinkedIn renders the
+                    // profile photo with alt="<full name>" or a sibling button
+                    // labelled "<name>'s profile photo".
+                    const alt = (img.alt || '').toLowerCase();
+                    const parentLabel = (img.closest('button, a')?.getAttribute('aria-label') || '').toLowerCase();
+                    const matchesTarget =
+                        alt.includes(targetFirstName) || parentLabel.includes(targetFirstName);
+                    if (!matchesTarget) continue;
+                    photoUrl = src;
+                    break;
+                }
             }
 
             return { name, headline, summary, experiences, skills: [], education: [], photoUrl };
@@ -360,11 +371,18 @@ def _is_already_enriched(attendee: dict) -> bool:
     return bool(li.get("headline"))
 
 
-async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False, verify_company: bool = False):
+async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False, verify_company: bool = False, missing_photos_only: bool = False):
     print("=== LinkedIn Profile Scraper (Playwright) ===\n")
 
     # Fetch attendees
-    if discover:
+    if missing_photos_only:
+        # Target only rows with linkedin_url set AND photo_url IS NULL.
+        # Bypasses the _is_already_enriched skip so we re-visit profiles
+        # that have LinkedIn data already but never captured a photo.
+        attendees_with_url = fetch_attendees(with_url_only=True, missing_photo_only=True)
+        attendees_without_url = []
+        print(f"  Attendees missing photos (linkedin_url set, photo_url NULL): {len(attendees_with_url)}")
+    elif discover:
         attendees = fetch_attendees(with_url_only=False)
         attendees_with_url = [a for a in attendees if a.get("linkedin_url")]
         attendees_without_url = [a for a in attendees if not a.get("linkedin_url")]
@@ -378,7 +396,9 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
     # Default: skip attendees who already have non-stub LinkedIn data —
     # cheaper, kinder to LinkedIn rate limits, and the common case.
     # Override with --include-enriched to force re-scrape.
-    if not include_enriched:
+    # --missing-photos-only bypasses this skip — the WHOLE POINT of that
+    # mode is to re-scrape profiles that DO have linkedin data but no photo.
+    if not include_enriched and not missing_photos_only:
         before_with = len(attendees_with_url)
         before_without = len(attendees_without_url)
         attendees_with_url = [a for a in attendees_with_url if not _is_already_enriched(a)]
@@ -565,8 +585,9 @@ if __name__ == "__main__":
     parser.add_argument("--verify-company", action="store_true", help="When discovering URLs, only accept candidates whose scraped LinkedIn page contains the attendee's company name or email-domain slug. Lower false-positive risk; recommended for any --discover run.")
     parser.add_argument("--only-missing", action="store_true", help="Only process attendees without linkedin_url (retry failed discoveries, skip the ones we already have)")
     parser.add_argument("--include-enriched", action="store_true", help="Re-scrape attendees who already have LinkedIn data (default: skip them)")
+    parser.add_argument("--missing-photos-only", action="store_true", help="Only scrape rows where linkedin_url is set AND photo_url is NULL. Targets photo gaps without re-touching profiles that already have a photo.")
     args = parser.parse_args()
 
     # --only-missing implies --discover
     discover = args.discover or args.only_missing
-    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing, include_enriched=args.include_enriched, verify_company=args.verify_company))
+    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing, include_enriched=args.include_enriched, verify_company=args.verify_company, missing_photos_only=args.missing_photos_only))
