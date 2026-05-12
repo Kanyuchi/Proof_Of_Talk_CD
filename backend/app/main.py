@@ -171,6 +171,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+    expose_headers=["X-Refresh-Token"],
 )
 
 # ── Security headers ──────────────────────────────────────────────────────────
@@ -182,6 +183,36 @@ async def security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
+
+# ── Sliding token refresh ─────────────────────────────────────────────────────
+# When an authenticated request comes in with a still-valid JWT that is
+# within 2h of expiry, return a fresh token in the X-Refresh-Token
+# response header. The frontend axios interceptor swaps it into
+# localStorage on the next response. Net effect: active users never see
+# a "session expired" mid-conference; idle users still expire after the
+# normal 8h TTL.
+@app.middleware("http")
+async def sliding_token_refresh(request: Request, call_next):
+    response = await call_next(request)
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return response
+    token = auth.split(None, 1)[1]
+    try:
+        import time as _time
+        from app.core.security import decode_token, create_access_token
+        payload = decode_token(token)
+        exp = float(payload.get("exp") or 0)
+        sub = payload.get("sub")
+        # Refresh if less than 2h left and still valid
+        remaining = exp - _time.time()
+        if sub and 0 < remaining < 7200:
+            response.headers["X-Refresh-Token"] = create_access_token({"sub": sub})
+            response.headers.setdefault("Access-Control-Expose-Headers", "X-Refresh-Token")
+    except Exception:
+        pass  # invalid/expired token — let the route's auth deps handle it
     return response
 
 # ── Global exception handler (no stack traces in responses) ──────────────────

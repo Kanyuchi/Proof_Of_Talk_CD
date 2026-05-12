@@ -531,6 +531,38 @@ EXTASY_EVENT_ID = "32b1b684-0e87-4633-92ef-b47272aa3fce"
 EXTASY_ORDERS_URL = f"https://api.b2b.extasy.com/operations/reports/orders/{EXTASY_EVENT_ID}"
 TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
 
+# In-process cache for the Extasy orders CSV. Previously every admin
+# dashboard page-load triggered a full Extasy API request; at conference
+# scale (347+ concurrent admins/sponsors viewing the dashboard) that
+# would hammer Extasy and slow every page render. Cache for 5 min: the
+# dashboard already runs a daily cron at 02:00 UTC for the source-of-
+# truth sync, so a 5-min staleness on revenue counts is acceptable.
+_EXTASY_CACHE: dict = {"orders": None, "fetched_at": 0.0}
+_EXTASY_CACHE_TTL_SECONDS = 300
+
+
+async def _get_extasy_orders() -> tuple[list, str | None]:
+    """Return (orders, error_msg). Cached for _EXTASY_CACHE_TTL_SECONDS."""
+    import time as _time
+    now = _time.time()
+    if _EXTASY_CACHE["orders"] is not None and (now - _EXTASY_CACHE["fetched_at"]) < _EXTASY_CACHE_TTL_SECONDS:
+        return _EXTASY_CACHE["orders"], None
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(EXTASY_ORDERS_URL)
+            resp.raise_for_status()
+            text = resp.content.decode("iso-8859-1", errors="replace")
+            orders = list(csv.DictReader(io.StringIO(text)))
+        _EXTASY_CACHE["orders"] = orders
+        _EXTASY_CACHE["fetched_at"] = now
+        return orders, None
+    except Exception as exc:
+        # On error, serve the stale cache if we have one rather than
+        # showing the user nothing.
+        if _EXTASY_CACHE["orders"] is not None:
+            return _EXTASY_CACHE["orders"], None
+        return [], f"Extasy API unavailable: {exc}"
+
 
 @router.get("/revenue")
 async def revenue_stats(
@@ -538,14 +570,9 @@ async def revenue_stats(
     _admin: User = Depends(require_admin),
 ):
     """Revenue tracking, registration funnel, and attendee growth from Extasy."""
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(EXTASY_ORDERS_URL)
-            resp.raise_for_status()
-            text = resp.content.decode("iso-8859-1", errors="replace")
-            orders = list(csv.DictReader(io.StringIO(text)))
-    except Exception as exc:
-        return {"error": f"Extasy API unavailable: {exc}"}
+    orders, err = await _get_extasy_orders()
+    if err:
+        return {"error": err}
 
     # ── Registration funnel ───────────────────────────────────────────────
     # Exclude test tickets from every funnel count so the headline "Valid

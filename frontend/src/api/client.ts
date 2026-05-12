@@ -21,6 +21,19 @@ if (stored) {
   api.defaults.headers.common["Authorization"] = `Bearer ${stored}`;
 }
 
+// Sliding-token refresh: backend sets X-Refresh-Token whenever the
+// current JWT is within 2h of expiry. Capture and swap into localStorage
+// so the user never sees a "session expired" mid-conference. Pairs with
+// the backend's sliding_token_refresh middleware in app/main.py.
+api.interceptors.response.use((response) => {
+  const refreshed = response.headers?.["x-refresh-token"];
+  if (typeof refreshed === "string" && refreshed) {
+    localStorage.setItem("token", refreshed);
+    api.defaults.headers.common["Authorization"] = `Bearer ${refreshed}`;
+  }
+  return response;
+});
+
 // ── Attendees ─────────────────────────────────────────────────────────
 
 export async function listAttendees(params?: {
