@@ -100,6 +100,24 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
         await page.evaluate("window.scrollTo(0, 0)")
         await page.wait_for_timeout(500)
 
+        # Click "…see more" expanders before reading text. Without this,
+        # LinkedIn truncates About to ~250 chars and we capture half a
+        # sentence ("…until I (my"). Try the common selectors; ignore
+        # errors if no expander present.
+        try:
+            await page.evaluate("""() => {
+                const buttons = [...document.querySelectorAll('button')];
+                for (const b of buttons) {
+                    const label = (b.getAttribute('aria-label') || b.innerText || '').toLowerCase();
+                    if (/see more|…see more|show more/.test(label) && b.offsetParent !== null) {
+                        try { b.click(); } catch (_) {}
+                    }
+                }
+            }""")
+            await page.wait_for_timeout(500)
+        except Exception:
+            pass
+
         data = await page.evaluate("""() => {
             // Get page title for name (most reliable)
             const titleMatch = document.title.match(/^(.+?)\\s*[|\\-–]\\s*LinkedIn/);
@@ -119,16 +137,36 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                 }
             }
 
-            // About section — look for long paragraph text
+            // About section — anchor to the actual About section when we
+            // can find it. LinkedIn renders it as section[id*="about"] or
+            // a <section> whose <h2> says "About". Fall back to the longest
+            // <p> on the page if neither is present.
             let summary = null;
-            for (const p of allPs) {
-                const text = p.innerText.trim();
-                if (text.length > 100 && text.length < 3000 &&
-                    !text.includes('LinkedIn') && !text.includes('cookie') &&
-                    !text.includes('notifications')) {
-                    summary = text;
-                    break;
-                }
+            const aboutSection =
+                document.querySelector('section[id*="about" i]') ||
+                [...document.querySelectorAll('section')].find(s => {
+                    const h = s.querySelector('h2');
+                    return h && /^about$/i.test(h.innerText.trim());
+                });
+            if (aboutSection) {
+                // Prefer the expanded text (after "see more" click); take
+                // the largest text node inside the section.
+                const candidates = [...aboutSection.querySelectorAll('p, span[class*="break"], div[class*="text"]')]
+                    .map(el => el.innerText.trim())
+                    .filter(t => t.length > 80 && !/^see (more|less)/i.test(t))
+                    .sort((a, b) => b.length - a.length);
+                if (candidates.length) summary = candidates[0];
+            }
+            if (!summary) {
+                // Fallback: longest <p> on the page (legacy heuristic, but
+                // now scoped to <main> to avoid suggested-content noise).
+                const main = document.querySelector('main') || document.body;
+                const pCandidates = [...main.querySelectorAll('p')]
+                    .map(p => p.innerText.trim())
+                    .filter(t => t.length > 100 && t.length < 5000 &&
+                                 !t.includes('cookie') && !t.includes('notifications'))
+                    .sort((a, b) => b.length - a.length);
+                if (pCandidates.length) summary = pCandidates[0];
             }
 
             // Experience — find sections with job titles
@@ -542,7 +580,11 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
                     if data.get("headline"):
                         summary_parts.append(data["headline"])
                     if data.get("summary"):
-                        summary_parts.append(data["summary"][:200])
+                        # Bumped 200 → 1500 chars on 2026-05-12 — the old
+                        # cap cut bios mid-sentence ("…and meaning. Fee",
+                        # "…until I (my"). 1500 fits a typical full About
+                        # section without bloating the prompt context.
+                        summary_parts.append(data["summary"][:1500])
                     enriched["linkedin_summary"] = " | ".join(summary_parts)
 
                     patch_payload = {"enriched_profile": enriched}

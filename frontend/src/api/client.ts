@@ -90,7 +90,13 @@ export async function getMatches(
 
 export async function updateProfileViaMagicLink(
   token: string,
-  data: { twitter_handle?: string; target_companies?: string; photo_url?: string }
+  data: {
+    twitter_handle?: string;
+    target_companies?: string;
+    photo_url?: string;
+    linkedin_url?: string;
+    goals?: string;
+  }
 ): Promise<{ status: string }> {
   const { data: resp } = await api.patch(`/matches/m/${token}/profile`, data);
   return resp;

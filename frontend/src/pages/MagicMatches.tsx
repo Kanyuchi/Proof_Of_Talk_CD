@@ -13,7 +13,12 @@ import AttendeeAvatar from "../components/AttendeeAvatar";
 export default function MagicMatches() {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
-  const [enrichForm, setEnrichForm] = useState({ twitter_handle: "", target_companies: "" });
+  const [enrichForm, setEnrichForm] = useState({
+    twitter_handle: "",
+    target_companies: "",
+    linkedin_url: "",
+    goals: "",
+  });
   const [enrichSaved, setEnrichSaved] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -33,6 +38,8 @@ export default function MagicMatches() {
     mutationFn: () => updateProfileViaMagicLink(token!, {
       twitter_handle: enrichForm.twitter_handle || undefined,
       target_companies: enrichForm.target_companies || undefined,
+      linkedin_url: enrichForm.linkedin_url || undefined,
+      goals: enrichForm.goals || undefined,
     }),
     onSuccess: () => {
       setEnrichSaved(true);
@@ -41,8 +48,14 @@ export default function MagicMatches() {
     },
   });
 
+  // Show the card whenever ANY of the high-leverage profile fields are
+  // empty — LinkedIn URL and goals are now the most common gaps for
+  // Extasy buyers who get a placeholder profile.
   const showEnrichCard = attendee && (
-    !attendee.twitter_handle && !attendee.target_companies
+    !attendee.twitter_handle ||
+    !attendee.target_companies ||
+    !attendee.linkedin_url ||
+    !attendee.goals
   );
 
   const matches = data?.matches ?? [];
@@ -106,32 +119,67 @@ export default function MagicMatches() {
             The more we know, the better your introductions. This takes 30 seconds.
           </p>
           <div className="space-y-3">
-            <div>
-              <label className="text-xs text-white/50 block mb-1">Your Twitter / X handle</label>
-              <input
-                type="text"
-                placeholder="@yourhandle"
-                value={enrichForm.twitter_handle}
-                onChange={(e) => setEnrichForm(prev => ({ ...prev, twitter_handle: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 block mb-1">Who do you want to meet at Proof of Talk?</label>
-              <textarea
-                placeholder="e.g., Coinbase, a16z crypto, anyone building L2 infrastructure, Kucoin..."
-                value={enrichForm.target_companies}
-                onChange={(e) => setEnrichForm(prev => ({ ...prev, target_companies: e.target.value }))}
-                rows={3}
-                className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30 resize-none"
-              />
-              <p className="text-[10px] text-white/30 mt-1">
-                Name companies, people, or types of organisations. We'll prioritise these in your matches.
-              </p>
-            </div>
+            {!attendee?.linkedin_url && (
+              <div>
+                <label className="text-xs text-white/50 block mb-1">Your LinkedIn URL</label>
+                <input
+                  type="text"
+                  placeholder="https://www.linkedin.com/in/your-handle"
+                  value={enrichForm.linkedin_url}
+                  onChange={(e) => setEnrichForm(prev => ({ ...prev, linkedin_url: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30"
+                />
+                <p className="text-[10px] text-white/30 mt-1">
+                  Must be a linkedin.com/in/ profile link. Used to enrich your matchmaking profile.
+                </p>
+              </div>
+            )}
+            {!attendee?.goals && (
+              <div>
+                <label className="text-xs text-white/50 block mb-1">What are your goals for Proof of Talk?</label>
+                <textarea
+                  placeholder="e.g., raising a Series A, finding a Layer-2 partner, exploring tokenisation deals..."
+                  value={enrichForm.goals}
+                  onChange={(e) => setEnrichForm(prev => ({ ...prev, goals: e.target.value }))}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30 resize-none"
+                />
+              </div>
+            )}
+            {!attendee?.twitter_handle && (
+              <div>
+                <label className="text-xs text-white/50 block mb-1">Your Twitter / X handle</label>
+                <input
+                  type="text"
+                  placeholder="@yourhandle"
+                  value={enrichForm.twitter_handle}
+                  onChange={(e) => setEnrichForm(prev => ({ ...prev, twitter_handle: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30"
+                />
+              </div>
+            )}
+            {!attendee?.target_companies && (
+              <div>
+                <label className="text-xs text-white/50 block mb-1">Who do you want to meet at Proof of Talk?</label>
+                <textarea
+                  placeholder="e.g., Coinbase, a16z crypto, anyone building L2 infrastructure, Kucoin..."
+                  value={enrichForm.target_companies}
+                  onChange={(e) => setEnrichForm(prev => ({ ...prev, target_companies: e.target.value }))}
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30 resize-none"
+                />
+                <p className="text-[10px] text-white/30 mt-1">
+                  Name companies, people, or types of organisations. We'll prioritise these in your matches.
+                </p>
+              </div>
+            )}
             <button
               onClick={() => enrichMutation.mutate()}
-              disabled={enrichMutation.isPending || (!enrichForm.twitter_handle && !enrichForm.target_companies)}
+              disabled={
+                enrichMutation.isPending ||
+                (!enrichForm.twitter_handle && !enrichForm.target_companies &&
+                 !enrichForm.linkedin_url && !enrichForm.goals)
+              }
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#E76315] text-white font-medium text-sm disabled:opacity-30 hover:bg-[#D35400] transition-all"
             >
               <Send className="w-4 h-4" />

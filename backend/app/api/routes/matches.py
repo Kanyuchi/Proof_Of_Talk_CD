@@ -139,6 +139,11 @@ class MagicProfileUpdate(BaseModel):
     target_companies: str | None = None
     photo_url: str | None = None
     privacy_mode: str | None = None
+    # Added 2026-05-12: Extasy buyers don't supply LinkedIn URL or goals
+    # at checkout. Letting them self-fill via the magic link is the
+    # cheapest fix for the 52 missing-LinkedIn attendees.
+    linkedin_url: str | None = None
+    goals: str | None = None
 
 
 @router.patch("/m/{token}/profile")
@@ -166,6 +171,14 @@ async def update_profile_via_magic_link(
         attendee.photo_url = data.photo_url
     if data.privacy_mode is not None and data.privacy_mode in ("full", "b2b_only"):
         attendee.privacy_mode = data.privacy_mode
+    if data.linkedin_url is not None:
+        url = (data.linkedin_url or "").strip()
+        # Light validation — must look like a LinkedIn profile URL
+        if url and not (url.startswith("http") and "linkedin.com/in/" in url.lower()):
+            raise HTTPException(status_code=400, detail="LinkedIn URL must be a linkedin.com/in/ profile link")
+        attendee.linkedin_url = url or None
+    if data.goals is not None:
+        attendee.goals = (data.goals or "").strip() or None
 
     await db.commit()
     return {"status": "updated"}
