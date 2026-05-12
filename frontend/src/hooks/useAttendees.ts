@@ -1,27 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { listAttendees } from "../api/client";
-import { demoAttendees } from "../data/demo";
 
 export function useAttendees(params?: { ticket_type?: string; limit?: number }) {
   return useQuery({
     queryKey: ["attendees", params],
     queryFn: async () => {
-      try {
-        // Limit set to 1000 (backend cap, raised today from 200). At 353
-        // attendees the previous 200 cap silently truncated the list, so
-        // searching for anyone past position 200 (Laurence Filby,
-        // Kaushik Sthankiya, etc.) returned "No attendees found" even
-        // though the header showed "353 decision-makers registered".
-        const result = await listAttendees({ limit: params?.limit ?? 1000 });
-        return result.attendees.length > 0
-          ? result
-          : { attendees: demoAttendees, total: demoAttendees.length };
-      } catch {
-        return { attendees: demoAttendees, total: demoAttendees.length };
-      }
+      // Limit set to 1000 (backend cap, raised from 200 on 2026-05-12).
+      // Removed the demo-fallback (May 12) — a transient 401 on token
+      // refresh or an empty initial response was causing 5 hardcoded
+      // demo seeds to flash through the UI as "5 decision-makers
+      // registered" until the real fetch completed. Let errors surface
+      // naturally so React Query retries with backoff instead of
+      // showing fake data.
+      return await listAttendees({ limit: params?.limit ?? 1000 });
     },
-    // No placeholderData — the demo seeds (5 entries) used to flash through
-    // the UI as "5 decision-makers registered" before the real data resolved.
-    staleTime: 30_000,
+    // Keep prior data visible across refetches so the list never collapses
+    // to 0 mid-render. Also raised staleTime 30s → 5min — the attendees
+    // list rarely changes within a single session and the previous
+    // setting caused constant refetching.
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
   });
 }

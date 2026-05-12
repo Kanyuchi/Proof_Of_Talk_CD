@@ -40,7 +40,9 @@ class Settings(BaseSettings):
 
     # Auth
     SECRET_KEY: str = "change-me-in-production"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    # 8 hours — long enough for a full conference day (June 2-3) so attendees
+    # don't get kicked out mid-meeting. Bumped from 60 min on 2026-05-12.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     # Integration (Runa / third-party)
     INTEGRATION_API_KEY: str = ""
