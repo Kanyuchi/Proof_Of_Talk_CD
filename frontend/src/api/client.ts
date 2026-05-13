@@ -413,6 +413,42 @@ export async function clearChatHistory(): Promise<{ deleted: number }> {
   return data;
 }
 
+// ── Proactive profile-field offers in the concierge ──────────────────
+
+export type OfferableField = "goals" | "target_companies" | "interests";
+
+export async function getProfilePrompt(): Promise<{
+  field: OfferableField | null;
+  current_completeness_pct: number;
+  is_sparse: boolean;
+}> {
+  const { data } = await api.get("/chat/profile-prompt");
+  return data;
+}
+
+export async function draftField(field: OfferableField): Promise<{
+  candidates: string[];
+  is_sparse: boolean;
+}> {
+  const { data } = await api.post("/chat/draft-field", { field });
+  return data;
+}
+
+export async function saveDraftedField(
+  field: OfferableField,
+  value: string,
+): Promise<{ ok: true }> {
+  const { data } = await api.post("/chat/save-field", { field, value });
+  return data;
+}
+
+export async function declineProfilePrompt(
+  field: OfferableField,
+): Promise<{ ok: true }> {
+  const { data } = await api.post("/chat/decline-prompt", { field });
+  return data;
+}
+
 // ── Messages ─────────────────────────────────────────────────────────
 
 export async function listConversations(): Promise<{ conversations: ConversationSummary[] }> {

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Literal
 
 from openai import AsyncOpenAI
 from sqlalchemy import select
@@ -15,12 +16,254 @@ from app.models.attendee import Attendee
 settings = get_settings()
 _client: AsyncOpenAI | None = None
 
+# Fields the concierge will proactively offer to draft, in priority order.
+# Higher-impact fields (those that move match quality most) come first.
+OFFERABLE_FIELDS: tuple[str, ...] = ("goals", "target_companies", "interests")
+
+# Six fields used to compute profile completeness %. `title` and `company`
+# are in the denominator (they raise the baseline for users who already
+# have them) but NOT in OFFERABLE_FIELDS (they come from registration /
+# Extasy and aren't appropriate to GPT-generate).
+COMPLETENESS_FIELDS: tuple[str, ...] = (
+    "goals", "target_companies", "interests",
+    "title", "company", "photo_url",
+)
+
+# < 80% complete triggers the proactive offer. With 6 fields that's
+# 4-or-fewer filled (i.e. at least 2 missing).
+COMPLETENESS_THRESHOLD = 0.80
+
+# Re-eligibility for a declined field. After 30 days the offer can fire
+# again — gives the user space to fill it themselves, then nudges later.
+DECLINE_COOLDOWN_DAYS = 30
+
 
 def _get_client() -> AsyncOpenAI:
     global _client
     if _client is None:
         _client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
     return _client
+
+
+# ── Profile data quality + offer selection ─────────────────────────────
+
+def profile_data_quality(a: Attendee) -> Literal["SPARSE", "PARTIAL", "GOOD"]:
+    """Single source of truth for the SPARSE/PARTIAL/GOOD bucket.
+
+    Used by the [VERIFIED]-line builder in _brief_attendee_line AND by
+    draft_field_candidates so the anti-hallucination posture stays in sync.
+    """
+    completeness = sum([
+        bool(a.interests),
+        bool(a.goals and a.goals.strip()),
+        bool(a.intent_tags),
+        bool(a.title and a.title.strip()),
+    ])
+    if completeness <= 1:
+        return "SPARSE"
+    if completeness <= 2:
+        return "PARTIAL"
+    return "GOOD"
+
+
+def _field_is_empty(attendee: Attendee, field: str) -> bool:
+    val = getattr(attendee, field, None)
+    if val is None:
+        return True
+    if isinstance(val, str):
+        return not val.strip()
+    if isinstance(val, list):
+        return len(val) == 0
+    return False
+
+
+def compute_completeness_pct(attendee: Attendee) -> int:
+    """Returns 0–100. Denominator is COMPLETENESS_FIELDS (6 fields)."""
+    filled = sum(0 if _field_is_empty(attendee, f) else 1 for f in COMPLETENESS_FIELDS)
+    return round(100 * filled / len(COMPLETENESS_FIELDS))
+
+
+def _field_prompts_state(attendee: Attendee) -> dict[str, dict[str, Any]]:
+    enriched = attendee.enriched_profile or {}
+    return enriched.get("field_prompts", {}) or {}
+
+
+def _was_declined_recently(state_entry: dict[str, Any]) -> bool:
+    if state_entry.get("state") != "declined":
+        return False
+    raw = state_entry.get("last_offered_at")
+    if not raw:
+        return False
+    try:
+        last = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) - last < timedelta(days=DECLINE_COOLDOWN_DAYS)
+
+
+def select_next_field_to_offer(attendee: Attendee) -> str | None:
+    """Return the next field worth offering, or None if no offer should fire.
+
+    Logic:
+      - If profile already ≥ 80% complete → None (user is good enough).
+      - Otherwise walk OFFERABLE_FIELDS in priority order:
+          * skip fields that are already non-empty
+          * skip fields declined within DECLINE_COOLDOWN_DAYS
+      - Return the first eligible field, or None if all are taken/declined.
+    """
+    if compute_completeness_pct(attendee) >= int(COMPLETENESS_THRESHOLD * 100):
+        return None
+    prompts = _field_prompts_state(attendee)
+    for field in OFFERABLE_FIELDS:
+        if not _field_is_empty(attendee, field):
+            continue
+        entry = prompts.get(field) or {}
+        if _was_declined_recently(entry):
+            continue
+        return field
+    return None
+
+
+# ── GPT-driven candidate drafting ──────────────────────────────────────
+
+_FIELD_PROMPTS: dict[str, str] = {
+    "goals": (
+        "Draft 2-3 specific conference goals this attendee might want at Proof "
+        "of Talk 2026 (a Web3 event of 2,500 decision-makers at the Louvre, "
+        "Paris). Each goal should be concrete and action-oriented (e.g. "
+        "'Meet 5 LPs interested in early-stage Web3 infrastructure funds' "
+        "or 'Find 2-3 design partners for our institutional-custody product'). "
+        "Goals should match the attendee's seniority and role — don't suggest "
+        "junior tactics for a CEO, or strategic-partnership goals for a junior IC."
+    ),
+    "target_companies": (
+        "Suggest 2-3 specific companies / company-types this attendee should "
+        "prioritise meeting, given their role and what they appear to be "
+        "working on. Be specific (real company names where you can ground them "
+        "in the attendee's context); otherwise describe the company type "
+        "precisely (e.g. 'Tier-1 EU crypto exchanges with PSP licences')."
+    ),
+    "interests": (
+        "Suggest 2-3 Web3 sectors or topics this attendee likely follows "
+        "professionally. Be specific — prefer 'Restaking infrastructure' or "
+        "'EU MiCA compliance' over generic 'DeFi' or 'crypto regulation'. "
+        "Return them as a list of short interest phrases (each ≤ 6 words)."
+    ),
+}
+
+
+def _context_for_drafting(a: Attendee) -> str:
+    enriched = a.enriched_profile or {}
+    linkedin = (enriched.get("linkedin") or {}) if isinstance(enriched, dict) else {}
+    headline = linkedin.get("headline") or ""
+    about = linkedin.get("about") or ""
+    verticals = ", ".join(a.vertical_tags or []) or "none"
+    summary = a.ai_summary or ""
+    lines = [
+        f"Name: {a.name}",
+        f"Title: {a.title or 'unknown'}",
+        f"Company: {a.company or 'unknown'}",
+        f"Verticals: {verticals}",
+    ]
+    if headline:
+        lines.append(f"LinkedIn headline: {headline}")
+    if about:
+        lines.append(f"LinkedIn about (truncated): {about[:400]}")
+    if summary:
+        lines.append(f"AI summary: {summary}")
+    if a.goals:
+        lines.append(f"Existing goals: {a.goals}")
+    if a.interests:
+        lines.append(f"Existing interests: {', '.join(a.interests)}")
+    if a.target_companies:
+        lines.append(f"Existing target companies: {a.target_companies}")
+    return "\n".join(lines)
+
+
+async def draft_field_candidates(field: str, attendee: Attendee) -> tuple[list[str], bool]:
+    """Ask GPT-4o for 2-3 draft values for `field`. Returns (candidates, is_sparse).
+
+    - GOOD/PARTIAL profile: 3 candidates grounded in profile + LinkedIn context.
+    - SPARSE profile: 2 generic "starting point" candidates with a relaxed prompt.
+    - Empty / malformed model response: raises ValueError so the route can 500.
+    """
+    if field not in _FIELD_PROMPTS:
+        raise ValueError(f"Unsupported field: {field}")
+
+    quality = profile_data_quality(attendee)
+    is_sparse = quality == "SPARSE"
+    n_candidates = 2 if is_sparse else 3
+    sparse_note = (
+        "\n\nIMPORTANT: profile data is limited. Mark these as starting "
+        "points — they should be generic enough that the user can rewrite "
+        "freely. Do NOT invent specifics (fund sizes, products, theses) "
+        "you cannot ground in the input."
+        if is_sparse else ""
+    )
+
+    user_prompt = (
+        f"{_FIELD_PROMPTS[field]}\n\n"
+        f"Return {n_candidates} candidates as JSON: "
+        f'{{"candidates": [{", ".join(["\"...\"" for _ in range(n_candidates)])}]}}.'
+        f"{sparse_note}\n\n"
+        f"Attendee profile:\n{_context_for_drafting(attendee)}"
+    )
+
+    response = await _get_client().chat.completions.create(
+        model=settings.OPENAI_REASONING_MODEL or settings.OPENAI_CHAT_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You draft concise, plausible profile-field suggestions for "
+                    "attendees of a high-end Web3 conference. Be specific where the "
+                    "input supports it; be generic where it doesn't. Never invent "
+                    "facts (companies, products, fund sizes) that aren't grounded "
+                    "in the input. Return ONLY the JSON object — no prose."
+                ),
+            },
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.5,
+        max_tokens=400,
+        response_format={"type": "json_object"},
+    )
+    raw = (response.choices[0].message.content or "").strip()
+    try:
+        data = json.loads(raw)
+        candidates = data.get("candidates") or []
+        cleaned = [str(c).strip() for c in candidates if str(c).strip()]
+    except (json.JSONDecodeError, TypeError):
+        raise ValueError(f"Could not parse GPT draft response: {raw[:200]}")
+    if not cleaned:
+        raise ValueError("GPT returned no usable candidates")
+    return cleaned[:n_candidates], is_sparse
+
+
+# ── Persistence helpers ────────────────────────────────────────────────
+
+def mark_field_prompt(
+    attendee: Attendee,
+    field: str,
+    state: Literal["accepted", "declined"],
+) -> None:
+    """Record an offer outcome on enriched_profile.field_prompts.{field}.
+
+    Mutates a JSONB dict on the attendee row. The caller must commit. We
+    rebuild the dict (rather than in-place edit) so SQLAlchemy's JSONB
+    change tracking notices — same posture as the earlier mutation-fix
+    work documented in whats_next.md.
+    """
+    enriched = dict(attendee.enriched_profile or {})
+    prompts = dict(enriched.get("field_prompts") or {})
+    prompts[field] = {
+        "state": state,
+        "last_offered_at": datetime.now(timezone.utc).isoformat(),
+    }
+    enriched["field_prompts"] = prompts
+    attendee.enriched_profile = enriched
 
 
 async def _list_attendees(db: AsyncSession) -> list[Attendee]:
@@ -37,18 +280,15 @@ def _brief_attendee_line(a: Attendee) -> str:
     goals = a.goals or "none"
     title = a.title or "not provided"
 
-    # Flag data completeness so the AI knows when to be cautious
-    has_interests = bool(a.interests)
-    has_goals = bool(a.goals and a.goals.strip())
-    has_intents = bool(a.intent_tags)
-    has_title = bool(a.title and a.title.strip())
-    completeness = sum([has_interests, has_goals, has_intents, has_title])
-    if completeness <= 1:
+    # Flag data completeness so the AI knows when to be cautious.
+    # profile_data_quality() is the single source of truth — also used by
+    # draft_field_candidates() so the SPARSE posture stays in sync.
+    bucket = profile_data_quality(a)
+    if bucket == "SPARSE":
         quality = "SPARSE — treat AI summary with caution, do NOT present inferred details as facts"
-    elif completeness <= 2:
-        quality = "PARTIAL"
     else:
-        quality = "GOOD"
+        quality = bucket
+    completeness = 4 if bucket == "GOOD" else (2 if bucket == "PARTIAL" else 1)
 
     lines = [
         f"• {a.name} ({a.ticket_type.upper()}) — {title}, {a.company}",

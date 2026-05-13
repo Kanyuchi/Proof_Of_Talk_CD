@@ -1,36 +1,60 @@
 import { useState, useCallback, useEffect } from "react";
 import type { ChatMessage } from "../types";
-import { chatWithConcierge, fetchChatHistory, clearChatHistory } from "../api/client";
+import {
+  chatWithConcierge,
+  fetchChatHistory,
+  clearChatHistory,
+  getProfilePrompt,
+  type OfferableField,
+} from "../api/client";
+
+export interface ProfilePromptOffer {
+  field: OfferableField;
+  current_completeness_pct: number;
+  is_sparse: boolean;
+}
 
 export function useChat(attendeeId?: string) {
   const [history, setHistory] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profilePromptOffer, setProfilePromptOffer] =
+    useState<ProfilePromptOffer | null>(null);
 
   // On mount (and when attendee changes), pull persisted history from the
-  // server. Backend writes every exchange to chat_messages so users can
-  // resume a conversation across sessions / devices.
+  // server AND check whether a proactive profile-field offer should fire.
+  // We surface the offer only when chat history is empty — otherwise the
+  // user is mid-conversation and a nag would be intrusive.
   useEffect(() => {
     if (!attendeeId) return;
     let cancelled = false;
     setIsLoadingHistory(true);
-    fetchChatHistory()
-      .then(({ messages }) => {
+
+    Promise.allSettled([fetchChatHistory(), getProfilePrompt()])
+      .then(([historyRes, promptRes]) => {
         if (cancelled) return;
-        setHistory(
-          messages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          }))
-        );
-      })
-      .catch(() => {
-        // Silent — empty history is a fine fallback
+
+        const messages =
+          historyRes.status === "fulfilled" ? historyRes.value.messages : [];
+        setHistory(messages.map((m) => ({ role: m.role, content: m.content })));
+
+        if (
+          promptRes.status === "fulfilled" &&
+          promptRes.value.field &&
+          messages.length === 0
+        ) {
+          setProfilePromptOffer({
+            field: promptRes.value.field,
+            current_completeness_pct: promptRes.value.current_completeness_pct,
+            is_sparse: promptRes.value.is_sparse,
+          });
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoadingHistory(false);
       });
+
     return () => {
       cancelled = true;
     };
@@ -43,17 +67,19 @@ export function useChat(attendeeId?: string) {
       setHistory(newHistory);
       setIsLoading(true);
       setError(null);
+      // First real user message hides the proactive offer — we never want
+      // the offer card competing with an in-progress conversation.
+      setProfilePromptOffer(null);
 
       try {
         const { response } = await chatWithConcierge({
           message,
           attendee_id: attendeeId,
-          history: history, // server-side history wins for authed users; this is a fallback
+          history: history,
         });
         setHistory([...newHistory, { role: "assistant", content: response }]);
       } catch {
         setError("Failed to get a response. Please try again.");
-        // Revert user message on error
         setHistory(history);
       } finally {
         setIsLoading(false);
@@ -74,5 +100,21 @@ export function useChat(attendeeId?: string) {
     }
   }, [attendeeId]);
 
-  return { history, isLoading, isLoadingHistory, error, sendMessage, clearHistory };
+  // Allow the offer component to dismiss itself locally after the user
+  // accepts/declines/saves. Backend persistence is the source of truth
+  // for future visits; this just clears the in-session card.
+  const dismissProfilePromptOffer = useCallback(() => {
+    setProfilePromptOffer(null);
+  }, []);
+
+  return {
+    history,
+    isLoading,
+    isLoadingHistory,
+    error,
+    sendMessage,
+    clearHistory,
+    profilePromptOffer,
+    dismissProfilePromptOffer,
+  };
 }

@@ -774,3 +774,32 @@ The old `speakers_sync.py` reads `speakers` table where `is_live = true` — onl
 - Attendee list cap raised 200 → 1000 (`c982ce1`) — search was silently truncating past row 200.
 - Manual enrichment for Sithum (just registered today) — Grid + website + LinkedIn + photo all captured; 4 matches generated.
 - Exported speaker emails for Zohair: `backend/exports/pot_speakers_emails_20260513.xlsx` (83 real + 65 placeholder).
+
+## 2026-05-13 (evening) — Phase 2 #5 shipped: AI Concierge proactively drafts missing profile fields
+
+Closes the self-enrichment loop kicked off this morning: incentives #1 (locked-match preview) and #2 (match-quality benchmark) showed users *why* they should finish their profile; #5 now does it *for* them.
+
+### Flow (verified end-to-end in browser against Mona Bauer, 50% complete)
+1. User opens AI Concierge → `GET /chat/profile-prompt` returns the next missing high-impact field (goals → target_companies → interests, in that priority).
+2. Tailored welcome replaces the generic "Hello!" — "Your profile is 50% complete — I can draft your conference goals based on your role and profile."
+3. Yes → `POST /chat/draft-field` → GPT-4o returns 2–3 grounded candidates (3 for PARTIAL/GOOD profiles, 2 with a "starting points — feel free to rewrite" hint for SPARSE).
+4. Click a candidate → inline textarea pre-filled → edit → Save.
+5. `POST /chat/save-field` persists the value, marks `enriched_profile.field_prompts.{field} = {state: "accepted", last_offered_at: …}`, schedules a background `process_attendee` + `generate_matches_for_attendee` refresh.
+6. Confirmation card: "Saved. I've kicked off a match refresh in the background — new recommendations will appear shortly."
+7. Maybe later → `POST /chat/decline-prompt` → `state: "declined"`, suppressed for 30 days, offer rotates to the next priority field on next visit.
+
+### Files
+- **New:** `backend/app/api/routes/chat.py` got 4 endpoints (`/profile-prompt`, `/draft-field`, `/save-field`, `/decline-prompt`). `frontend/src/components/chat/ProfilePromptOffer.tsx` for the four-phase offer UI (idle → picking → editing → saved).
+- **Edited:** `backend/app/services/concierge.py` — `select_next_field_to_offer`, `draft_field_candidates`, `profile_data_quality` (now the single source of truth for SPARSE/PARTIAL/GOOD — also called by `_brief_attendee_line` so the anti-hallucination posture stays in sync), `mark_field_prompt`, `compute_completeness_pct`. `backend/app/schemas/chat.py` — 5 new Pydantic models. `frontend/src/api/client.ts` — 4 new fetch helpers + `OfferableField` type. `frontend/src/hooks/useChat.ts` — fetches the prompt on mount, exposes `profilePromptOffer` + `dismissProfilePromptOffer`. `frontend/src/components/chat/ChatPanel.tsx` — renders `ProfilePromptOffer` when an offer exists, falls back to generic welcome otherwise.
+
+### Smoke tests
+- 8 unit smokes on `select_next_field_to_offer` covering all-empty / priority rotation / 80%-threshold / 30-day decline cooldown / SPARSE bucket — all green.
+- Live HTTP curl: auth, empty-value rejection, full draft → save loop, completeness rotation 50% → 67%.
+- Live browser flow against `localhost:5277` + `localhost:8000` → Mona Bauer's offer rendered, GPT drafted 3 specific candidates ("Establish 3 partnerships with AI/Web3 ecosystem foundations…"), save succeeded, DB row mutated correctly, background re-embed completed without errors, reload rotated the offer to `target_companies` (the next priority field), Maybe-later persisted `declined` with timestamp.
+- Test mutation reverted: Mona's row restored to empty `goals` + cleared `field_prompts`.
+
+### Design + spec
+- Brainstorm + design doc: `docs/superpowers/specs/2026-05-13-concierge-field-drafting-design.md`. Resolved during brainstorming: offer surface (starter message + chips), fields in scope (goals + target_companies + interests, not photo), save UX (chip → editable textarea → Save), persistence (per-field state map with 30-day decline cooldown), completeness denominator (6 fields).
+
+### Anti-hallucination posture
+- `profile_data_quality()` is now a single helper used by both the concierge context builder and the new drafter. SPARSE profiles get 2 generic "starting points" candidates instead of 3 specific ones, and the system prompt explicitly forbids inventing fund sizes, products, theses not grounded in the input.

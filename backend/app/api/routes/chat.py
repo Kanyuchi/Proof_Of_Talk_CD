@@ -1,15 +1,57 @@
-from fastapi import APIRouter, Depends, Request
+import logging
+import uuid
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import async_session, get_db
 from app.core.deps import require_auth
 from app.core.limiter import limiter
+from app.models.attendee import Attendee
 from app.models.user import User
-from app.schemas.chat import ChatRequest, ChatResponse
-from app.services.concierge import concierge_chat
+from app.schemas.chat import (
+    ChatRequest,
+    ChatResponse,
+    DeclinePromptRequest,
+    DraftFieldRequest,
+    DraftFieldResponse,
+    ProfilePromptResponse,
+    SaveFieldRequest,
+)
+from app.services.concierge import (
+    compute_completeness_pct,
+    concierge_chat,
+    draft_field_candidates,
+    mark_field_prompt,
+    profile_data_quality,
+    select_next_field_to_offer,
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+async def _refresh_attendee_matches_bg(attendee_id: uuid.UUID) -> None:
+    """Background task: re-run AI pipeline + regenerate matches for one attendee.
+
+    Fired after a save-field commit so the embedding picks up the new
+    goals/target_companies/interests value and matches reflect the
+    richer profile. Failures are logged; the 02:45 UTC daily refresh
+    is the fallback.
+    """
+    from app.services.matching import MatchingEngine  # local import: avoids circular at module load
+
+    try:
+        async with async_session() as db:
+            engine = MatchingEngine(db)
+            attendee = await db.get(Attendee, attendee_id)
+            if not attendee:
+                return
+            await engine.process_attendee(attendee)
+            await engine.generate_matches_for_attendee(attendee_id, top_k=10)
+    except Exception as e:  # pragma: no cover — log + swallow; cron is fallback
+        logger.exception("concierge save-field background refresh failed: %s", e)
 
 # Keep last N exchanges in the prompt so prompt-cost stays bounded; older
 # turns still live in chat_messages and can be browsed via GET /history.
@@ -98,3 +140,106 @@ async def chat_concierge(
         await db.commit()
 
     return ChatResponse(response=response)
+
+
+# ── Proactive profile-field drafting ──────────────────────────────────
+#
+# Three-step flow:
+#   1. Frontend calls GET /chat/profile-prompt on chat-open. Backend
+#      returns the next field worth offering, or null.
+#   2. On Yes, frontend calls POST /chat/draft-field to get 2–3 GPT
+#      candidates grounded in the user's existing context.
+#   3. On Save, frontend calls POST /chat/save-field. Backend persists,
+#      schedules a background re-embed + match refresh, and confirms.
+#   On Maybe-later / Cancel, frontend calls POST /chat/decline-prompt
+#   so the field is suppressed for DECLINE_COOLDOWN_DAYS.
+
+
+async def _require_attendee(user: User, db: AsyncSession) -> Attendee:
+    if not user.attendee_id:
+        raise HTTPException(status_code=404, detail="No attendee profile linked")
+    attendee = await db.get(Attendee, user.attendee_id)
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Attendee not found")
+    return attendee
+
+
+@router.get("/profile-prompt", response_model=ProfilePromptResponse)
+async def get_profile_prompt(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Return the next missing high-impact profile field worth offering,
+    or `field=null` if nothing should be offered right now."""
+    attendee = await _require_attendee(user, db)
+    field = select_next_field_to_offer(attendee)
+    return ProfilePromptResponse(
+        field=field,
+        current_completeness_pct=compute_completeness_pct(attendee),
+        is_sparse=profile_data_quality(attendee) == "SPARSE",
+    )
+
+
+@router.post("/draft-field", response_model=DraftFieldResponse)
+@limiter.limit("20/hour")
+async def draft_field(
+    request: Request,
+    data: DraftFieldRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Ask GPT-4o for 2–3 candidate values for a missing field."""
+    attendee = await _require_attendee(user, db)
+    try:
+        candidates, is_sparse = await draft_field_candidates(data.field, attendee)
+    except ValueError as e:
+        logger.warning("draft_field_candidates failed for %s: %s", attendee.id, e)
+        raise HTTPException(
+            status_code=502,
+            detail="Couldn't draft suggestions right now. Try filling this in from your Profile page.",
+        )
+    return DraftFieldResponse(candidates=candidates, is_sparse=is_sparse)
+
+
+@router.post("/save-field")
+async def save_field(
+    data: SaveFieldRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Persist a user-chosen draft to the attendee row, mark the prompt
+    accepted, and schedule a background re-embed + match refresh."""
+    value = (data.value or "").strip()
+    if not value:
+        raise HTTPException(status_code=400, detail="Looks empty — try a few words.")
+
+    attendee = await _require_attendee(user, db)
+
+    if data.field == "interests":
+        # The interests column is an ARRAY(String). Accept either a
+        # comma-separated string (most likely from the textarea) or a
+        # newline-separated list.
+        items = [s.strip() for s in value.replace("\n", ",").split(",")]
+        attendee.interests = [s for s in items if s]
+    else:
+        setattr(attendee, data.field, value)
+
+    mark_field_prompt(attendee, data.field, "accepted")
+    await db.commit()
+
+    background_tasks.add_task(_refresh_attendee_matches_bg, attendee.id)
+    return {"ok": True}
+
+
+@router.post("/decline-prompt")
+async def decline_prompt(
+    data: DeclinePromptRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Suppress this field's offer for DECLINE_COOLDOWN_DAYS (30 days)."""
+    attendee = await _require_attendee(user, db)
+    mark_field_prompt(attendee, data.field, "declined")
+    await db.commit()
+    return {"ok": True}
