@@ -41,6 +41,16 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 
 ## Soon
 
+- **NEXT UP — AI Concierge offers to draft missing fields** *(planned 2026-05-13 with Shaun)* — Self-enrichment incentives #1 and #2 shipped today (locked-match preview + match-quality benchmark in `MyMatches`). #5 is the heavier follow-on:
+  - When an attendee opens the AI Concierge (`/concierge` or chat widget) and their profile is < 80% complete, the assistant proactively offers: *"I notice you haven't set your goals for the conference. Want me to suggest some based on your title at {company}?"*
+  - User says yes → GPT-4o drafts 2-3 candidate goals using `title + company + ai_summary + LinkedIn headline if present` → user picks one, edits inline, hits Save → backend calls `PATCH /matches/m/{token}/profile` or authenticated equivalent → embedding regenerated for that attendee → match-refresh kicks in.
+  - Repeat for any other missing high-impact field (target_companies, interests, photo upload nudge).
+  - Implementation pointers:
+    - Use `app/services/concierge.py` — already has GPT-4o + persistent chat history.
+    - Add a `suggest_field_completion(field, attendee)` helper that returns 3 candidates.
+    - Frontend: render the candidates as clickable chips inside the concierge response, each one saves on click.
+    - Persist a flag on the attendee row (e.g. `enriched_profile.field_prompts_declined: ["goals"]`) so we don't pester users who said no.
+  - Effort estimate: 1.5-2h. Start a fresh session with this as the headline goal — context will be cleaner.
 - **Resume photo backfill** *(paused 2026-05-12 17:38 — both LinkedIn accounts rate-limited)* — 155/347 attendees have verified LinkedIn profile photos. 142 still missing. Resume in 24-48h with `python scripts/linkedin_scrape.py --missing-photos-only --limit 30` (smaller batches stay under the per-session ban threshold). Selector defenses (nav-blacklist + `<main>` scope + first-name verification + null-name short-circuit) are battle-tested — no Shaun-dup regressions across the last ~110 photos captured today.
 - **Improve LinkedIn enrichment depth** *(noted 2026-05-12 — Shaun flagged it)* — current scraper truncates the About section at 200 chars and doesn't click LinkedIn's "see more" expander, so attendee bios cut off mid-sentence ("…until I (my", "…and meaning. Fee"). Three fixes:
   (a) bump truncation 200 → 1500 chars (`linkedin_scrape.py` line ~421)

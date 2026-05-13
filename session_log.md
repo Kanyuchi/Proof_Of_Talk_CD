@@ -739,3 +739,38 @@ The old `speakers_sync.py` reads `speakers` table where `is_live = true` — onl
 - Run enrichment + match-gen for the 143 new attendees (kicked off in background).
 - The old `app/services/speakers_sync.py` file is left in place — no caller references it after this change. Will delete in a follow-up once we're confident the new path runs cleanly through one cron cycle.
 - 22 suspicious-email rows: ops to audit `enriched_profile.suspicious_email_in_sheet` against the master sheet and patch real emails by hand.
+
+## 2026-05-13 — Big run-up day: heartbeats green, branding shipped, self-enrichment incentives + Requests tab
+
+### Cron hardening
+- **Heartbeat retry** (`459a6b0`) — `_run_with_heartbeat` now retries the `sync_status` upsert once on DBAPIError/OperationalError/InterfaceError. Two cron failures this morning (speakers + enrichment_sweep) lost their heartbeats to a Supabase pooler drop and showed as stale on the dashboard even though the jobs ran.
+- **Railway env-var fix** — `SUPABASE_SERVICE_ROLE_KEY` was truncated on Railway to 116 chars (full key is 219). Caused 401 on every enrichment_sweep call. Restored the full key.
+- **Manual sweep** — ran `daily_enrichment_sweep` end-to-end after the key fix: 362 ok / 0 errors. All 5 daily crons should now run green.
+
+### Enrichment depth fix + backfill
+- `linkedin_scrape.py` now clicks "…see more" expanders, anchors About-section scraping to `section[id*="about"]`, and bumps truncation 200 → 1500 chars (shipped `b3f763b`).
+- **Backfilled 180 attendees** by rebuilding `linkedin_summary` from the existing full `enriched_profile.linkedin.summary` we'd been storing all along but truncating to 200 chars in the combined field. No re-scrape needed.
+- Refreshed AI summary + embedding for 279 LinkedIn-enriched profiles → match-gen → **1385 matches, avg 0.734**.
+
+### Brand assets
+- Real POT logo shipped (`cd3a9d8`) — replaced the placeholder CSS-clipped orange polygon with the wordmark + square mark supplied by ops. Favicon, apple-touch-icon, Open Graph + Twitter card meta all wired.
+
+### Register flow
+- **Critical fix** (`9ea8f2b`) — register endpoint was rejecting every Extasy ticket buyer because their attendee row already existed (cron-created). Now LINKS the new user to the existing attendee and merges supplied fields. Closes the gap that blocked Shaun's colleague from registering.
+
+### Match visibility
+- **Requests tab** (`e487ca1`) — new tab on MyMatches that surfaces pending "I'd like to meet" requests with an orange banner + pulsing-dot tab badge. Closes the notification gap until email re-enable.
+- **Two-pass match fetch** (`40e10a5`) — `/matches/{attendee_id}` was only returning top-N by score, so low-score pending requests (Sithum→Zohair, 0.78, rank ~12 of 46) were invisible on the recipient's frontend. Now always appends pending-request rows regardless of rank.
+
+### Self-enrichment incentives (#1 + #2 of the 5-mechanic plan)
+- **Locked-match preview** (`59ecc88`) — `MyMatches` now gates how many matches a regular user can see based on profile-completeness %. Below the gate: a dashed-orange "N more matches hidden" card with a "Unlock my matches" CTA → /profile. Admins are exempt.
+- **Match-quality benchmark banner** — top of MyMatches shows the user's average match score vs the 0.85 rich-profile benchmark, with the lift number quantified. Auto-hides at ≥80% completeness.
+- Util: `frontend/src/utils/profileCompleteness.ts` (8 equal-weight fields, plus `visibleMatchLimit` for the gate logic).
+- Next on the plan: #5 (concierge offers to draft missing fields with GPT) — captured in `whats_next.md` for a fresh session.
+
+### Misc
+- Sliding-token refresh middleware + Extasy 5-min cache (`cb98733`) — kills mid-event logouts and dashboard hot-fetching.
+- Dropped 5-attendee demo fallback in `useAttendees` (`20f0ef8`) — was causing a flash of fake data on login.
+- Attendee list cap raised 200 → 1000 (`c982ce1`) — search was silently truncating past row 200.
+- Manual enrichment for Sithum (just registered today) — Grid + website + LinkedIn + photo all captured; 4 matches generated.
+- Exported speaker emails for Zohair: `backend/exports/pot_speakers_emails_20260513.xlsx` (83 real + 65 placeholder).
