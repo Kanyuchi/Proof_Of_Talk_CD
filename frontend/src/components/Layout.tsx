@@ -33,14 +33,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="border-b border-white/10 bg-[#121212]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <Link to={isAuthenticated ? "/matches" : "/"} className="flex items-center gap-3 shrink-0">
-            {/* POT logo mark */}
-            <div
-              className="w-7 h-9 bg-[#E76315] shrink-0"
-              style={{ clipPath: "polygon(0 0, 100% 8%, 100% 92%, 0 100%)" }}
+            {/* POT wordmark (white version for dark header) — supplied
+                by ops in /Logo/ on 2026-05-13. Square mark used as fallback
+                on mobile where the wordmark is too wide to fit. */}
+            <img
+              src="/brand/pot-wordmark-white.png"
+              alt="Proof of Talk"
+              className="hidden sm:block h-8 w-auto"
             />
-            <span className="font-semibold text-lg tracking-tight hidden sm:block">
-              Proof of Talk
-            </span>
+            <img
+              src="/brand/pot-mark.png"
+              alt="Proof of Talk"
+              className="sm:hidden h-8 w-8 rounded-md"
+            />
           </Link>
 
           {/* Desktop nav */}
