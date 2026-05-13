@@ -38,32 +38,60 @@ async def register(
     db: AsyncSession = Depends(get_db),
 ):
     """Register a new user + attendee profile. Returns a JWT token."""
-    # Uniqueness checks
+    # Uniqueness check — only block if a USER (with login) already exists
+    # at this email. An attendee row at this email is fine: it means the
+    # person bought a Rhuna/Extasy ticket (cron-created) or was added by
+    # ops via the speaker sheet, and is now claiming the account. We
+    # link the new user to that existing attendee row and merge any
+    # fields they supplied that the row was missing.
     if (await db.execute(select(User).where(User.email == data.email))).scalars().first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    if (await db.execute(select(Attendee).where(Attendee.email == data.email))).scalars().first():
-        raise HTTPException(status_code=400, detail="Email already in use")
 
-    # Create attendee profile first
-    attendee = Attendee(
-        name=data.name,
-        email=data.email,
-        company=data.company,
-        title=data.title,
-        ticket_type=data.ticket_type,
-        interests=data.interests,
-        goals=data.goals,
-        seeking=data.seeking,
-        not_looking_for=data.not_looking_for,
-        preferred_geographies=data.preferred_geographies,
-        deal_stage=data.deal_stage,
-        linkedin_url=data.linkedin_url,
-        twitter_handle=data.twitter_handle,
-        company_website=data.company_website,
-        magic_access_token=secrets.token_urlsafe(32),
-        privacy_mode=data.privacy_mode if data.privacy_mode in ("full", "b2b_only") else "full",
-    )
-    db.add(attendee)
+    existing_attendee = (await db.execute(
+        select(Attendee).where(Attendee.email == data.email)
+    )).scalars().first()
+
+    if existing_attendee:
+        # Merge non-empty registration fields onto the existing row —
+        # the user is the source of truth for their own profile.
+        for field in ("name", "company", "title", "linkedin_url",
+                      "twitter_handle", "company_website", "goals",
+                      "deal_stage"):
+            val = getattr(data, field, None)
+            if val:
+                setattr(existing_attendee, field, val)
+        for list_field in ("interests", "seeking", "not_looking_for",
+                           "preferred_geographies"):
+            val = getattr(data, list_field, None)
+            if val:
+                setattr(existing_attendee, list_field, val)
+        if data.privacy_mode in ("full", "b2b_only"):
+            existing_attendee.privacy_mode = data.privacy_mode
+        if not existing_attendee.magic_access_token:
+            existing_attendee.magic_access_token = secrets.token_urlsafe(32)
+        attendee = existing_attendee
+    else:
+        # Fresh registration — create a new attendee row.
+        attendee = Attendee(
+            name=data.name,
+            email=data.email,
+            company=data.company,
+            title=data.title,
+            ticket_type=data.ticket_type,
+            interests=data.interests,
+            goals=data.goals,
+            seeking=data.seeking,
+            not_looking_for=data.not_looking_for,
+            preferred_geographies=data.preferred_geographies,
+            deal_stage=data.deal_stage,
+            linkedin_url=data.linkedin_url,
+            twitter_handle=data.twitter_handle,
+            company_website=data.company_website,
+            magic_access_token=secrets.token_urlsafe(32),
+            privacy_mode=data.privacy_mode if data.privacy_mode in ("full", "b2b_only") else "full",
+        )
+        db.add(attendee)
+
     await db.flush()  # ensures attendee.id is populated
 
     # Create auth user
