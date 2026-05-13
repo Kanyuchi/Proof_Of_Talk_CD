@@ -61,24 +61,38 @@ async def _run_with_heartbeat(job_name: str, coro_factory):
         logger.error(f"scheduler: {job_name} failed", error=error_msg)
 
     # Heartbeat write in its own session — a poisoned scheduler event loop
-    # or a broken main-pipeline session can't suppress this.
+    # or a broken main-pipeline session can't suppress this. Retry once on
+    # a Supabase pooler disconnect (May 13 morning: heartbeat writes were
+    # silently lost when the pooler dropped the connection mid-write, so
+    # the dashboard showed stale timestamps even though jobs ran).
     log_stats = {k: v for k, v in stats.items() if k != "inserted_ids"}
-    try:
-        async with async_session() as db:
-            await db.execute(
-                _text("""
-                    INSERT INTO sync_status (job_name, last_run_at, last_status, stats)
-                    VALUES (:job, NOW(), :status, CAST(:stats AS JSONB))
-                    ON CONFLICT (job_name) DO UPDATE SET
-                        last_run_at = NOW(),
-                        last_status = EXCLUDED.last_status,
-                        stats = EXCLUDED.stats
-                """),
-                {"job": job_name, "status": status, "stats": _json.dumps(log_stats)},
-            )
-            await db.commit()
-    except Exception as exc:
-        logger.error(f"scheduler: {job_name} heartbeat write failed", error=str(exc))
+    import asyncio as _asyncio
+    from sqlalchemy.exc import DBAPIError, OperationalError, InterfaceError
+    for attempt in (1, 2):
+        try:
+            async with async_session() as db:
+                await db.execute(
+                    _text("""
+                        INSERT INTO sync_status (job_name, last_run_at, last_status, stats)
+                        VALUES (:job, NOW(), :status, CAST(:stats AS JSONB))
+                        ON CONFLICT (job_name) DO UPDATE SET
+                            last_run_at = NOW(),
+                            last_status = EXCLUDED.last_status,
+                            stats = EXCLUDED.stats
+                    """),
+                    {"job": job_name, "status": status, "stats": _json.dumps(log_stats)},
+                )
+                await db.commit()
+            break
+        except (DBAPIError, OperationalError, InterfaceError) as exc:
+            if attempt == 2:
+                logger.error(f"scheduler: {job_name} heartbeat write failed after retry", error=str(exc))
+            else:
+                logger.warning(f"scheduler: {job_name} heartbeat write pooler-disconnect, retrying", error=str(exc))
+                await _asyncio.sleep(1.0)
+        except Exception as exc:
+            logger.error(f"scheduler: {job_name} heartbeat write failed", error=str(exc))
+            break
 
 
 # ── Daily Extasy sync + enrichment job ────────────────────────────────────────
