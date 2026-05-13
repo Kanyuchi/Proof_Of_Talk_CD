@@ -43,10 +43,22 @@ export default function MyMatches() {
       return new Set();
     }
   });
-  const [activeTab, setActiveTab] = useState<"all" | "saved">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "requests" | "saved">("all");
 
   const matches = matchData?.matches ?? [];
   const isAdmin = user?.is_admin ?? false;
+
+  // Connection requests = matches where the OTHER party has clicked
+  // "I'd like to meet" but you haven't responded yet. Surfaces the
+  // notification gap until email is re-enabled.
+  const isRequestToMe = (m: typeof matches[number]) => {
+    if (!attendeeId) return false;
+    const iAmA = m.attendee_a_id === attendeeId;
+    const myStatus = iAmA ? m.status_a : m.status_b;
+    const otherStatus = iAmA ? m.status_b : m.status_a;
+    return otherStatus === "accepted" && myStatus === "pending";
+  };
+  const requestMatches = matches.filter(isRequestToMe);
 
   // Wait for auth to resolve before redirecting
   if (authLoading) {
@@ -160,12 +172,32 @@ export default function MyMatches() {
         </div>
       ) : (
         <>
+          {requestMatches.length > 0 && activeTab !== "requests" && (
+            <button
+              onClick={() => setActiveTab("requests")}
+              className="w-full flex items-center justify-between gap-3 p-4 rounded-xl bg-[#E76315]/10 border border-[#E76315]/30 text-left hover:bg-[#E76315]/15 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <Heart className="w-5 h-5 text-[#E76315] fill-[#E76315]" />
+                <div>
+                  <div className="text-sm font-semibold text-white">
+                    {requestMatches.length} {requestMatches.length === 1 ? "person wants" : "people want"} to meet you
+                  </div>
+                  <div className="text-xs text-white/50">
+                    Tap to review their requests and respond
+                  </div>
+                </div>
+              </div>
+              <span className="text-xs text-[#E76315] font-medium">View →</span>
+            </button>
+          )}
+
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2 text-sm text-white/40">
               <Sparkles className="w-4 h-4 text-[#E76315]" />
               We found {matches.length} people you should meet at the Louvre
             </div>
-            {savedMatchIds.size > 0 && (
+            {(savedMatchIds.size > 0 || requestMatches.length > 0) && (
               <div className="flex items-center gap-1 p-1 bg-white/5 rounded-lg">
                 <button
                   onClick={() => setActiveTab("all")}
@@ -175,15 +207,34 @@ export default function MyMatches() {
                 >
                   All ({matches.length})
                 </button>
-                <button
-                  onClick={() => setActiveTab("saved")}
-                  className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                    activeTab === "saved" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
-                  }`}
-                >
-                  <BookmarkCheck className="w-3 h-3" />
-                  Saved ({savedMatchIds.size})
-                </button>
+                {requestMatches.length > 0 && (
+                  <button
+                    onClick={() => setActiveTab("requests")}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      activeTab === "requests"
+                        ? "bg-[#E76315]/20 text-[#E76315]"
+                        : "text-[#E76315]/70 hover:text-[#E76315]"
+                    }`}
+                    title={`${requestMatches.length} attendee${requestMatches.length===1?"":"s"} would like to meet you`}
+                  >
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#E76315] opacity-60"></span>
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E76315]"></span>
+                    </span>
+                    Requests ({requestMatches.length})
+                  </button>
+                )}
+                {savedMatchIds.size > 0 && (
+                  <button
+                    onClick={() => setActiveTab("saved")}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      activeTab === "saved" ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+                    }`}
+                  >
+                    <BookmarkCheck className="w-3 h-3" />
+                    Saved ({savedMatchIds.size})
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -237,7 +288,13 @@ export default function MyMatches() {
           })()}
 
           <div className="space-y-4">
-            {(activeTab === "saved" ? matches.filter((m) => savedMatchIds.has(m.id)) : matches).map((match, idx) => {
+            {(
+              activeTab === "saved"
+                ? matches.filter((m) => savedMatchIds.has(m.id))
+                : activeTab === "requests"
+                ? requestMatches
+                : matches
+            ).map((match, idx) => {
               const config = matchTypeConfig[match.match_type] ?? matchTypeConfig.complementary;
               const Icon = config.icon;
               const person = match.matched_attendee;
