@@ -18,7 +18,16 @@ _client: AsyncOpenAI | None = None
 
 # Fields the concierge will proactively offer to draft, in priority order.
 # Higher-impact fields (those that move match quality most) come first.
-OFFERABLE_FIELDS: tuple[str, ...] = ("goals", "target_companies", "interests")
+# `photo_url` is a non-GPT nudge — last priority because it doesn't change
+# match quality, but useful for recognition on the day. It bypasses the
+# < 80% completeness gate (see select_next_field_to_offer).
+OFFERABLE_FIELDS: tuple[str, ...] = (
+    "goals", "target_companies", "interests", "photo_url",
+)
+
+# Fields that bypass the completeness gate — they're worth offering even
+# to a near-complete profile because they don't compete with GPT drafts.
+GATE_BYPASS_FIELDS: frozenset[str] = frozenset({"photo_url"})
 
 # Six fields used to compute profile completeness %. `title` and `company`
 # are in the denominator (they raise the baseline for users who already
@@ -107,20 +116,25 @@ def select_next_field_to_offer(attendee: Attendee) -> str | None:
     """Return the next field worth offering, or None if no offer should fire.
 
     Logic:
-      - If profile already ≥ 80% complete → None (user is good enough).
-      - Otherwise walk OFFERABLE_FIELDS in priority order:
+      - Walk OFFERABLE_FIELDS in priority order:
           * skip fields that are already non-empty
           * skip fields declined within DECLINE_COOLDOWN_DAYS
-      - Return the first eligible field, or None if all are taken/declined.
+      - GPT-drafted fields (goals / target_companies / interests) only fire
+        when overall completeness is < 80%. The photo_url nudge bypasses
+        that gate — at 5/6 = 83% with only the photo missing, we still
+        nudge because it doesn't compete with a GPT draft.
+      - Return the first eligible field, or None if nothing qualifies.
     """
-    if compute_completeness_pct(attendee) >= int(COMPLETENESS_THRESHOLD * 100):
-        return None
+    completeness = compute_completeness_pct(attendee)
+    under_threshold = completeness < int(COMPLETENESS_THRESHOLD * 100)
     prompts = _field_prompts_state(attendee)
     for field in OFFERABLE_FIELDS:
         if not _field_is_empty(attendee, field):
             continue
         entry = prompts.get(field) or {}
         if _was_declined_recently(entry):
+            continue
+        if field not in GATE_BYPASS_FIELDS and not under_threshold:
             continue
         return field
     return None

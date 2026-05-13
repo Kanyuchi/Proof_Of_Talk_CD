@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Camera } from "lucide-react";
 import {
   draftField,
   saveDraftedField,
@@ -13,18 +13,26 @@ interface Props {
   onResolved: () => void;
 }
 
-type Phase = "idle" | "drafting" | "picking" | "editing" | "saving" | "saved";
+type Phase =
+  | "idle"
+  | "drafting"
+  | "picking"
+  | "editing"
+  | "saving"
+  | "saved";
 
 const FIELD_LABEL: Record<OfferableField, string> = {
   goals: "conference goals",
   target_companies: "target companies",
   interests: "Web3 interests",
+  photo_url: "profile photo",
 };
 
 const FIELD_PROMPT_VERB: Record<OfferableField, string> = {
   goals: "draft your conference goals",
   target_companies: "suggest companies you should prioritise meeting",
   interests: "suggest Web3 sectors you likely follow",
+  photo_url: "add a profile photo", // unused — photo branch renders its own copy
 };
 
 export default function ProfilePromptOffer({
@@ -32,6 +40,31 @@ export default function ProfilePromptOffer({
   completenessPct,
   onResolved,
 }: Props) {
+  if (field === "photo_url") {
+    return (
+      <PhotoOffer completenessPct={completenessPct} onResolved={onResolved} />
+    );
+  }
+  return (
+    <DraftOffer
+      field={field}
+      completenessPct={completenessPct}
+      onResolved={onResolved}
+    />
+  );
+}
+
+// ── GPT-drafted field branch (goals / target_companies / interests) ────
+
+function DraftOffer({
+  field,
+  completenessPct,
+  onResolved,
+}: {
+  field: Exclude<OfferableField, "photo_url">;
+  completenessPct: number;
+  onResolved: () => void;
+}) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [candidates, setCandidates] = useState<string[]>([]);
   const [isSparse, setIsSparse] = useState(false);
@@ -190,6 +223,121 @@ export default function ProfilePromptOffer({
             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 text-xs text-emerald-300">
               Saved. I've kicked off a match refresh in the background — new
               recommendations will appear shortly.
+            </div>
+            <button
+              onClick={onResolved}
+              className="text-[11px] text-white/40 hover:text-white/70 transition-all px-1"
+            >
+              Continue chatting →
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-[11px] text-red-400 px-1">{error}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Photo-URL branch (no GPT, no embedding refresh) ────────────────────
+
+type PhotoPhase = "idle" | "saving" | "saved";
+
+function PhotoOffer({
+  completenessPct,
+  onResolved,
+}: {
+  completenessPct: number;
+  onResolved: () => void;
+}) {
+  const [phase, setPhase] = useState<PhotoPhase>("idle");
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSkip = async () => {
+    try {
+      await declineProfilePrompt("photo_url");
+    } catch {
+      // Best-effort — local UI dismisses regardless
+    }
+    onResolved();
+  };
+
+  const handleSave = async () => {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setError("Paste a photo URL first.");
+      return;
+    }
+    if (!/^https?:\/\//i.test(trimmed)) {
+      setError("URL should start with http:// or https://");
+      return;
+    }
+    setPhase("saving");
+    setError(null);
+    try {
+      await saveDraftedField("photo_url", trimmed);
+      setPhase("saved");
+    } catch {
+      setError("Save failed. You can add a photo from your Profile page.");
+      setPhase("idle");
+    }
+  };
+
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="w-7 h-7 rounded-full bg-[#E76315]/10 flex items-center justify-center shrink-0 mt-0.5">
+        <Camera className="w-3.5 h-3.5 text-[#E76315]" />
+      </div>
+      <div className="flex-1 space-y-2.5">
+        <div className="bg-white/5 rounded-2xl rounded-tl-sm p-3 text-sm text-white/70">
+          Your profile is{" "}
+          <span className="text-white font-medium">{completenessPct}%</span>{" "}
+          complete — last thing: drop in a profile photo so your matches
+          recognise you on the day. Paste a public URL (LinkedIn, Twitter,
+          your company site).
+        </div>
+
+        {phase === "idle" && (
+          <div className="space-y-2 bg-white/[0.03] border border-white/10 rounded-xl p-2.5">
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://…"
+              className="w-full bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && url.trim()) handleSave();
+              }}
+            />
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={handleSkip}
+                className="px-3 py-1 rounded-lg text-xs text-white/50 hover:text-white transition-all"
+              >
+                Skip
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!url.trim()}
+                className="px-3 py-1 rounded-lg bg-[#E76315] text-black text-xs font-semibold hover:bg-[#FF833A] transition-all disabled:opacity-40"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+
+        {phase === "saving" && (
+          <div className="text-xs text-white/40 px-1">Saving…</div>
+        )}
+
+        {phase === "saved" && (
+          <div className="space-y-2">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 text-xs text-emerald-300">
+              Saved. Your photo will show on match cards going forward.
             </div>
             <button
               onClick={onResolved}

@@ -415,7 +415,11 @@ export async function clearChatHistory(): Promise<{ deleted: number }> {
 
 // ── Proactive profile-field offers in the concierge ──────────────────
 
-export type OfferableField = "goals" | "target_companies" | "interests";
+export type OfferableField =
+  | "goals"
+  | "target_companies"
+  | "interests"
+  | "photo_url";
 
 export async function getProfilePrompt(): Promise<{
   field: OfferableField | null;

@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-OfferableField = Literal["goals", "target_companies", "interests"]
+OfferableField = Literal["goals", "target_companies", "interests", "photo_url"]
 
 
 class ChatMessageSchema(BaseModel):

@@ -803,3 +803,24 @@ Closes the self-enrichment loop kicked off this morning: incentives #1 (locked-m
 
 ### Anti-hallucination posture
 - `profile_data_quality()` is now a single helper used by both the concierge context builder and the new drafter. SPARSE profiles get 2 generic "starting points" candidates instead of 3 specific ones, and the system prompt explicitly forbids inventing fund sizes, products, theses not grounded in the input.
+
+## 2026-05-13 21:35 — Photo-upload nudge in AI Concierge (follow-on to field-drafting)
+
+Extended the `ProfilePromptOffer` flow to nudge for `photo_url` once the GPT-drafted fields are filled. Photo is in the completeness denominator but was previously unreachable: an 83% attendee with only photo missing got `field=null` because the GPT offer set excluded it. Now the offer rotates: goals → target_companies → interests → photo_url, and photo bypasses the < 80% completeness gate (no GPT call to gate against).
+
+### Backend
+- `app/services/concierge.py` — `OFFERABLE_FIELDS` extended with `"photo_url"`. New `GATE_BYPASS_FIELDS = {"photo_url"}` and `select_next_field_to_offer` rewritten to apply the 80% gate only to GPT-drafted fields. Photo nudge fires at any completeness level if photo is missing and not recently declined.
+- `app/api/routes/chat.py` — `save-field` accepts `photo_url`, validates `http(s)://` prefix, writes `attendees.photo_url`, skips the background re-embed (photo doesn't affect matching, saves an OpenAI call + match-gen round-trip).
+- `app/schemas/chat.py` — `OfferableField` literal includes `"photo_url"`.
+
+### Frontend
+- `components/chat/ProfilePromptOffer.tsx` split into two branches: `DraftOffer` (existing GPT flow) and new `PhotoOffer` (URL paste + Save / Skip, no candidates step). Photo branch uses the same idle/saving/saved phase pattern. Camera icon instead of Sparkles in the avatar slot.
+- `api/client.ts` — `OfferableField` type extended.
+
+### Smoke tests
+- Round-trip against a real attendee (Lamar Ellis) set to "only photo missing" state: `select_next_field_to_offer` returned `photo_url` at 83% complete ✓; save with a https URL took the attendee to 100% with `field_prompts.photo_url.state="accepted"` ✓; decline path persisted `declined` with timestamp and suppressed the offer ✓; attendee row reverted to original state.
+- Vite production build: 2047 modules, 1 unrelated CSS warning, 0 TS errors.
+- No real attendee currently sits at "only photo missing" in production (most users still missing goals/targets/interests too); offer will surface organically as users complete the GPT-drafted fields.
+
+### Out-of-scope
+- File-upload affordance: the platform has no object-storage backend (auth/profile + magic-link both take photo URLs). Adding file-upload would need new infra. URL paste matches the existing system and shipped in scope.

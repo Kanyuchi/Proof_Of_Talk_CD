@@ -222,13 +222,23 @@ async def save_field(
         # newline-separated list.
         items = [s.strip() for s in value.replace("\n", ",").split(",")]
         attendee.interests = [s for s in items if s]
+    elif data.field == "photo_url":
+        if not (value.startswith("http://") or value.startswith("https://")):
+            raise HTTPException(
+                status_code=400,
+                detail="Photo URL must start with http:// or https://",
+            )
+        attendee.photo_url = value
     else:
         setattr(attendee, data.field, value)
 
     mark_field_prompt(attendee, data.field, "accepted")
     await db.commit()
 
-    background_tasks.add_task(_refresh_attendee_matches_bg, attendee.id)
+    # photo_url doesn't affect embeddings or match quality, so skip the
+    # background re-embed — saves an OpenAI call + match-gen round-trip.
+    if data.field != "photo_url":
+        background_tasks.add_task(_refresh_attendee_matches_bg, attendee.id)
     return {"ok": True}
 
 
