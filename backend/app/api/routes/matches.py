@@ -47,6 +47,14 @@ async def get_matches(
     if not attendee:
         raise HTTPException(status_code=404, detail="Attendee not found")
 
+    # Two-pass fetch:
+    #   1. Top-N by score (the AI's best recommendations).
+    #   2. ANY match where the other party has clicked "I'd like to meet"
+    #      but this user hasn't responded yet — regardless of score rank.
+    # Without (2), pending-request matches whose score sits below the
+    # cutoff are invisible to the recipient (May 13 incident:
+    # Sithum→Zohair, score 0.78, rank ~12 of 46 → never reached Zohair's
+    # frontend). The Requests tab depends on these rows being present.
     result = await db.execute(
         select(Match)
         .where(
@@ -59,7 +67,31 @@ async def get_matches(
         .order_by(Match.overall_score.desc())
         .limit(limit)
     )
-    matches = result.scalars().all()
+    matches = list(result.scalars().all())
+    matched_ids = {m.id for m in matches}
+
+    # Append any pending-request matches not already in the top-N.
+    request_result = await db.execute(
+        select(Match)
+        .where(
+            and_(
+                Match.hidden_by_user.is_(False),
+                or_(
+                    and_(Match.attendee_a_id == attendee_id,
+                         Match.status_a == "pending",
+                         Match.status_b == "accepted"),
+                    and_(Match.attendee_b_id == attendee_id,
+                         Match.status_b == "pending",
+                         Match.status_a == "accepted"),
+                ),
+            )
+        )
+        .order_by(Match.overall_score.desc())
+    )
+    for m in request_result.scalars().all():
+        if m.id not in matched_ids:
+            matches.append(m)
+            matched_ids.add(m.id)
 
     match_responses = []
     for match in matches:
