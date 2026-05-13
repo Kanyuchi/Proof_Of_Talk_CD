@@ -6,8 +6,11 @@ import {
 } from "lucide-react";
 import AttendeeAvatar from "../components/AttendeeAvatar";
 import { useAuth } from "../hooks/useAuth";
+import { useAttendee } from "../hooks/useAttendee";
 import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedback } from "../hooks/useMatches";
 import { useSendMatchMessage } from "../hooks/useMessages";
+import { profileCompleteness, visibleMatchLimit } from "../utils/profileCompleteness";
+import { Lock, Zap } from "lucide-react";
 import { useState } from "react";
 import {
   CONFERENCE_SLOTS, slotToISO, formatMeetingTime, formatSlotChip, downloadICS,
@@ -22,6 +25,7 @@ export default function MyMatches() {
   const attendeeId = user?.attendee_id ?? undefined;
 
   const { data: matchData, isLoading: loadingMatches } = useMatches(attendeeId);
+  const { data: myAttendee } = useAttendee(attendeeId);
   const updateStatus = useUpdateMatchStatus(attendeeId);
   const scheduleMeeting = useScheduleMeeting(attendeeId);
   const feedback = useMeetingFeedback(attendeeId);
@@ -59,6 +63,25 @@ export default function MyMatches() {
     return otherStatus === "accepted" && myStatus === "pending";
   };
   const requestMatches = matches.filter(isRequestToMe);
+
+  // Profile-completeness gate + match-quality benchmark — drives
+  // attendees to enrich their own profiles (added 2026-05-13).
+  // Admins always see everything; the gate only applies to regular users.
+  const completeness = profileCompleteness(myAttendee);
+  const maxVisible = isAdmin
+    ? matches.length
+    : visibleMatchLimit(completeness.percent, matches.length);
+  const lockedCount = Math.max(0, matches.length - maxVisible);
+
+  const myAvgScore =
+    matches.length > 0
+      ? matches.reduce((s, m) => s + (m.overall_score ?? 0), 0) / matches.length
+      : 0;
+  // Best score across all matches — represents the upside the user
+  // *currently* has access to. The lift number compares to a 0.85
+  // benchmark derived from rich-profile cohorts in the DB.
+  const benchmarkAvg = 0.85;
+  const liftIfComplete = Math.max(0, benchmarkAvg - myAvgScore);
 
   // Wait for auth to resolve before redirecting
   if (authLoading) {
@@ -172,6 +195,45 @@ export default function MyMatches() {
         </div>
       ) : (
         <>
+          {/* Profile-completeness + match-quality banner (regular users only).
+              Quantifies the cost of an incomplete profile and links to the
+              fix. Hidden when the profile is already ≥80% complete or for
+              admins (who see everything). */}
+          {!isAdmin && completeness.percent < 80 && matches.length > 0 && (
+            <div className="rounded-2xl border border-[#E76315]/30 bg-gradient-to-br from-[#E76315]/[0.08] to-transparent p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <Zap className="w-5 h-5 text-[#E76315]" />
+                <div className="text-sm font-semibold text-white">
+                  Your current match quality is {myAvgScore.toFixed(2)}
+                </div>
+                <div className="ml-auto text-xs text-white/40">
+                  Profile {completeness.percent}% complete
+                </div>
+              </div>
+              <p className="text-sm text-white/60 leading-relaxed">
+                Rich profiles average <span className="text-white font-medium">{benchmarkAvg.toFixed(2)}</span>.
+                {liftIfComplete > 0.02 && (
+                  <> Lift potential: <span className="text-[#E76315] font-medium">+{liftIfComplete.toFixed(2)}</span>.</>
+                )}{" "}
+                The AI weighs what you tell it — adding{" "}
+                {completeness.missingHighImpact.length > 0 ? (
+                  <span className="text-white">
+                    {completeness.missingHighImpact.map((f) => f.label).join(", ")}
+                  </span>
+                ) : (
+                  <span className="text-white">the missing fields</span>
+                )}{" "}
+                gives it much more to work with.
+              </p>
+              <Link
+                to="/profile"
+                className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#E76315] text-white text-xs font-medium hover:bg-[#D35400] transition-all"
+              >
+                Improve my profile →
+              </Link>
+            </div>
+          )}
+
           {requestMatches.length > 0 && activeTab !== "requests" && (
             <button
               onClick={() => setActiveTab("requests")}
@@ -293,7 +355,7 @@ export default function MyMatches() {
                 ? matches.filter((m) => savedMatchIds.has(m.id))
                 : activeTab === "requests"
                 ? requestMatches
-                : matches
+                : matches.slice(0, maxVisible)
             ).map((match, idx) => {
               const config = matchTypeConfig[match.match_type] ?? matchTypeConfig.complementary;
               const Icon = config.icon;
@@ -898,6 +960,34 @@ export default function MyMatches() {
                 </div>
               );
             })}
+
+            {/* Locked matches preview — drives profile enrichment.
+                Only shows on the "All" tab and when matches are
+                hidden by the visibility gate. */}
+            {!isAdmin && activeTab === "all" && lockedCount > 0 && (
+              <div className="rounded-2xl border-2 border-dashed border-[#E76315]/30 bg-[#E76315]/[0.04] p-6 text-center space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <Lock className="w-5 h-5 text-[#E76315]" />
+                  <span className="text-sm font-semibold text-white">
+                    {lockedCount} more {lockedCount === 1 ? "match" : "matches"} hidden
+                  </span>
+                </div>
+                <p className="text-sm text-white/60 max-w-md mx-auto">
+                  Your profile is {completeness.percent}% complete. Add{" "}
+                  {completeness.missingHighImpact.length > 0
+                    ? completeness.missingHighImpact.map((f) => f.label.toLowerCase()).join(", ")
+                    : "the missing fields"}{" "}
+                  to unlock them. The AI uses these signals to surface deeper, more relevant matches.
+                </p>
+                <Link
+                  to="/profile"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E76315] text-white text-sm font-medium hover:bg-[#D35400] transition-all"
+                >
+                  <Zap className="w-4 h-4" />
+                  Unlock my matches
+                </Link>
+              </div>
+            )}
 
           </div>
         </>
