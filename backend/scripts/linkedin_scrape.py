@@ -140,8 +140,14 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
             pass
 
         data = await page.evaluate("""() => {
-            // Get page title for name (most reliable)
-            const titleMatch = document.title.match(/^(.+?)\\s*[|\\-–]\\s*LinkedIn/);
+            // Get page title for name (most reliable). Strip leading
+            // notification count "(7) " — when the logged-in user has
+            // unread badges, LinkedIn prepends "(N) " to every page title,
+            // which broke first-name extraction and silently rejected
+            // every photo via the alt-text safety check (Cynthia Lo Bessette,
+            // Johnna Powell, Steven Goldfeder, … — 9 cases in batch 3).
+            const rawTitle = document.title.replace(/^\\s*\\(\\d+\\)\\s*/, '');
+            const titleMatch = rawTitle.match(/^(.+?)\\s*[|\\-–]\\s*LinkedIn/);
             const name = titleMatch ? titleMatch[1].trim() : null;
 
             // Find headline — it's usually the first <p> after the name
@@ -235,12 +241,20 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
             }
 
             const main = document.querySelector('main') || document.body;
-            const candidates = [
+            // Two-tier candidate set: "highly specific" selectors that uniquely
+            // identify LinkedIn's own profile-photo elements can be accepted
+            // without an alt-text match (Cynthia Lo Bessette, Fabian Dori,
+            // Jorgen Ouaknine, Shardul Bansal all have photos that render
+            // without alt or aria-label). The looser fallback selectors still
+            // require an alt/aria match to protect against mis-attribution.
+            const specificCandidates = [
                 ...main.querySelectorAll('img.pv-top-card-profile-picture__image'),
-                ...main.querySelectorAll('img.evi-image'),
-                ...main.querySelectorAll('button[aria-label*="profile photo" i] img'),
                 ...main.querySelectorAll('img[src*="profile-displayphoto"]'),
                 ...main.querySelectorAll('img[src*="profile-framedphoto"]'),
+                ...main.querySelectorAll('button[aria-label*="profile photo" i] img'),
+            ];
+            const looseCandidates = [
+                ...main.querySelectorAll('img.evi-image'),
             ];
             // If we couldn't extract the target's name from the page title,
             // refuse to set a photo at all. Without a name we have no way to
@@ -250,21 +264,29 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
             if (!targetFirstName) {
                 photoUrl = null;
             } else {
-                for (const img of candidates) {
+                // Pass 1: specific selectors — accept without alt match (we
+                // already scoped to <main> and excluded nav-avatar srcs).
+                for (const img of specificCandidates) {
                     const src = img.src || '';
                     if (!src.startsWith('http')) continue;
-                    if (navAvatarSrcs.has(src)) continue;  // skip operator's own avatar
-                    // Belt-and-braces: verify alt or surrounding aria-label
-                    // contains the target's first name. LinkedIn renders the
-                    // profile photo with alt="<full name>" or a sibling button
-                    // labelled "<name>'s profile photo".
-                    const alt = (img.alt || '').toLowerCase();
-                    const parentLabel = (img.closest('button, a')?.getAttribute('aria-label') || '').toLowerCase();
-                    const matchesTarget =
-                        alt.includes(targetFirstName) || parentLabel.includes(targetFirstName);
-                    if (!matchesTarget) continue;
+                    if (navAvatarSrcs.has(src)) continue;
                     photoUrl = src;
                     break;
+                }
+                // Pass 2: loose selectors require alt-text first-name match.
+                if (!photoUrl) {
+                    for (const img of looseCandidates) {
+                        const src = img.src || '';
+                        if (!src.startsWith('http')) continue;
+                        if (navAvatarSrcs.has(src)) continue;
+                        const alt = (img.alt || '').toLowerCase();
+                        const parentLabel = (img.closest('button, a')?.getAttribute('aria-label') || '').toLowerCase();
+                        const matchesTarget =
+                            alt.includes(targetFirstName) || parentLabel.includes(targetFirstName);
+                        if (!matchesTarget) continue;
+                        photoUrl = src;
+                        break;
+                    }
                 }
             }
 
