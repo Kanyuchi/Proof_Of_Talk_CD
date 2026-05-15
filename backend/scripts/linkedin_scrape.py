@@ -247,52 +247,51 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
             }
 
             const main = document.querySelector('main') || document.body;
-            // Two-tier candidate set: "highly specific" selectors that uniquely
-            // identify LinkedIn's own profile-photo elements can be accepted
-            // without an alt-text match (Cynthia Lo Bessette, Fabian Dori,
-            // Jorgen Ouaknine, Shardul Bansal all have photos that render
-            // without alt or aria-label). The looser fallback selectors still
-            // require an alt/aria match to protect against mis-attribution.
-            const specificCandidates = [
-                ...main.querySelectorAll('img.pv-top-card-profile-picture__image'),
-                ...main.querySelectorAll('img[src*="profile-displayphoto"]'),
-                ...main.querySelectorAll('img[src*="profile-framedphoto"]'),
-                ...main.querySelectorAll('button[aria-label*="profile photo" i] img'),
-            ];
-            const looseCandidates = [
-                ...main.querySelectorAll('img.evi-image'),
-            ];
+            // CRITICAL: scope photo extraction to the top-card SECTION, not
+            // all of <main>. LinkedIn's profile page renders a "More profiles
+            // for you" sidebar inside <main> with avatars that use the same
+            // CSS classes and src patterns (profile-displayphoto) as the
+            // target's own avatar. Trusting <main> scope alone caused 6
+            // wrong-photo attributions in batch 5 (Christian Walker got
+            // Chiara M.'s photo from the sidebar; Yana Vella, Devon Euring,
+            // Nathan Chow, Micaela Bazo, Eleanor Terrett similar). The
+            // top-card container varies — try several known selectors.
+            const topCard =
+                main.querySelector('section.artdeco-card:first-of-type') ||
+                main.querySelector('[data-view-name*="profile-card"]') ||
+                main.querySelector('.pv-top-card') ||
+                main.querySelector('.ph5.pb5') ||
+                null;
+
+            // Belt-and-braces: collect candidates from the top-card only,
+            // AND still require alt-text or aria-label to mention the
+            // target's first name. Both defences must pass — scope alone
+            // isn't enough if the top-card heuristic falls back to <main>.
+            const candidates = topCard ? [
+                ...topCard.querySelectorAll('img.pv-top-card-profile-picture__image'),
+                ...topCard.querySelectorAll('img[src*="profile-displayphoto"]'),
+                ...topCard.querySelectorAll('img[src*="profile-framedphoto"]'),
+                ...topCard.querySelectorAll('button[aria-label*="profile photo" i] img'),
+                ...topCard.querySelectorAll('img.evi-image'),
+            ] : [];
+
             // If we couldn't extract the target's name from the page title,
             // refuse to set a photo at all. Without a name we have no way to
-            // distinguish the target's photo from the operator's nav avatar
-            // (May 12 Junhaeng Lee regression). Better to leave photo_url
-            // NULL than risk another mis-attribution.
+            // distinguish the target's photo from sidebar/suggestion avatars.
             if (!targetFirstName) {
                 photoUrl = null;
             } else {
-                // Pass 1: specific selectors — accept without alt match (we
-                // already scoped to <main> and excluded nav-avatar srcs).
-                for (const img of specificCandidates) {
+                for (const img of candidates) {
                     const src = img.src || '';
                     if (!src.startsWith('http')) continue;
                     if (navAvatarSrcs.has(src)) continue;
+                    const alt = (img.alt || '').toLowerCase();
+                    const parentLabel = (img.closest('button, a')?.getAttribute('aria-label') || '').toLowerCase();
+                    const matchesTarget =
+                        alt.includes(targetFirstName) || parentLabel.includes(targetFirstName);
+                    if (!matchesTarget) continue;
                     photoUrl = src;
                     break;
-                }
-                // Pass 2: loose selectors require alt-text first-name match.
-                if (!photoUrl) {
-                    for (const img of looseCandidates) {
-                        const src = img.src || '';
-                        if (!src.startsWith('http')) continue;
-                        if (navAvatarSrcs.has(src)) continue;
-                        const alt = (img.alt || '').toLowerCase();
-                        const parentLabel = (img.closest('button, a')?.getAttribute('aria-label') || '').toLowerCase();
-                        const matchesTarget =
-                            alt.includes(targetFirstName) || parentLabel.includes(targetFirstName);
-                        if (!matchesTarget) continue;
-                        photoUrl = src;
-                        break;
-                    }
                 }
             }
 
