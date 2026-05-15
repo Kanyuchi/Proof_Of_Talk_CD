@@ -52,6 +52,12 @@ export default function MyMatches() {
   const matches = matchData?.matches ?? [];
   const isAdmin = user?.is_admin ?? false;
 
+  // Admins don't have an attendee profile, so /matches is always empty for
+  // them. Redirect to /attendees — that's the admin's natural landing page.
+  if (isAdmin) {
+    return <Navigate to="/attendees" replace />;
+  }
+
   // Connection requests = matches where the OTHER party has clicked
   // "I'd like to meet" but you haven't responded yet. Surfaces the
   // notification gap until email is re-enabled.
