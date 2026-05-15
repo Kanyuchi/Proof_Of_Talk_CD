@@ -832,3 +832,27 @@ Extended the `ProfilePromptOffer` flow to nudge for `photo_url` once the GPT-dra
 - Tweaked scraper queue ordering to `created_at.desc` so the latest registrations (who need matches now) get photographed first when batches are rate-limit-capped. Older missing-photo rows can wait one more day.
 - Spotted a duplicate Stani Kulechov row in `attendees` — real `stani@aave.com` (Rhuna registration today) vs `stani.kulechov@speaker.proofoftalk.io` placeholder from the May 4 speaker-sheet sync. Logged for dedup follow-up in `whats_next.md`. Speaker-sheet sync doesn't currently merge on `linkedin_url`.
 - ~7 enriched profiles didn't yield a photo URL despite the scraper marking them ✅. Likely LinkedIn's lazy-loaded avatar element not present at scrape time — separate fix.
+
+## 2026-05-15 10:30 — Post-batch cleanup: dedup, name backfill, richer AI summaries
+
+Three issues surfaced when Shaun spot-checked the photo batch in the app; all addressed before the next scrape.
+
+### 1. Stani Kulechov dedup
+- Speaker-sheet sync (May 4) had created a placeholder row (`stani.kulechov@speaker.proofoftalk.io`, "Aave Labs") with 8 matches. Today's Rhuna registration created a second row (`stani@aave.com`, "Aave") with 0 matches.
+- Resolution: deleted the new orphan row, then updated the placeholder row's email → `stani@aave.com` and company → `Aave`. All 8 matches preserved on the canonical row.
+- Order matters: `attendees_email_key` unique constraint forces delete-orphan-first before update.
+
+### 2. First-name-only name backfill (Gavin Zaentz)
+- Audit found 2 single-word-name attendees with linkedin_url: Gavin (Zaentz) and Shaun (Kanyuchi). Gavin was hard to find via in-app search because his stored name was just "Gavin".
+- Manual fix: `update attendees set name = 'Gavin Zaentz', title = 'Co-Founder' where id = '539a656a-…'`. Shaun's own row left as-is.
+- Long-term fix added to `scripts/linkedin_scrape.py`: when the DB name is single-word, the scraper now backfills the surname from the scraped page-title name, falling back to title-casing the LinkedIn URL slug (`gavin-zaentz` → "Gavin Zaentz"). First-name match required as a safety check so we don't overwrite with a wrong-person name.
+
+### 3. AI summary now surfaces LinkedIn About content
+- Old `generate_ai_summary` dumped the full enriched_profile dict into the prompt but the rules were defensive ("DO NOT invent…") with no instruction to *use* the LinkedIn About. Result: Chiara Munaretto's summary leaned on Grid data only ("Managing Partner at Stablecoin Insider… Specific interests or goals have not been disclosed") and never mentioned her PoT marketing role, Web3 Deloitte advisory, or 20+ Web3 events organised — all explicit in her LinkedIn About.
+- Rewrote the prompt in both `app/services/embeddings.py` (ORM-attendee version) and `scripts/enrich_and_embed.py` (dict version, used by the refresh script). New prompt extracts `linkedin.headline` + `linkedin.summary` + Grid + website summary into named fields, instructs to lead with role + company, then "surface the most match-relevant signals from their LinkedIn About — domain expertise, past roles or exits, products/funds/protocols they've built". Guardrails kept (no invented theses; "actively seeking" only if Goals say so; LinkedIn About is biographical history not current intent).
+- Bumped max_tokens 200 → 400 to fit the richer summary.
+- Smoke-test on Chiara + Joris: both summaries now include real LinkedIn-grounded specifics (Joris's Nexteem exit, two decades of company-building, work with top European banks; Chiara's PoT marketing lead role, 20+ Web3 event organising, Web3 Deloitte advisory on Crypto Custody). The "Specific interests or goals have not been disclosed" close is preserved where both fields are empty — no fabrication.
+- Bulk regen kicked off via `scripts/refresh_summary_after_linkedin.py` (CUTOFF set to 2024-01-01 to refresh ALL 174 LinkedIn-enriched attendees). Each run regenerates ai_summary + intent_tags + deal_readiness_score + embedding so the matching engine reflects the richer summary too. Cost ~$0.55 total.
+
+### 4. Sentence-aware truncation for `linkedin_summary`
+- `enriched_profile.linkedin_summary` (the convenience field rendered in the admin "Enriched Data" panel) capped at exactly 1500 chars, producing mid-word cuts ("…what I call being a horizonta", "…mentoring coll"). Bumped cap 1500 → 2500 and now cut at the last `. / ! / ?` before the cap, appending " …" so the truncation is visible. Falls back to a hard cut only if no sentence boundary exists in the back half of the string.

@@ -351,17 +351,33 @@ async def generate_ai_summary(attendee: dict) -> str:
 
     interests = ", ".join(interests_raw) if interests_raw else "Not specified"
 
+    linkedin = enriched.get("linkedin") if isinstance(enriched, dict) else None
+    linkedin_headline = (linkedin or {}).get("headline") or ""
+    linkedin_about = (linkedin or {}).get("summary") or ""
+    grid = enriched.get("grid") if isinstance(enriched, dict) else None
+    website_summary = enriched.get("website_summary") if isinstance(enriched, dict) else None
+
     prompt = f"""You are an AI assistant for Proof of Talk 2026, an exclusive Web3 conference at the Louvre Palace (2,500 decision-makers, $18T AUM).
 
-Generate a concise 2-3 sentence professional summary for this attendee.
+Generate a professional 3-5 sentence summary of this attendee. Lead with role + company,
+then surface the most match-relevant signals from their LinkedIn About — domain expertise,
+past roles or exits, the products/funds/protocols they've built, and the kinds of
+counterparties they typically work with. Close with stated goals/interests if present.
 
-CRITICAL ACCURACY RULES:
-- ONLY state facts directly supported by the data below.
-- If Goals or Interests say "Not specified", write "Specific interests/goals have not been disclosed" — do NOT guess.
-- Do NOT invent investment theses, mandates, or product descriptions not in the data.
-- Do NOT claim someone "is actively seeking" unless their Goals or Interests explicitly say so.
-- If Company looks like an email domain (Gmail, Googlemail, Hotmail), note company is not confirmed.
-- Be specific where data exists, brief where it doesn't.
+ACCURACY RULES:
+- Ground every claim in the data below. Do NOT invent investment theses, mandates,
+  AUM figures, fund sizes, or product features that are not explicitly stated.
+- Do NOT claim someone "is actively seeking" or "is looking to" unless their Goals
+  or Interests explicitly say so. The LinkedIn About is biographical history, not
+  a statement of current intent.
+- If Interests AND Goals are both "Not specified", end the summary with a single
+  short sentence: "Specific interests or goals have not been disclosed." Do NOT
+  repeat that phrase or pad with filler.
+- If Company is a generic email domain (Gmail, Outlook, Hotmail, etc.), note the
+  company is not confirmed.
+- Paraphrase the LinkedIn About — do NOT quote raw sentences or copy mid-sentence
+  fragments. Skip personal asides, hiring pitches, and contact instructions.
+- Write in third person.
 
 Name: {name}
 Title: {title or 'Not provided'}
@@ -371,11 +387,16 @@ Goals: {goals or 'Not specified'}
 Interests: {interests}
 Company Description: {company_desc or 'Not available'}
 
-Write in third person."""
+LinkedIn headline: {linkedin_headline or 'Not available'}
+LinkedIn About (verbatim, paraphrase don't quote):
+{linkedin_about or 'Not available'}
+
+Grid (Web3 verified) data: {grid or 'Not available'}
+Website summary: {website_summary or 'Not available'}"""
 
     return await call_openai_chat(
         [{"role": "user", "content": prompt}],
-        max_tokens=200,
+        max_tokens=400,
         temperature=0.3,
     )
 

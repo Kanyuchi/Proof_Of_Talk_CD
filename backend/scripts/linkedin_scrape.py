@@ -584,11 +584,21 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
                     if data.get("headline"):
                         summary_parts.append(data["headline"])
                     if data.get("summary"):
-                        # Bumped 200 → 1500 chars on 2026-05-12 — the old
-                        # cap cut bios mid-sentence ("…and meaning. Fee",
-                        # "…until I (my"). 1500 fits a typical full About
-                        # section without bloating the prompt context.
-                        summary_parts.append(data["summary"][:1500])
+                        # Bumped 1500 → 2500 chars on 2026-05-15 — bios
+                        # like Chiara's (2417) were still cut. If we DO
+                        # need to truncate, cut at the last sentence
+                        # boundary (./!/?) before the cap so the admin
+                        # "Enriched Data" panel never ends mid-word. An
+                        # explicit "…" marks the truncation.
+                        raw = data["summary"]
+                        if len(raw) <= 2500:
+                            summary_parts.append(raw)
+                        else:
+                            head = raw[:2500]
+                            cut = max(head.rfind("."), head.rfind("!"), head.rfind("?"))
+                            if cut < 1200:
+                                cut = 2500
+                            summary_parts.append(head[: cut + 1] + " …")
                     enriched["linkedin_summary"] = " | ".join(summary_parts)
 
                     patch_payload = {"enriched_profile": enriched}
@@ -600,6 +610,28 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
                     # Auto-fill photo
                     if data.get("profile_pic_url"):
                         patch_payload["photo_url"] = data["profile_pic_url"]
+
+                    # Backfill surname when DB has only a first name. The
+                    # speaker-sheet sync sometimes lands rows like
+                    # name="Gavin" (Gavin Zaentz on LinkedIn), which makes
+                    # them undiscoverable by full-name search in the app.
+                    # Prefer the scraped page-title name; fall back to
+                    # title-casing the URL slug if that's missing.
+                    db_name = (attendee.get("name") or "").strip()
+                    if db_name and " " not in db_name:
+                        candidate = (data.get("scraped_name") or "").strip()
+                        if not candidate:
+                            slug = linkedin_url.rstrip("/").split("/in/")[-1].split("/")[0]
+                            slug = slug.split("?")[0]
+                            if slug and "-" in slug:
+                                candidate = " ".join(p.capitalize() for p in slug.split("-"))
+                        if (
+                            candidate
+                            and " " in candidate
+                            and candidate.split()[0].lower() == db_name.lower()
+                        ):
+                            patch_payload["name"] = candidate
+                            print(f"    📝 Name backfilled: '{db_name}' → '{candidate}'")
 
                     ok = patch_attendee(attendee["id"], patch_payload)
                     if ok:
