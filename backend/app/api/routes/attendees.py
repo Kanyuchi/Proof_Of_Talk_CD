@@ -18,18 +18,28 @@ async def search_attendees(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_auth),
 ):
-    """Full-text search across name, company, title, goals, and ai_summary."""
-    from sqlalchemy import or_, cast, String
+    """Full-text search across name, company, title, goals, and ai_summary.
+
+    Accent-insensitive: wraps both the term and the columns in `unaccent()`
+    so typing "stephanie" matches "Stéphanie", "chloe" matches "Chloé", etc.
+    Requires the `unaccent` Postgres extension.
+    """
+    from sqlalchemy import or_
     term = f"%{q.lower()}%"
+
+    def u(col):
+        return func.unaccent(func.lower(col))
+
+    uterm = func.unaccent(term)
     query = (
         select(Attendee)
         .where(
             or_(
-                func.lower(Attendee.name).like(term),
-                func.lower(Attendee.company).like(term),
-                func.lower(Attendee.title).like(term),
-                func.lower(Attendee.goals).like(term),
-                func.lower(Attendee.ai_summary).like(term),
+                u(Attendee.name).like(uterm),
+                u(Attendee.company).like(uterm),
+                u(Attendee.title).like(uterm),
+                u(Attendee.goals).like(uterm),
+                u(Attendee.ai_summary).like(uterm),
             )
         )
         .limit(limit)

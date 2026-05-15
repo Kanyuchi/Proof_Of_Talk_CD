@@ -65,14 +65,17 @@ export default function Attendees() {
       prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
     );
 
+  // Accent-insensitive: "stephanie" should match "Stéphanie", "chloe" → "Chloé".
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
   const filtered = attendees.filter((a) => {
-    const q = search.toLowerCase();
+    const q = norm(search);
     const matchesSearch =
       !search ||
-      a.name.toLowerCase().includes(q) ||
-      a.company.toLowerCase().includes(q) ||
-      a.title.toLowerCase().includes(q) ||
-      a.email.toLowerCase().includes(q);
+      norm(a.name).includes(q) ||
+      norm(a.company).includes(q) ||
+      norm(a.title).includes(q) ||
+      norm(a.email).includes(q);
     const matchesFilter = filters.length === 0 || filters.includes(a.ticket_type);
     return matchesSearch && matchesFilter;
   });
