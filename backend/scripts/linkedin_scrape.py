@@ -69,7 +69,13 @@ def fetch_attendees(with_url_only: bool = True, missing_photo_only: bool = False
     with httpx.Client(timeout=30) as client:
         resp = client.get(url, headers=sb_headers(), params=params)
         resp.raise_for_status()
-        return resp.json()
+        rows = resp.json()
+    # Skip rows we've already concluded are unscrapable (private profiles,
+    # repeated 403s). Flagged manually after 4+ failed attempts. Keeps the
+    # newest-first queue from wasting 5 slots on the same dead profiles
+    # every batch.
+    rows = [r for r in rows if not ((r.get("enriched_profile") or {}).get("linkedin_unscrapable"))]
+    return rows
 
 
 def patch_attendee(aid: str, payload: dict) -> bool:
