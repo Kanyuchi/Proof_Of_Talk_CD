@@ -824,3 +824,11 @@ Extended the `ProfilePromptOffer` flow to nudge for `photo_url` once the GPT-dra
 
 ### Out-of-scope
 - File-upload affordance: the platform has no object-storage backend (auth/profile + magic-link both take photo URLs). Adding file-upload would need new infra. URL paste matches the existing system and shipped in scope.
+
+## 2026-05-15 09:55 — LinkedIn photo backfill resumed (LinkedIn unblocked)
+
+- LinkedIn accounts unblocked after the 2026-05-12 rate-limit pause. Ran `scripts/linkedin_scrape.py --missing-photos-only --limit 30` against the 143-row queue.
+- Result: 25/30 enriched, 5 skipped (private/blocked profiles), 0 errors. Photo count: 156 → 174 (+18). Pending queue: 143 → 125.
+- Tweaked scraper queue ordering to `created_at.desc` so the latest registrations (who need matches now) get photographed first when batches are rate-limit-capped. Older missing-photo rows can wait one more day.
+- Spotted a duplicate Stani Kulechov row in `attendees` — real `stani@aave.com` (Rhuna registration today) vs `stani.kulechov@speaker.proofoftalk.io` placeholder from the May 4 speaker-sheet sync. Logged for dedup follow-up in `whats_next.md`. Speaker-sheet sync doesn't currently merge on `linkedin_url`.
+- ~7 enriched profiles didn't yield a photo URL despite the scraper marking them ✅. Likely LinkedIn's lazy-loaded avatar element not present at scrape time — separate fix.

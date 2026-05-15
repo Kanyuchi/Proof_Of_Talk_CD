@@ -41,7 +41,8 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 
 ## Soon
 
-- **Resume photo backfill** *(paused 2026-05-12 17:38 — both LinkedIn accounts rate-limited)* — 155/347 attendees have verified LinkedIn profile photos. 142 still missing. Resume in 24-48h with `python scripts/linkedin_scrape.py --missing-photos-only --limit 30` (smaller batches stay under the per-session ban threshold). Selector defenses (nav-blacklist + `<main>` scope + first-name verification + null-name short-circuit) are battle-tested — no Shaun-dup regressions across the last ~110 photos captured today.
+- **Resume photo backfill** *(2026-05-15: LinkedIn back up, first batch of 30 ran cleanly — +18 photos, 174 total, 125 still missing)* — Next batch when ready: `python scripts/linkedin_scrape.py --missing-photos-only --limit 30`. Scraper now orders newest-first so latest registrations get priority. 5/30 returned no data this run (private profiles / blocked); ~7 enriched but no photo URL in HTML (LinkedIn's lazy-loaded avatar — separate fix).
+- **Dedup Stani Kulechov rows** — two rows in `attendees` for the same person: `stani@aave.com` (real, created today via Rhuna) and `stani.kulechov@speaker.proofoftalk.io` (placeholder from speaker-sheet sync 2026-05-04). Speaker-sheet sync doesn't merge across `linkedin_url` match. One-off: merge the real-email row into the speaker row (or vice versa) so matches don't fragment.
 - **Improve LinkedIn enrichment depth** *(noted 2026-05-12 — Shaun flagged it)* — current scraper truncates the About section at 200 chars and doesn't click LinkedIn's "see more" expander, so attendee bios cut off mid-sentence ("…until I (my", "…and meaning. Fee"). Three fixes:
   (a) bump truncation 200 → 1500 chars (`linkedin_scrape.py` line ~421)
   (b) click `button[aria-label*="see more" i]` inside the About section before reading text

@@ -54,7 +54,11 @@ def fetch_attendees(with_url_only: bool = True, missing_photo_only: bool = False
     url = f"{SUPABASE_URL}/rest/v1/attendees"
     params = {
         "select": "id,name,email,company,title,linkedin_url,photo_url,enriched_profile",
-        "order": "created_at.asc",
+        # Newest first — when scraping is rate-limited and we can only do
+        # a few per session, the latest registrations (who need matches
+        # right now) get priority. Older attendees who've been missing a
+        # photo for weeks can wait one more day.
+        "order": "created_at.desc",
         "limit": "500",
     }
     if with_url_only:
