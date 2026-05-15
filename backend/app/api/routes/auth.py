@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import secrets
 import uuid
@@ -21,12 +22,23 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 async def _process_attendee_bg(attendee_id: uuid.UUID) -> None:
-    """Background task: run AI pipeline on a newly registered attendee."""
-    async with async_session() as db:
-        engine = MatchingEngine(db)
-        attendee = await db.get(Attendee, attendee_id)
-        if attendee:
-            await engine.process_attendee(attendee)
+    """Run AI pipeline on a newly registered attendee.
+
+    Fire-and-forget — invoked via `asyncio.create_task`, NOT FastAPI's
+    BackgroundTasks. Reason: BackgroundTasks holds the request worker
+    until the task completes, so a 10-20s OpenAI/Grid/embed pipeline
+    can cause the Netlify edge to 504 even though the response is ready.
+    asyncio.create_task lets the worker return immediately and the AI
+    processing runs detached on the event loop.
+    """
+    try:
+        async with async_session() as db:
+            engine = MatchingEngine(db)
+            attendee = await db.get(Attendee, attendee_id)
+            if attendee:
+                await engine.process_attendee(attendee)
+    except Exception as exc:
+        logger.exception("Detached attendee processing failed for %s: %s", attendee_id, exc)
 
 
 @router.post("/register", response_model=Token, status_code=201)
@@ -104,8 +116,11 @@ async def register(
     db.add(user)
     await db.commit()
 
-    # Kick off AI processing in the background (non-blocking)
-    background_tasks.add_task(_process_attendee_bg, attendee.id)
+    # Fire-and-forget AI processing. asyncio.create_task lets the worker
+    # release the response immediately; FastAPI's BackgroundTasks would
+    # hold the worker until processing finishes, causing edge timeouts
+    # on slow OpenAI/Grid pipelines (William Raulin's 504, 2026-05-15).
+    asyncio.create_task(_process_attendee_bg(attendee.id))
 
     token = create_access_token({"sub": str(user.id)})
     return Token(access_token=token)
