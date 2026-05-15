@@ -104,6 +104,23 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
         await page.evaluate("window.scrollTo(0, 0)")
         await page.wait_for_timeout(500)
 
+        # Wait for the profile avatar to render before reading data.
+        # LinkedIn lazy-loads the top-card photo — without this wait, ~25%
+        # of scrapes ended up with ✅ enriched but photo_url NULL (Josiah,
+        # Luca, Nikhil's first attempt, etc). Up to 4s; if no avatar selector
+        # ever matches the profile is likely photo-less and we just continue.
+        try:
+            await page.wait_for_selector(
+                'img.pv-top-card-profile-picture__image, '
+                'img[src*="profile-displayphoto"], '
+                'img[src*="profile-framedphoto"], '
+                'button[aria-label*="profile photo" i] img',
+                state="visible",
+                timeout=4000,
+            )
+        except Exception:
+            pass
+
         # Click "…see more" expanders before reading text. Without this,
         # LinkedIn truncates About to ~250 chars and we capture half a
         # sentence ("…until I (my"). Try the common selectors; ignore
@@ -413,7 +430,7 @@ def _is_already_enriched(attendee: dict) -> bool:
     return bool(li.get("headline"))
 
 
-async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False, verify_company: bool = False, missing_photos_only: bool = False):
+async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False, verify_company: bool = False, missing_photos_only: bool = False, names: list[str] | None = None):
     print("=== LinkedIn Profile Scraper (Playwright) ===\n")
 
     # Fetch attendees
@@ -455,6 +472,12 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
         print(f"  Mode: --only-missing — retrying {len(all_targets)} attendees without URLs")
     else:
         all_targets = attendees_without_url + attendees_with_url if discover else attendees_with_url + attendees_without_url
+    # --names filter (case-insensitive substring match against attendee.name)
+    # for surgical re-scrapes without burning through the queue.
+    if names:
+        name_set = [n.lower() for n in names]
+        all_targets = [a for a in all_targets if any(n in (a.get("name") or "").lower() for n in name_set)]
+        print(f"  --names filter matched: {len(all_targets)}")
     if limit:
         all_targets = all_targets[:limit]
     print(f"  Processing: {len(all_targets)}\n")
@@ -664,8 +687,9 @@ if __name__ == "__main__":
     parser.add_argument("--only-missing", action="store_true", help="Only process attendees without linkedin_url (retry failed discoveries, skip the ones we already have)")
     parser.add_argument("--include-enriched", action="store_true", help="Re-scrape attendees who already have LinkedIn data (default: skip them)")
     parser.add_argument("--missing-photos-only", action="store_true", help="Only scrape rows where linkedin_url is set AND photo_url is NULL. Targets photo gaps without re-touching profiles that already have a photo.")
+    parser.add_argument("--names", nargs="+", help="Case-insensitive substring filter on attendee.name. Targets a specific subset without burning through the queue (e.g. --names josiah luca).")
     args = parser.parse_args()
 
     # --only-missing implies --discover
     discover = args.discover or args.only_missing
-    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing, include_enriched=args.include_enriched, verify_company=args.verify_company, missing_photos_only=args.missing_photos_only))
+    asyncio.run(run(dry_run=args.dry_run, limit=args.limit, discover=discover, only_missing=args.only_missing, include_enriched=args.include_enriched, verify_company=args.verify_company, missing_photos_only=args.missing_photos_only, names=args.names))
