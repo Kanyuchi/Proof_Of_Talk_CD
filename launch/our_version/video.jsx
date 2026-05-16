@@ -338,7 +338,7 @@ function useCardCards() {
     return {
       ...p,
       rot: ((seed * 11) % 100 - 50) * 0.08,    // -4 .. +4 deg
-      blur: 0.4 + (i % 5) * 0.25,               // ~0.4–1.4 px (atmospheric, names stay legible)
+      blur: 1 + (i % 5) * 0.6,                  // ~1–3.5 px
       scale: 0.88 + ((seed % 24) / 100),        // ~0.88–1.12
       opacityBase: 0.4 + ((seed * 7) % 50) / 100,
       seed,
@@ -351,14 +351,13 @@ function SwarmCard({ card, sceneT, dim = false }) {
   const driftX = Math.sin(sceneT * 0.55 + card.seed * 0.31) * 10;
   const driftY = Math.cos(sceneT * 0.45 + card.seed * 0.22) * 7;
   const rotDrift = Math.sin(sceneT * 0.35 + card.seed) * 0.8;
-  const entryT = Easing.easeOutBack(clamp((sceneT - card.seed * 0.025) / 0.55, 0, 1));
-  const popScale = card.scale * (0.7 + 0.3 * Math.min(1, entryT));
+  const entryT = Easing.easeOutCubic(clamp((sceneT - card.seed * 0.012) / 0.85, 0, 1));
   return (
     <div style={{
       position: 'absolute',
       left: card.x + driftX, top: card.y + driftY,
       width: 300,
-      transform: `rotate(${card.rot + rotDrift}deg) scale(${popScale})`,
+      transform: `rotate(${card.rot + rotDrift}deg) scale(${card.scale})`,
       transformOrigin: 'center',
       filter: `blur(${dim ? card.blur * 1.8 : card.blur}px)`,
       opacity: entryT * card.opacityBase * (dim ? 0.55 : 1),
@@ -453,16 +452,13 @@ function Scene01Legacy() {
 
 // ── SCENE 02 — Cards continue + 2,500 counter ───────────────────────────────
 function Scene02() {
-  const cards = useCardCards();
   const local = useSprite().localTime;
   const labelT = Easing.easeOutCubic(clamp((local - 1.1) / 0.55, 0, 1));
   const subT   = Easing.easeOutCubic(clamp((local - 1.8) / 0.55, 0, 1));
   return (
     <React.Fragment>
       <Vignette />
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.85 }}>
-        {cards.map((c, i) => <SwarmCard key={i} card={c} sceneT={local + 0.6} />)}
-      </div>
+      {/* Attendee cards removed — Scene 02 is now clean counter + label only */}
       <div style={{
         position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
