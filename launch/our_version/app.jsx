@@ -181,6 +181,8 @@ function VideoApp() {
         );
       })}
       <WatermarkLogo />
+      <BackgroundMusic />
+      <SyncedAudio />
     </Stage>
   );
 }
