@@ -15,7 +15,7 @@
 //   ffmpeg installed (brew install ffmpeg)
 
 import { chromium } from 'playwright';
-import { spawn, execSync } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { mkdirSync, rmSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -106,7 +106,13 @@ const args_ffmpeg = [
   OUT_VIDEO,
 ];
 
-execSync(`ffmpeg ${args_ffmpeg.map(a => a.includes(' ') ? `"${a}"` : a).join(' ')}`, { stdio: 'inherit' });
+// Use spawnSync with arg array — avoids shell parsing of special chars like ; [ ]
+// in the filter_complex expression.
+const ff = spawnSync('ffmpeg', args_ffmpeg, { stdio: 'inherit' });
+if (ff.status !== 0) {
+  console.error(`\n[render] ffmpeg failed with exit code ${ff.status}`);
+  process.exit(ff.status ?? 1);
+}
 
 // Cleanup intermediate frames (comment out if you want to keep them)
 rmSync(FRAMES_DIR, { recursive: true });
