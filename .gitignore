@@ -45,6 +45,7 @@ exports/*.xlsx
 # Launch video binaries (the renderer needs them at runtime, but they're heavy and Sithum-supplied)
 launch/from_sithum/
 launch/our_version/*.mp3
+!launch/our_version/voiceover.mp3
 launch/our_version/*.png
 launch/our_version/figures/
 launch/our_version/.DS_Store
