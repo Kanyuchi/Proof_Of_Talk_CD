@@ -262,17 +262,25 @@ async def _process_order_chunk(
         country_iso3             = order.get("countryIso3Code") or None
         ticket_bought_at         = _parse_extasy_dt(order.get("createdAtUtc"))
 
+        # Rhuna-authoritative fields live under enriched_profile.extasy so the
+        # granular pass name ("VIP Black Pass", "Investor Pass", "Startup
+        # Pass") survives the lossy collapse into the 4-value TicketType enum.
+        # The sub-dict is overwritten in full on every sync; the rest of
+        # enriched_profile keeps existing-wins semantics below.
+        extasy_block = {
+            "order_id":     order_id,
+            "ticket_code":  (order.get("ticketCodes") or "").split(",")[0].strip(),
+            "ticket_name":  ticket_name,
+            "phone":        order.get("phoneNumber") or None,
+            "city":         order.get("city") or None,
+            "country":      country_iso3,
+            "paid_amount":  order.get("paymentsAmount") or None,
+            "voucher_code": order.get("voucherCode") or None,
+            "synced_at":    datetime.now(timezone.utc).isoformat(),
+        }
         enriched_profile = {
-            "source":          "extasy",
-            "extasy_order_id": order_id,
-            "ticket_code":     (order.get("ticketCodes") or "").split(",")[0].strip(),
-            "ticket_name":     ticket_name,
-            "phone":           order.get("phoneNumber") or None,
-            "city":            order.get("city") or None,
-            "country":         country_iso3,
-            "paid_amount":     order.get("paymentsAmount") or None,
-            "voucher_code":    order.get("voucherCode") or None,
-            "synced_at":       datetime.now(timezone.utc).isoformat(),
+            "source": "extasy",
+            "extasy": extasy_block,
         }
 
         # Per-row savepoint isolates failures so one bad row can't poison the
@@ -299,9 +307,12 @@ async def _process_order_chunk(
                         existing.ticket_bought_at = ticket_bought_at
                         changed = True
 
-                    # Merge Extasy fields into enriched_profile without
-                    # clobbering anything already there (existing data wins).
-                    merged = {**enriched_profile, **(existing.enriched_profile or {})}
+                    # Merge: existing-wins for everything except the .extasy
+                    # sub-key, which is Rhuna-authoritative and always
+                    # overwritten with the latest sync values.
+                    current = dict(existing.enriched_profile or {})
+                    merged = {**enriched_profile, **current}
+                    merged["extasy"] = extasy_block
                     if merged != (existing.enriched_profile or {}):
                         existing.enriched_profile = merged
                         changed = True

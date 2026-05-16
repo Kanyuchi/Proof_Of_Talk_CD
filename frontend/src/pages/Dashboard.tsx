@@ -514,6 +514,42 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Ticket Types — mirrors Rhuna's granular pass-name view; the
+              ticket_type enum (DELEGATE/SPEAKER/VIP/SPONSOR) collapses 7 Rhuna
+              passes into 4 buckets, so we render the raw pass names from
+              enriched_profile.extasy.ticket_name instead. */}
+          {revenueData.ticket_types_breakdown && revenueData.ticket_types_breakdown.total > 0 && (
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-[#E76315]" />
+                  <h2 className="text-lg font-semibold">Ticket Types (Rhuna)</h2>
+                </div>
+                <span className="text-xs text-white/40">
+                  {revenueData.ticket_types_breakdown.total} ticket holder{revenueData.ticket_types_breakdown.total === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {revenueData.ticket_types_breakdown.by_pass.map(({ pass_name, count }) => {
+                  const total = revenueData.ticket_types_breakdown.total || 1;
+                  const pct = (count / total) * 100;
+                  return (
+                    <div key={pass_name} className="flex items-center gap-3">
+                      <span className="w-44 text-xs text-white/60 text-right shrink-0 truncate" title={pass_name}>{pass_name}</span>
+                      <div className="flex-1 h-6 bg-white/5 rounded-full overflow-hidden relative">
+                        <div className="h-full bg-[#E76315] rounded-full transition-all" style={{ width: `${Math.max(pct, 2)}%` }} />
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/80">{count} · {pct.toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-3 text-[10px] text-white/30">
+                Source: <code>enriched_profile.extasy.ticket_name</code> on attendees in our DB. Refresh after each Extasy sync.
+              </div>
+            </div>
+          )}
+
           {/* Attendee growth + source breakdown + profile completeness */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Weekly growth */}

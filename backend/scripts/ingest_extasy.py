@@ -145,8 +145,22 @@ def build_attendee_record(order: dict, ticket_name: str) -> dict:
             company = domain.replace("www.", "").split(".")[0].title()
             company_website = f"https://{domain}"
 
+    # Mirror extasy_sync's nested .extasy namespace so granular pass name
+    # ("VIP Black Pass", "Investor Pass", ...) is preserved alongside the
+    # lossy ticket_type enum. raw_order kept for debugging-friendly history.
     enriched_profile = {
         "source": "extasy",
+        "extasy": {
+            "order_id":     order.get("id"),
+            "ticket_code":  (order.get("ticketCodes") or "").split(",")[0].strip(),
+            "ticket_name":  ticket_name,
+            "phone":        order.get("phoneNumber"),
+            "city":         order.get("city"),
+            "country":      order.get("countryIso3Code"),
+            "paid_amount":  order.get("paymentsAmount"),
+            "voucher_code": order.get("voucherCode"),
+            "synced_at":    datetime.now(timezone.utc).isoformat(),
+        },
         "raw_order": {
             "order_id":      order.get("id"),
             "display_on":    order.get("displayOn"),

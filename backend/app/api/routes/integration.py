@@ -241,18 +241,23 @@ async def ticket_purchased(
     company, company_website = _infer_company(email_lower)
     ticket_type = _map_ticket_type(body.ticket_type)
 
+    # Mirror extasy_sync's structure: Rhuna-authoritative fields nested under
+    # .extasy; granular pass name preserved in .extasy.ticket_name even though
+    # ticket_type collapses it into a 4-value enum.
     enriched_profile = {
         "source": "runa_webhook",
-        "extasy_order_id": body.extasy_order_id,
-        "ticket_code": body.ticket_code,
-        "ticket_name": body.ticket_type,
-        "phone": body.phone,
-        "city": body.city,
-        "country": body.country,
-        "paid_amount": body.paid_amount,
-        "voucher_code": body.voucher_code,
-        "purchased_at": body.purchased_at,
-        "synced_at": datetime.now(timezone.utc).isoformat(),
+        "extasy": {
+            "order_id":     body.extasy_order_id,
+            "ticket_code":  body.ticket_code,
+            "ticket_name":  body.ticket_type,
+            "phone":        body.phone,
+            "city":         body.city,
+            "country":      body.country,
+            "paid_amount":  body.paid_amount,
+            "voucher_code": body.voucher_code,
+            "purchased_at": body.purchased_at,
+            "synced_at":    datetime.now(timezone.utc).isoformat(),
+        },
     }
 
     attendee = Attendee(

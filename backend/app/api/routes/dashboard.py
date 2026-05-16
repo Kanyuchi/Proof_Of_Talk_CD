@@ -677,6 +677,23 @@ async def revenue_stats(
     from_seed = sum(1 for a in attendees if a.email and "@example.com" in a.email)
     from_other = total_db - from_extasy - from_speakers - from_seed
 
+    # ── Rhuna ticket types (mirrors the Rhuna pass-name view) ─────────────
+    # Granular pass name lives at enriched_profile.extasy.ticket_name —
+    # see backfill_rhuna_pass_names.py for the migration. The 4-value
+    # TicketType enum is too coarse to surface to ops, so we group by
+    # the raw Rhuna pass name here.
+    ticket_type_counter: dict[str, int] = defaultdict(int)
+    for a in attendees:
+        ext = (a.enriched_profile or {}).get("extasy") or {}
+        pass_name = ext.get("ticket_name")
+        if pass_name:
+            ticket_type_counter[pass_name] += 1
+    ticket_types_breakdown = sorted(
+        ({"pass_name": k, "count": v} for k, v in ticket_type_counter.items()),
+        key=lambda x: -x["count"],
+    )
+    ticket_types_total = sum(ticket_type_counter.values())
+
     return {
         "funnel": {
             "total_orders": total_orders,
@@ -717,6 +734,10 @@ async def revenue_stats(
             "with_grid": with_grid,
             "with_photo": with_photo,
             "with_targets": with_targets,
+        },
+        "ticket_types_breakdown": {
+            "total": ticket_types_total,
+            "by_pass": ticket_types_breakdown,
         },
     }
 
