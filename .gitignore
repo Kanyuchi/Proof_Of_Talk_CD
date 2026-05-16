@@ -49,3 +49,5 @@ launch/our_version/*.mp3
 launch/our_version/*.png
 launch/our_version/figures/
 launch/our_version/.DS_Store
+launch/our_version/pot_matchmaker_*.mp4
+launch/our_version/.render_frames/

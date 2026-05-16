@@ -44,3 +44,46 @@ Verified rendering at the key scene timestamps (snapshots in `.playwright-mcp/`)
 - `scene11_booking.png` (t≈55.5s) — new header + subtext
 - `scene13_close.png` (t≈65s) — home-hero close
 - `scene14_built_into.png` (t≈69.5s) — typo fix
+
+## Audio (Brian VO + music)
+
+Voiceover: **Brian — Deep, Resonant, Comforting** (ElevenLabs premade, `nPczCjzI2devNBz1zQrb`). 20 phrases generated separately and stitched with `ffmpeg` silence padding to land each chapter-card callout when its title is fully sharp. See [voiceover_script_v2.md](voiceover_script_v2.md) for per-clip target times.
+
+Music: background track ducks (-12dB) during the VO window (1.0s → 74.5s) and returns to full volume for the final beat.
+
+Robust autoplay: if Chrome blocks audio, any click anywhere on the page resumes both tracks (window-level once-only listener in `app.jsx`). The orange "► Tap to enable sound" pill is the explicit fallback if the user wants to opt-in.
+
+## Mobile viewing
+
+Portrait mobile (≤720px width) shows a "Rotate your phone" splash with an animated icon. The 16:9 video is letterboxed in portrait — landscape gives the full experience. Tested via Chrome DevTools device emulation.
+
+## Download / export to MP4
+
+A Playwright + ffmpeg render script is included. From this directory:
+
+```bash
+# One-time setup
+npm install --no-save playwright
+npx playwright install chromium
+brew install ffmpeg                    # or apt/winget equivalent
+
+# Make sure dev server is running
+python3 -m http.server 8765 &
+
+# Render at 1080p (default, ~3-5 minutes)
+node render.mjs                        # → pot_matchmaker_1080p.mp4
+
+# Render at true 4K (3840×2160, ~10-15 minutes, larger file)
+node render.mjs --4k                   # → pot_matchmaker_4k.mp4
+
+# Faster preview render at 30fps
+node render.mjs --fps=30
+```
+
+The script seeks frame-by-frame via the page's `window.__seek(t)` helper (exposed in `?render=1` mode), screenshots each frame, then ffmpeg muxes the PNG sequence with `voiceover.mp3` + `music.mp3` (mixed at the same -12dB duck levels the live page uses) into an H.264 MP4 with `+faststart` for streaming.
+
+Output file:
+- 1080p: ~50–80 MB
+- 4K: ~200–400 MB (depending on scene complexity)
+
+The exports are gitignored (`pot_matchmaker_*.mp4`). Upload them to wherever you ship final cuts.

@@ -12,6 +12,34 @@
     body { font-family: 'Inter', system-ui, sans-serif; color: #f5f4ef; }
   #root { width: 100vw; height: 100vh; }
 
+    /* Mobile portrait hint — the video is 16:9, looks tiny in portrait.
+       Asks the viewer to rotate. Hidden in landscape and on desktops. */
+    .rotate-hint { display: none; }
+    @media (max-width: 720px) and (orientation: portrait) {
+      .rotate-hint {
+        display: flex;
+        position: fixed; inset: 0;
+        background: rgba(8,8,8,0.95);
+        color: #f5f4ef;
+        align-items: center; justify-content: center;
+        flex-direction: column; gap: 18px;
+        font-family: 'Inter', system-ui, sans-serif;
+        z-index: 2000;
+        text-align: center; padding: 24px;
+      }
+      .rotate-hint .icon {
+        font-size: 56px;
+        color: #f76a0c;
+        animation: rotate-pulse 1.8s ease-in-out infinite;
+      }
+      .rotate-hint .title { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+      .rotate-hint .sub { font-size: 14px; color: rgba(245,244,239,0.6); max-width: 280px; line-height: 1.5; }
+      @keyframes rotate-pulse {
+        0%, 100% { transform: rotate(0deg); }
+        50% { transform: rotate(90deg); }
+      }
+    }
+
   /* v5 snapshot ribbon */
   .ver-ribbon {
     position: fixed; top: 14px; right: 14px; z-index: 200;
@@ -85,6 +113,11 @@
   </style>
 </head>
 <body>
+  <div class="rotate-hint">
+    <div class="icon">⟳</div>
+    <div class="title">Rotate your phone</div>
+    <div class="sub">Best viewed in landscape. Tap to rotate or turn your device.</div>
+  </div>
   <div id="root"></div>
 
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>

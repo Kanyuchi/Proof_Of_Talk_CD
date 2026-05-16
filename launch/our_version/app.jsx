@@ -86,7 +86,7 @@ function BackgroundMusic() {
   const MAX_VOL  = 0.28;
   const DUCK_VOL = 0.08;
   const VO_START = 1.0;
-  const VO_END   = 67.24;
+  const VO_END   = 74.5;  // Brian VO clip 20 ends at ~74.1s — keep music ducked until then
   const DUCK_FADE = 1.5;
   React.useEffect(() => {
     const a = audioRef.current;
@@ -139,12 +139,29 @@ function SyncedAudio() {
       try { a.currentTime = time; } catch (e) {}
     }
   }, [time]);
-  const handleTap = () => {
-    const a = audioRef.current;
-    if (!a) return;
-    a.muted = false; a.volume = 1.0;
-    a.play().then(() => setNeedsTap(false)).catch(() => {});
-  };
+  // Retry every <audio> on the page (music + voiceover) on any user interaction.
+  // This is the robust fix for "sometimes only music plays, no Brian's voice":
+  // both audios sometimes fail to autoplay; the original handleTap only retried
+  // voiceover. Now any tap kicks both, and we hook the global window for click-
+  // anywhere recovery (single-fire — removes itself once audio actually plays).
+  const handleTap = React.useCallback(() => {
+    let anyPlaying = false;
+    document.querySelectorAll('audio').forEach(el => {
+      el.muted = false;
+      const p = el.play();
+      if (p && p.then) p.then(() => { anyPlaying = true; }).catch(() => {});
+    });
+    setNeedsTap(false);
+  }, []);
+  React.useEffect(() => {
+    const handler = () => handleTap();
+    window.addEventListener('click', handler, { once: true, capture: true });
+    window.addEventListener('keydown', handler, { once: true, capture: true });
+    return () => {
+      window.removeEventListener('click', handler, { capture: true });
+      window.removeEventListener('keydown', handler, { capture: true });
+    };
+  }, [handleTap]);
   return (
     <React.Fragment>
       <audio ref={audioRef} src="voiceover.mp3" preload="auto" style={{ display: 'none' }} />
