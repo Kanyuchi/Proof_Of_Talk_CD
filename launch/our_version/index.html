@@ -26,6 +26,11 @@
         font-family: 'Inter', system-ui, sans-serif;
         z-index: 2000;
         text-align: center; padding: 24px;
+        animation: rotate-hint-dismiss 4.5s ease-out forwards;
+      }
+      @keyframes rotate-hint-dismiss {
+        0%, 70%  { opacity: 1; pointer-events: auto; }
+        100%     { opacity: 0; pointer-events: none; visibility: hidden; }
       }
       .rotate-hint .icon {
         font-size: 56px;
