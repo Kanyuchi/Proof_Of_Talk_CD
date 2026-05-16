@@ -2,7 +2,9 @@
 
 Each row is one phrase. `start_s` is the target playhead time when that phrase should begin. ffmpeg will pad silence between phrases to hit these starts exactly.
 
-Voice: Lauren (PVC), settings preserved from the original — stability 50, similarity_boost 75, speed 1.00.
+Voice: **Brian — Deep, Resonant and Comforting** (premade, `nPczCjzI2devNBz1zQrb`). Model `eleven_multilingual_v2`. Settings: stability 0.50, similarity 0.75, speaker boost on, speed 1.00.
+
+Chapter-card callouts shifted +1s from the first cut so the VO names the feature when the title is fully sharp (the title has a 1.4s blur-dissolve animation). Clips 7 and 9 also pushed slightly later to prevent cascade overruns from clips 6 and 8.
 
 | # | start_s | phrase | scene it lands on |
 |---|---|---|---|
@@ -11,18 +13,18 @@ Voice: Lauren (PVC), settings preserved from the original — stability 50, simi
 | 3 | 8.2 | Eighteen trillion in combined assets. Ninety-three percent C-suite. | Scene 03 ($18T + 93%) |
 | 4 | 13.5 | And somewhere in that room is the conversation that changes your year. | Scene 04 (find the right people) |
 | 5 | 18.0 | Matchmaker finds them for you. | SceneHowItWorks bridge |
-| 5b | 18.9 | Matchmaker finds them for you. | (shifted +0.9 to avoid overrun) |
-| 6 | 21.1 | AI matchmaking. | SceneIntro07 chapter card (shifted +0.7) |
-| 7 | 23.3 | Your matches — ranked, scored, explained — before you board the plane. | Scene 07 (My Matches) |
-| 8 | 29.5 | AI Concierge. | SceneIntro08 chapter card (shifted +1.5 — clip 7 long) |
-| 9 | 31.0 | Ask anything about anyone. Real data, instant prep. | Scene 08 (Concierge Chat) |
-| 10 | 36.2 | Drafted for you. | SceneIntro09 chapter card |
+| 5 | 18.9 | Matchmaker finds them for you. | (shifted +0.9 to avoid overrun) |
+| 6 | 22.1 | AI matchmaking. | SceneIntro07 chapter card (lands when title is sharp) |
+| 7 | 23.6 | Your matches — ranked, scored, explained — before you board the plane. | Scene 07 (My Matches) |
+| 8 | 30.5 | AI Concierge. | SceneIntro08 chapter card (lands when title is sharp) |
+| 9 | 32.0 | Ask anything about anyone. Real data, instant prep. | Scene 08 (Concierge Chat) |
+| 10 | 37.2 | Drafted for you. | SceneIntro09 chapter card (lands when title is sharp) |
 | 11 | 39.2 | Concierge writes your profile. One tap to publish. | Scene 09 (rebuilt drafting) |
-| 12 | 44.0 | Mutual match. | SceneIntro10 chapter card |
+| 12 | 45.0 | Mutual match. | SceneIntro10 chapter card (lands when title is sharp) |
 | 13 | 47.0 | When they say yes too — you both know. | Scene 10 (Mutual match) |
-| 14 | 50.3 | Smart booking. | SceneIntro11 chapter card |
+| 14 | 51.3 | Smart booking. | SceneIntro11 chapter card (lands when title is sharp) |
 | 15 | 53.3 | Shared availability. Meeting locked in. | Scene 11 (One-tap booking) |
-| 16 | 56.5 | Magic link. | SceneIntro12 chapter card |
+| 16 | 57.5 | Magic link. | SceneIntro12 chapter card (lands when title is sharp) |
 | 17 | 59.5 | One link, every meeting, no login. | Scene 12 (Magic Link rebuilt) |
 | 18 | 62.4 | The most important meeting of your year is already in that room. | Scene 13 (Impact close) |
 | 19 | 67.3 | Built into Proof of Talk. | Scene 14 Availability (Built Into) |
