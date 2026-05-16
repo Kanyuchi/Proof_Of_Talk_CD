@@ -338,7 +338,7 @@ function useCardCards() {
     return {
       ...p,
       rot: ((seed * 11) % 100 - 50) * 0.08,    // -4 .. +4 deg
-      blur: 1 + (i % 5) * 0.6,                  // ~1–3.5 px
+      blur: 0.4 + (i % 5) * 0.25,               // ~0.4–1.4 px (atmospheric, names stay legible)
       scale: 0.88 + ((seed % 24) / 100),        // ~0.88–1.12
       opacityBase: 0.4 + ((seed * 7) % 50) / 100,
       seed,
@@ -351,13 +351,14 @@ function SwarmCard({ card, sceneT, dim = false }) {
   const driftX = Math.sin(sceneT * 0.55 + card.seed * 0.31) * 10;
   const driftY = Math.cos(sceneT * 0.45 + card.seed * 0.22) * 7;
   const rotDrift = Math.sin(sceneT * 0.35 + card.seed) * 0.8;
-  const entryT = Easing.easeOutCubic(clamp((sceneT - card.seed * 0.012) / 0.85, 0, 1));
+  const entryT = Easing.easeOutBack(clamp((sceneT - card.seed * 0.025) / 0.55, 0, 1));
+  const popScale = card.scale * (0.7 + 0.3 * Math.min(1, entryT));
   return (
     <div style={{
       position: 'absolute',
       left: card.x + driftX, top: card.y + driftY,
       width: 300,
-      transform: `rotate(${card.rot + rotDrift}deg) scale(${card.scale})`,
+      transform: `rotate(${card.rot + rotDrift}deg) scale(${popScale})`,
       transformOrigin: 'center',
       filter: `blur(${dim ? card.blur * 1.8 : card.blur}px)`,
       opacity: entryT * card.opacityBase * (dim ? 0.55 : 1),
@@ -459,8 +460,8 @@ function Scene02() {
   return (
     <React.Fragment>
       <Vignette />
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.3 }}>
-        {cards.map((c, i) => <SwarmCard key={i} card={c} sceneT={local + 0.6} dim />)}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: 0.85 }}>
+        {cards.map((c, i) => <SwarmCard key={i} card={c} sceneT={local + 0.6} />)}
       </div>
       <div style={{
         position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
