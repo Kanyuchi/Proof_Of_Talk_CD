@@ -245,10 +245,12 @@ function Scene07() {
 }
 
 // ── SCENE 08 — AI Concierge ─────────────────────────────────────────────────
-function ChatBubble({ side = 'right', label, text, delay = 0, y, accent = false, width = 560 }) {
+function ChatBubble({ side = 'right', label, text, delay = 0, y, accent = false, width = 560, typeSpeed }) {
   const local = useSprite().localTime;
   const enter = Easing.easeOutCubic(clamp((local - delay) / 0.5, 0, 1));
-  const charT = clamp((local - delay - 0.15) / 1.8, 0, 1);
+  // Default typewriter speed: 1.8s for user (short), 2.8s for accent/Concierge (longer text needs read time)
+  const speed = typeSpeed ?? (accent ? 2.8 : 1.8);
+  const charT = clamp((local - delay - 0.15) / speed, 0, 1);
   const shown = Math.floor(text.length * Easing.easeOutCubic(charT));
   const COL_LEFT = 560;
   const COL_WIDTH = 800;
@@ -313,14 +315,14 @@ function Scene08() {
         <ChapterLabel text="05 · How it works" />
       </FadeGroup>
       <SlideGroup ty={panelTy}>
-        <ChatBubble side="right" label="YOU" text="Prep me for my meeting with Mira." y={310} delay={0.9} />
+        <ChatBubble side="right" label="YOU" text="Prep me for my meeting with Mira." y={310} delay={0.4} typeSpeed={1.0} />
         <ChatBubble
           side="left" label="CONCIERGE"
           text="Mira leads Vega Series B fund — her thesis overlaps her last three checks. Lead with the LP angle."
-          y={455} delay={2.2} width={620} accent
+          y={455} delay={1.5} width={620} accent
         />
-        <ChatBubble side="right" label="YOU" text="What does she care about most?" y={660} delay={3.6} />
-        <TypingPill x={560} y={830} delay={2.7} />
+        <ChatBubble side="right" label="YOU" text="What does she care about most?" y={660} delay={4.3} typeSpeed={0.8} />
+        <TypingPill x={560} y={830} delay={4.6} />
         {/* Static input placeholder — mirrors real app's ChatPanel.tsx:180 */}
         <div style={{
           position: 'absolute', left: 560, top: 940, width: 800,
@@ -361,12 +363,14 @@ function ProfileField({ label, value, delay = 0, y }) {
 function Scene09() {
   const local = useSprite().localTime;
   const { leftOpacity, panelTy } = useFeatureTransition();
-  // Timing — beats at 0.7s / 1.6s / 2.1s / 2.5s / 3.5s / 3.9s
-  const btnRowT  = Easing.easeOutBack(clamp((local - 1.6) / 0.45, 0, 1));
-  const ctaTapT  = Easing.easeInOutCubic(clamp((local - 2.1) / 0.25, 0, 1));
-  const chipsT   = local - 2.5; // stagger handled inline
-  const chipTapT = Easing.easeInOutCubic(clamp((local - 3.5) / 0.25, 0, 1));
-  const bannerT  = Easing.easeOutCubic(clamp((local - 3.9) / 0.55, 0, 1));
+  // Beats reflowed so Concierge bubble (2.8s typewriter) + 0.4s read pause complete before buttons.
+  // Concierge bubble: 0.2s start + 0.15s charT lead + 2.8s typewriter = finishes typing at 3.15s.
+  // Buttons appear at 3.4s / tap 3.7s / chips 3.9s + stagger / chip-tap 4.4s / banner 4.6s.
+  const btnRowT  = Easing.easeOutBack(clamp((local - 3.4) / 0.4, 0, 1));
+  const ctaTapT  = Easing.easeInOutCubic(clamp((local - 3.7) / 0.2, 0, 1));
+  const chipsT   = local - 3.9; // stagger handled inline
+  const chipTapT = Easing.easeInOutCubic(clamp((local - 4.4) / 0.2, 0, 1));
+  const bannerT  = Easing.easeOutCubic(clamp((local - 4.6) / 0.3, 0, 1));
   const chips = [
     'Find LPs writing $5–25M tickets in DeFi infra.',
     'Meet builders shipping post-MiCAR tokenisation rails.',
@@ -391,7 +395,7 @@ function Scene09() {
         <ChatBubble
           side="left" label="CONCIERGE"
           text="Your profile is 62% complete — I can draft your conference goals based on your role. It'll sharpen your matches."
-          y={310} delay={0.7} width={780} accent
+          y={310} delay={0.2} width={780} accent
         />
         {/* Button row — Yes, draft my goals + Maybe later */}
         <div style={{
