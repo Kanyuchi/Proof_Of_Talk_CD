@@ -103,24 +103,26 @@ export default function Briefing() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 print:px-0 print:py-0">
-      {/* ── toolbar (hidden in print) ──────────────────────────────── */}
-      <div className="flex items-center justify-between mb-8 print:hidden">
+      {/* ── toolbar (hidden in print). Stacks on mobile so the action
+              buttons don't squeeze the "Print / Save PDF" label onto
+              three lines. ─────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8 print:hidden">
         <Link
           to={`/m/${token}`}
-          className="flex items-center gap-2 text-white/40 hover:text-white text-sm"
+          className="flex items-center gap-2 text-white/60 hover:text-white text-sm min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" /> Back to matches
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => exportContactsCSV(matches, attendee?.name ?? "attendee")}
-            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-white/70 rounded-lg hover:bg-white/10 text-sm"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white/5 border border-white/10 text-white/70 rounded-lg hover:bg-white/10 text-sm min-h-[44px] whitespace-nowrap"
           >
             <Download className="w-4 h-4" /> Export Contacts
           </button>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-2 px-4 py-2 bg-[#E76315] text-white rounded-lg hover:bg-[#c5520f] text-sm font-medium"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-[#E76315] text-white rounded-lg hover:bg-[#c5520f] text-sm font-medium min-h-[44px] whitespace-nowrap"
           >
             <Printer className="w-4 h-4" /> Print / Save PDF
           </button>

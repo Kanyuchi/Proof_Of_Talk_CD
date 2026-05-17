@@ -28,7 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }`;
 
   return (
-    <div className="min-h-screen bg-[#121212] text-white pb-16 sm:pb-0">
+    <div className="min-h-screen bg-[#121212] text-white pb-24 sm:pb-0">
       {/* Top nav */}
       <header className="border-b border-white/10 bg-[#121212]/80 backdrop-blur-xl sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
