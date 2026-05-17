@@ -108,9 +108,15 @@ def _service_account_bearer_token() -> str | None:
             "Add `google-auth` to requirements.txt and reinstall."
         ) from exc
     info = _json.loads(raw)
+    # /export?format=csv routes through Drive (not Sheets), so we need
+    # the Drive scope. spreadsheets.readonly is kept for safety in case
+    # we ever swap to the Sheets API proper.
     creds = service_account.Credentials.from_service_account_info(
         info,
-        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+        scopes=[
+            "https://www.googleapis.com/auth/drive.readonly",
+            "https://www.googleapis.com/auth/spreadsheets.readonly",
+        ],
     )
     creds.refresh(_GAuthRequest())
     return creds.token
