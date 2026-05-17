@@ -30,6 +30,12 @@ python-jose[cryptography]==3.3.0
 bcrypt>=4.0.0
 python-multipart==0.0.20
 
+# Google service-account auth (used by ingest_speakers_sheet for the
+# restricted POT26 Speakers CRM sheet — anon /export?format=csv started
+# returning 401 when the sheet sharing was tightened post security
+# incident, see whats_next "Fix daily_speakers_sync 401").
+google-auth>=2.36.0
+
 # AWS
 boto3==1.35.86
 

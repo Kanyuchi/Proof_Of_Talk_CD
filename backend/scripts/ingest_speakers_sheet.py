@@ -88,10 +88,55 @@ def supabase_headers() -> dict:
     }
 
 
+def _service_account_bearer_token() -> str | None:
+    """Return an OAuth2 access token for the configured GCP service account,
+    or None if no JSON credential is set in the environment.
+
+    Reads `GOOGLE_SERVICE_ACCOUNT_JSON` (whole JSON blob, as exported from
+    GCP). Scope: spreadsheets.readonly — enough to hit /export?format=csv
+    on a sheet the service account has been granted Viewer access to."""
+    raw = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if not raw:
+        return None
+    try:
+        import json as _json
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import Request as _GAuthRequest
+    except ImportError as exc:
+        raise RuntimeError(
+            "google-auth is required for service-account sheet access. "
+            "Add `google-auth` to requirements.txt and reinstall."
+        ) from exc
+    info = _json.loads(raw)
+    creds = service_account.Credentials.from_service_account_info(
+        info,
+        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"],
+    )
+    creds.refresh(_GAuthRequest())
+    return creds.token
+
+
 def fetch_sheet_csv() -> str:
-    """Pull the master sheet as CSV. Sheet must be link-shareable as viewer."""
+    """Pull the master sheet as CSV.
+
+    Tries service-account auth first (Authorization: Bearer <token> against
+    /export?format=csv). Falls back to an anonymous GET so local dev against
+    a publicly-shared sheet still works — but production sheets are
+    restricted post the security incident, so the env var is required there.
+    """
+    headers: dict[str, str] = {}
+    token = _service_account_bearer_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     with httpx.Client(timeout=30, follow_redirects=True) as client:
-        resp = client.get(SHEET_EXPORT_URL)
+        resp = client.get(SHEET_EXPORT_URL, headers=headers)
+        if resp.status_code == 401:
+            raise RuntimeError(
+                "401 from Google Sheets export. The sheet is restricted "
+                "and either GOOGLE_SERVICE_ACCOUNT_JSON is not set, or the "
+                "service account hasn't been granted Viewer access to "
+                f"{SHEET_ID}."
+            )
         resp.raise_for_status()
         return resp.text
 
