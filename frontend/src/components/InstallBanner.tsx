@@ -79,7 +79,7 @@ export default function InstallBanner() {
   if (!installEvent && !showIOSHint) return null;
 
   return (
-    <div className="fixed top-0 inset-x-0 z-50 px-3 pt-3 sm:hidden">
+    <div className="fixed top-0 inset-x-0 z-50 px-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:hidden">
       <div className="rounded-xl bg-[#1a1a1a]/95 border border-[#E76315]/30 backdrop-blur-xl shadow-2xl p-3 flex items-center gap-3">
         <div className="w-10 h-10 rounded-lg bg-[#E76315] flex items-center justify-center shrink-0">
           <Download className="w-5 h-5 text-black" />

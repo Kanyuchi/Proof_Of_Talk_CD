@@ -11,7 +11,7 @@ export default function ChatWidget() {
           doesn't cover the right-most tab (Sign out / Dashboard). */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 ${
+        className={`fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] sm:bottom-6 right-4 sm:right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 ${
           open
             ? "bg-white/10 border border-white/20 text-white/60 scale-90"
             : "bg-gradient-to-br from-[#E76315] to-[#D35400] text-black hover:scale-110"

@@ -67,7 +67,7 @@ export default function Messages() {
   const conversations = convsData?.conversations ?? [];
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] -mt-8 -mx-6 overflow-hidden rounded-none">
+    <div className="flex h-[calc(100dvh-8rem)] -mt-8 -mx-6 overflow-hidden rounded-none">
       {/* Left panel — conversation list. On mobile we show EITHER the
           list OR the thread, never both (the previous 2-col layout
           crammed the thread into ~120px and cut every message off). */}

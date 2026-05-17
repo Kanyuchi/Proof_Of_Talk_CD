@@ -30,6 +30,16 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* iOS Safari auto-zooms when a form field is focused if its computed
+   font-size is < 16px. Tailwind's text-sm (14px) and our pot-input
+   (0.9rem ≈ 14.4px) both trigger this. Force 16px on mobile only so
+   designs stay tight on desktop. */
+@media (max-width: 640px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 body {
   font-family: var(--font-body);
   background-color: var(--pot-dark);
