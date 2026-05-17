@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getPendingMatchCount } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import ChatWidget from "./chat/ChatWidget";
+import InstallBanner from "./InstallBanner";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -240,6 +241,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Floating AI Concierge */}
       <ChatWidget />
+
+      {/* PWA install prompt — mobile only, dismissible for 14 days */}
+      <InstallBanner />
     </div>
   );
 }

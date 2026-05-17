@@ -40,9 +40,12 @@ class Settings(BaseSettings):
 
     # Auth
     SECRET_KEY: str = "change-me-in-production"
-    # 8 hours — long enough for a full conference day (June 2-3) so attendees
-    # don't get kicked out mid-meeting. Bumped from 60 min on 2026-05-12.
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    # 30 days — covers the multi-week pre-event window + the 2-day event
+    # itself so attendees stay logged in across overnight gaps. Sliding-token
+    # refresh in main.py further extends for active users. 8h (the previous
+    # value) was kicking returning users out the next morning (Sithum,
+    # 2026-05-17). Reset SECRET_KEY post-event to force everyone to re-auth.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
 
     # Integration (Runa / third-party)
     INTEGRATION_API_KEY: str = ""

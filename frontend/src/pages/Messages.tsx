@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { MessageSquare, Send, Crown, Mic, Megaphone, User, Heart } from "lucide-react";
+import { MessageSquare, Send, Crown, Mic, Megaphone, User, Heart, ArrowLeft } from "lucide-react";
 import { useConversations, useConversation, useSendMessage } from "../hooks/useMessages";
 import { useAuth } from "../hooks/useAuth";
 
@@ -68,8 +68,10 @@ export default function Messages() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] -mt-8 -mx-6 overflow-hidden rounded-none">
-      {/* Left panel — conversation list */}
-      <div className="w-72 shrink-0 border-r border-white/10 flex flex-col bg-white/[0.01]">
+      {/* Left panel — conversation list. On mobile we show EITHER the
+          list OR the thread, never both (the previous 2-col layout
+          crammed the thread into ~120px and cut every message off). */}
+      <div className={`${activeMatchId ? "hidden sm:flex" : "flex"} w-full sm:w-72 shrink-0 border-r border-white/10 flex-col bg-white/[0.01]`}>
         <div className="px-4 py-4 border-b border-white/10">
           <h2 className="font-semibold">Messages</h2>
           <p className="text-xs text-white/30 mt-0.5">{conversations.length} conversations</p>
@@ -149,8 +151,9 @@ export default function Messages() {
         </div>
       </div>
 
-      {/* Right panel — message thread */}
-      <div className="flex-1 flex flex-col">
+      {/* Right panel — message thread. Hidden on mobile unless a
+          conversation is selected; takes the full screen when active. */}
+      <div className={`${activeMatchId ? "flex" : "hidden sm:flex"} flex-1 flex-col`}>
         {!activeMatchId ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center">
             <MessageSquare className="w-12 h-12 text-white/10 mb-3" />
@@ -162,13 +165,23 @@ export default function Messages() {
           <>
             {/* Thread header */}
             {thread?.other_attendee && (
-              <div className="px-5 py-4 border-b border-white/10 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-white/5 to-white/10 flex items-center justify-center text-white/60 font-semibold">
+              <div className="px-3 sm:px-5 py-3 sm:py-4 border-b border-white/10 flex items-center gap-2 sm:gap-3">
+                {/* Back-to-list button — mobile only, mirrors the list/thread
+                    pattern every messaging app uses on phones. */}
+                <button
+                  type="button"
+                  onClick={() => setSearchParams({})}
+                  className="sm:hidden w-9 h-9 flex items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-all shrink-0"
+                  aria-label="Back to conversations"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-white/5 to-white/10 flex items-center justify-center text-white/60 font-semibold shrink-0">
                   {thread.other_attendee.name[0]}
                 </div>
-                <div>
-                  <div className="font-semibold text-sm">{thread.other_attendee.name}</div>
-                  <div className="text-xs text-white/40">
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-sm truncate">{thread.other_attendee.name}</div>
+                  <div className="text-xs text-white/40 truncate">
                     {thread.other_attendee.title} · {thread.other_attendee.company}
                   </div>
                 </div>
