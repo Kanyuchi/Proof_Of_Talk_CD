@@ -681,18 +681,62 @@ async def revenue_stats(
     # Granular pass name lives at enriched_profile.extasy.ticket_name —
     # see backfill_rhuna_pass_names.py for the migration. The 4-value
     # TicketType enum is too coarse to surface to ops, so we group by
-    # the raw Rhuna pass name here.
+    # the raw Rhuna pass name here. Same loop also computes per-pass
+    # profile-completeness for the matchmaking-readiness cross-tab.
     ticket_type_counter: dict[str, int] = defaultdict(int)
+    pass_completeness: dict[str, dict] = defaultdict(
+        lambda: {
+            "total": 0, "with_goals": 0, "with_linkedin_data": 0,
+            "with_target_companies": 0, "with_photo": 0, "with_grid": 0,
+        }
+    )
     for a in attendees:
         ext = (a.enriched_profile or {}).get("extasy") or {}
         pass_name = ext.get("ticket_name")
-        if pass_name:
-            ticket_type_counter[pass_name] += 1
+        if not pass_name:
+            continue
+        ticket_type_counter[pass_name] += 1
+        b = pass_completeness[pass_name]
+        b["total"] += 1
+        if a.goals: b["with_goals"] += 1
+        if ((a.enriched_profile or {}).get("linkedin") or {}).get("headline"):
+            b["with_linkedin_data"] += 1
+        if a.target_companies: b["with_target_companies"] += 1
+        if a.photo_url: b["with_photo"] += 1
+        if ((a.enriched_profile or {}).get("grid") or {}).get("grid_name"):
+            b["with_grid"] += 1
+
     ticket_types_breakdown = sorted(
         ({"pass_name": k, "count": v} for k, v in ticket_type_counter.items()),
         key=lambda x: -x["count"],
     )
     ticket_types_total = sum(ticket_type_counter.values())
+    pass_completeness_list = sorted(
+        ({"pass_name": k, **v} for k, v in pass_completeness.items()),
+        key=lambda x: -x["total"],
+    )
+
+    # ── Sync health (heartbeat from sync_status table) ────────────────────
+    # Surfaces silent-failure drift like the Apr 28 incident where the
+    # cron stopped firing for ~6 days and nobody noticed until Karl asked
+    # about ticket-holder counts. Each cron writes a row on every run via
+    # _record_sync_status; we surface them all with computed age.
+    from datetime import datetime as _dt, timezone as _tz
+    from sqlalchemy import text as _text
+    now_utc = _dt.now(_tz.utc)
+    sync_rows = (await db.execute(
+        _text("SELECT job_name, last_run_at, last_status, stats FROM sync_status ORDER BY last_run_at DESC")
+    )).all()
+    sync_health = []
+    for row in sync_rows:
+        age = (now_utc - row.last_run_at).total_seconds() if row.last_run_at else None
+        sync_health.append({
+            "job_name":    row.job_name,
+            "last_run_at": row.last_run_at.isoformat() if row.last_run_at else None,
+            "age_seconds": int(age) if age is not None else None,
+            "last_status": row.last_status,
+            "stats":       row.stats or {},
+        })
 
     return {
         "funnel": {
@@ -738,7 +782,9 @@ async def revenue_stats(
         "ticket_types_breakdown": {
             "total": ticket_types_total,
             "by_pass": ticket_types_breakdown,
+            "completeness": pass_completeness_list,
         },
+        "sync_health": sync_health,
     }
 
 

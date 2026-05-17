@@ -454,6 +454,45 @@ export default function Dashboard() {
       {/* Revenue & Registration */}
       {revenueData && (
         <>
+          {/* Sync health — heartbeat from cron jobs writing to sync_status.
+              Surfaces silent-failure drift like the Apr 28 incident where
+              the cron stopped firing for ~6 days and only Karl's question
+              about ticket counts surfaced it. */}
+          {revenueData.sync_health && revenueData.sync_health.length > 0 && (
+            <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 mb-3">
+                <RefreshCw className="w-4 h-4 text-white/60" />
+                <h2 className="text-sm font-semibold text-white/80">Sync Health</h2>
+                <span className="text-[10px] text-white/30">last heartbeat per cron</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                {revenueData.sync_health.map((j) => {
+                  const age = j.age_seconds ?? 0;
+                  const hours = age / 3600;
+                  // Green < 6h, amber 6-30h, red > 30h. Daily crons should
+                  // be < 24h; 30h gives a 6h grace window before alarming.
+                  const ageColor = hours < 6 ? "text-emerald-400"
+                    : hours < 30 ? "text-amber-400" : "text-red-400";
+                  const ageLabel = hours < 1 ? `${Math.round(age / 60)}m`
+                    : hours < 24 ? `${Math.round(hours)}h`
+                    : `${Math.round(hours / 24)}d`;
+                  const statusColor = j.last_status === "ok" ? "bg-emerald-500/20 text-emerald-300"
+                    : j.last_status === "partial" ? "bg-amber-500/20 text-amber-300"
+                    : "bg-red-500/20 text-red-300";
+                  return (
+                    <div key={j.job_name} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5">
+                      <span className="text-xs text-white/70 truncate font-mono">{j.job_name}</span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-semibold ${statusColor}`}>{j.last_status}</span>
+                        <span className={`text-[10px] font-mono ${ageColor}`} title={j.last_run_at ?? ""}>{ageLabel} ago</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard icon={DollarSign} label="Total Revenue" value={`€${revenueData.revenue.total.toLocaleString()}`} color="bg-emerald-500" />
             <StatCard icon={Users} label="Valid Tickets" value={revenueData.funnel.valid} color="bg-blue-500" />
@@ -546,6 +585,68 @@ export default function Dashboard() {
               </div>
               <div className="mt-3 text-[10px] text-white/30">
                 Source: <code>enriched_profile.extasy.ticket_name</code> on attendees in our DB. Refresh after each Extasy sync.
+              </div>
+            </div>
+          )}
+
+          {/* Pass × profile-completeness cross-tab — matchmaking readiness
+              per pass. Lets ops see which high-value tiers (VIP Black,
+              Investor) have low completeness and need targeted outreach. */}
+          {revenueData.ticket_types_breakdown && revenueData.ticket_types_breakdown.completeness && revenueData.ticket_types_breakdown.completeness.length > 0 && (
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="w-5 h-5 text-emerald-400" />
+                  <h2 className="text-lg font-semibold">Matchmaking Readiness by Pass</h2>
+                </div>
+                <span className="text-xs text-white/40">% with each enrichment</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-white/40 border-b border-white/10">
+                      <th className="text-left font-medium py-2 pr-2">Pass</th>
+                      <th className="text-right font-medium py-2 px-2">N</th>
+                      <th className="text-right font-medium py-2 px-2">Goals</th>
+                      <th className="text-right font-medium py-2 px-2">LinkedIn</th>
+                      <th className="text-right font-medium py-2 px-2">Targets</th>
+                      <th className="text-right font-medium py-2 px-2">Photo</th>
+                      <th className="text-right font-medium py-2 pl-2">Grid</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {revenueData.ticket_types_breakdown.completeness.map((p) => {
+                      const cells: [number, number][] = [
+                        [p.with_goals, p.total],
+                        [p.with_linkedin_data, p.total],
+                        [p.with_target_companies, p.total],
+                        [p.with_photo, p.total],
+                        [p.with_grid, p.total],
+                      ];
+                      return (
+                        <tr key={p.pass_name} className="border-b border-white/5 last:border-0">
+                          <td className="text-white/80 py-2 pr-2 truncate max-w-[180px]" title={p.pass_name}>{p.pass_name}</td>
+                          <td className="text-right text-white/60 font-mono py-2 px-2">{p.total}</td>
+                          {cells.map(([num, denom], i) => {
+                            const pct = denom ? (num / denom) * 100 : 0;
+                            const color = pct >= 75 ? "text-emerald-400"
+                              : pct >= 40 ? "text-amber-400"
+                              : "text-red-400";
+                            return (
+                              <td key={i} className={`text-right py-2 ${i === cells.length - 1 ? "pl-2" : "px-2"}`}>
+                                <span className={`font-mono ${color}`}>{Math.round(pct)}%</span>
+                                <span className="text-white/30 font-mono text-[10px] ml-1">{num}</span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 text-[10px] text-white/30">
+                Coverage gaps on VIP / VIP Black / Investor are the matchmaker's highest-value backfill targets. Green ≥75% · Amber ≥40% · Red &lt;40%.
               </div>
             </div>
           )}
