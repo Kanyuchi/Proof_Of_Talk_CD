@@ -462,12 +462,6 @@ export default function MyMatches() {
                               ))}
                             </div>
                           )}
-                          {/* Grid B2B data */}
-                          {(person.enriched_profile as Record<string, any>)?.grid?.grid_description && (
-                            <div className="mt-2">
-                              <GridOrgCard grid={(person.enriched_profile as Record<string, any>).grid} />
-                            </div>
-                          )}
                         </div>
                         {person.deal_readiness_score != null && person.deal_readiness_score > 0 && (
                           <div className="ml-auto text-right">
@@ -478,6 +472,12 @@ export default function MyMatches() {
                           </div>
                         )}
                       </div>
+                    )}
+
+                    {/* Grid B2B data — full-width below the avatar row so
+                        it doesn't get crammed into ~250px on mobile. */}
+                    {person && (person.enriched_profile as Record<string, any>)?.grid?.grid_description && (
+                      <GridOrgCard grid={(person.enriched_profile as Record<string, any>).grid} />
                     )}
 
                     {/* About this person — bio / AI summary */}

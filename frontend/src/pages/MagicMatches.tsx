@@ -297,14 +297,14 @@ export default function MagicMatches() {
                           </a>
                         )}
                       </div>
-                      {/* Grid B2B data */}
-                      {person && (person.enriched_profile as Record<string, any>)?.grid?.grid_description && (
-                        <div className="mt-2">
-                          <GridOrgCard grid={(person.enriched_profile as Record<string, any>).grid} />
-                        </div>
-                      )}
                     </div>
                   </div>
+
+                  {/* Grid B2B data — full-width below the avatar row so it
+                      doesn't get crammed into a ~280px column on mobile. */}
+                  {person && (person.enriched_profile as Record<string, any>)?.grid?.grid_description && (
+                    <GridOrgCard grid={(person.enriched_profile as Record<string, any>).grid} />
+                  )}
 
                   {/* About this person — bio / AI summary */}
                   {person?.ai_summary && (
