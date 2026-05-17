@@ -1,0 +1,32 @@
+{
+  "name": "Proof of Talk 2026 — Matchmaker",
+  "short_name": "PoT Matchmaker",
+  "description": "AI-powered matchmaking for Proof of Talk 2026 at the Louvre Palace, Paris.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#E76315",
+  "background_color": "#121212",
+  "categories": ["business", "social", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
