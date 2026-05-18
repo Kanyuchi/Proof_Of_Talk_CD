@@ -156,24 +156,91 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
             const titleMatch = rawTitle.match(/^(.+?)\\s*[|\\-–]\\s*LinkedIn/);
             const name = titleMatch ? titleMatch[1].trim() : null;
 
-            // Find headline — it's usually the first <p> after the name
-            // that contains job-related keywords like "|" or "at" or common titles
+            // Find the profile owner's <h1> (their name) — the structural
+            // anchor for headline + photo extraction. Same approach used
+            // below for photo. The h1 is stable across LinkedIn redesigns;
+            // every profile page has exactly one h1 for the owner's name,
+            // inside <main> and not in any nav/header/dialog.
+            const _allH1s = [...document.querySelectorAll('h1')];
+            const ownerH1 = _allH1s.find(h => {
+                const inMain = h.closest('main');
+                const inNav = h.closest('header, nav, [role="dialog"]');
+                return inMain && !inNav;
+            });
+
+            // Find the top-card container by walking up from the h1 until
+            // we hit a section/article that contains a sibling text element
+            // (the headline) OR until we'd cross into <main>.
+            let topCardEl = null;
+            if (ownerH1) {
+                let walker = ownerH1.parentElement;
+                for (let i = 0; i < 6 && walker; i++) {
+                    if (walker.tagName === 'MAIN' || walker.tagName === 'BODY') break;
+                    if (walker.tagName === 'SECTION' || walker.tagName === 'ARTICLE') {
+                        topCardEl = walker;
+                        break;
+                    }
+                    walker = walker.parentElement;
+                }
+                if (!topCardEl) topCardEl = ownerH1.parentElement;
+            }
+
+            // Headline extraction with anti-post filters. The original
+            // page-wide <p>-scan with " at "/"|" keyword match grabbed
+            // recent feed post text for several attendees on 2026-05-18
+            // (Tony McLaughlin's Money20/20 post, Maha Al-Saadi's "We
+            // brought together CEOs..." post, Nicholas Pelecanos's altcoin
+            // valuation post, Alexis Tasset's "Investors Club" UI fragment).
+            // We keep the page-wide scan but reject anything that smells
+            // like a post: 2+ hashtags, post-starter phrases, etc.
+            //
+            // Also try to detect headline from the top-card region first
+            // (the real headline is the closest text to the owner's h1).
+            const _isPostLike = (text) => {
+                if ((text.match(/#\\w+/g) || []).length >= 2) return true;
+                if (/^\\s*(I['’]ll|I['’]m|I have|We have|Just |Today |Yesterday |Excited |Honoured |Thrilled |Delighted |Proud )/i.test(text)) return true;
+                if (/\\b(speaking at|spoke at|on stage|in the room|sponsored by|congrats|congratulations)\\b/i.test(text)) return true;
+                if (/\\b(you and \\w+ are both in|you and \\w+ are connected)/i.test(text)) return true;
+                return false;
+            };
+
             let headline = null;
-            const allPs = [...document.querySelectorAll('p')];
-            for (const p of allPs) {
-                const text = p.innerText.trim();
-                if (text.length > 15 && text.length < 300 &&
-                    (text.includes('|') || text.includes(' at ') ||
-                     /\\b(CEO|CTO|CIO|COO|CFO|VP|Director|Head|Manager|Engineer|Founder|Partner|Investor|Analyst|Advisor|Consultant)\\b/i.test(text))) {
-                    headline = text;
-                    break;
+            // Pass 1: scan elements near the owner's h1 first (more reliable).
+            if (ownerH1) {
+                const ownerName = ownerH1.innerText.trim().toLowerCase();
+                const scope = topCardEl || ownerH1.parentElement || document.body;
+                const nearby = [...scope.querySelectorAll('div, span, p')]
+                    .filter(el => (ownerH1.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING));
+                for (const el of nearby.slice(0, 30)) {
+                    const text = (el.innerText || '').trim();
+                    if (text.length < 8 || text.length > 300) continue;
+                    if (text.toLowerCase() === ownerName) continue;
+                    if (_isPostLike(text)) continue;
+                    if (/^(she|he|they)\\s*\\//i.test(text)) continue;
+                    if (/\\d+\\s*(connections|followers|mutual)/i.test(text)) continue;
+                    if (/contact info/i.test(text)) continue;
+                    if (/^\\s*(message|connect|follow|more|share|save|copy)\\s*$/i.test(text)) continue;
+                    const first = text.split('\\n')[0].trim();
+                    if (first.length >= 8) { headline = first; break; }
+                }
+            }
+            // Pass 2: legacy page-wide <p>-scan, but with post filtering.
+            if (!headline) {
+                const allPs = [...document.querySelectorAll('p')];
+                for (const p of allPs) {
+                    const text = (p.innerText || '').trim();
+                    if (text.length < 15 || text.length > 300) continue;
+                    if (_isPostLike(text)) continue;
+                    if (text.includes('|') ||
+                        /\\b(CEO|CTO|CIO|COO|CFO|VP|Director|Head|Manager|Engineer|Founder|Partner|Investor|Analyst|Advisor|Consultant)\\b/i.test(text)) {
+                        headline = text; break;
+                    }
                 }
             }
 
-            // About section — anchor to the actual About section when we
-            // can find it. LinkedIn renders it as section[id*="about"] or
-            // a <section> whose <h2> says "About". Fall back to the longest
-            // <p> on the page if neither is present.
+            // About section — strict anchor on a <section> whose <h2> is
+            // exactly "About". No longest-<p> fallback (that's how Tony's
+            // and Maha's recent posts ended up as their summary).
             let summary = null;
             const aboutSection =
                 document.querySelector('section[id*="about" i]') ||
@@ -182,24 +249,11 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                     return h && /^about$/i.test(h.innerText.trim());
                 });
             if (aboutSection) {
-                // Prefer the expanded text (after "see more" click); take
-                // the largest text node inside the section.
                 const candidates = [...aboutSection.querySelectorAll('p, span[class*="break"], div[class*="text"]')]
                     .map(el => el.innerText.trim())
                     .filter(t => t.length > 80 && !/^see (more|less)/i.test(t))
                     .sort((a, b) => b.length - a.length);
                 if (candidates.length) summary = candidates[0];
-            }
-            if (!summary) {
-                // Fallback: longest <p> on the page (legacy heuristic, but
-                // now scoped to <main> to avoid suggested-content noise).
-                const main = document.querySelector('main') || document.body;
-                const pCandidates = [...main.querySelectorAll('p')]
-                    .map(p => p.innerText.trim())
-                    .filter(t => t.length > 100 && t.length < 5000 &&
-                                 !t.includes('cookie') && !t.includes('notifications'))
-                    .sort((a, b) => b.length - a.length);
-                if (pCandidates.length) summary = pCandidates[0];
             }
 
             // Experience — find sections with job titles
@@ -246,44 +300,62 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                 }
             }
 
-            // Photo extraction: page-wide search for LinkedIn's profile-photo
-            // URL pattern. The previous top-card-scoped approach broke when
-            // LinkedIn shipped DOM updates that no longer matched the
-            // hardcoded selectors (.pv-top-card, [data-view-name*="profile-card"]
-            // etc.) — captured 0/7 photos in the 2026-05-18 batch.
+            // Photo extraction: anchor on the profile owner's <h1> (their name),
+            // walk up to the nearest ancestor section/article, and search for
+            // a profile-photo image ONLY inside that container.
             //
-            // Why this is safe against the May 11 nav-pollution bug AND the
-            // batch-5 sidebar-pollution bug:
-            //   - nav avatars are blacklisted by src (defense 2)
-            //   - sidebar suggestion avatars come AFTER the top-card photo
-            //     in DOM order on every LinkedIn profile layout — taking
-            //     the first match in document order picks the top-card
-            //   - alt-text first-name match is used as a TIEBREAKER (if any
-            //     candidate matches, prefer it), not a hard gate (which had
-            //     ~50% false-negative rate on non-English UIs)
-            if (!targetFirstName) {
-                photoUrl = null;
-            } else {
-                const allPhotos = [...document.querySelectorAll(
-                    'img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]'
-                )];
-                const eligible = allPhotos.filter(img => {
-                    const src = img.src || '';
-                    if (!src.startsWith('http')) return false;
-                    if (navAvatarSrcs.has(src)) return false;
-                    return true;
-                });
-                // Tiebreaker: any candidate whose alt or parent aria-label
-                // contains the target's first name wins, regardless of DOM order.
-                const altMatches = eligible.filter(img => {
-                    const alt = (img.alt || '').toLowerCase();
-                    const parentLabel = (img.closest('button, a')?.getAttribute('aria-label') || '').toLowerCase();
-                    return alt.includes(targetFirstName) || parentLabel.includes(targetFirstName);
-                });
-                if (altMatches.length) {
-                    photoUrl = altMatches[0].src;
-                } else if (eligible.length) {
-                    photoUrl = eligible[0].src;  // first in DOM order = top-card
+            // Why this anchor approach beats the previous strategies:
+            //   - Page-wide search (the 2026-05-18 v1 of this code) picked up
+            //     wrong photos when the target profile had no photo: the
+            //     operator's own nav avatar OR sidebar suggestion avatars
+            //     became "the first profile-displayphoto in DOM order".
+            //     Hit at least 4 attendees (Chrissy Hill got the operator's
+            //     photo; Devon Euring, Christian Walker, Nathan Chow got
+            //     other wrong photos).
+            //   - Hardcoded top-card selectors (the pre-2026-05-18 strategy)
+            //     break when LinkedIn ships DOM updates.
+            //   - The h1 is structurally stable across LinkedIn redesigns —
+            //     every profile page has exactly one h1 for the owner's name.
+            //
+            // STRICT POLICY: if no photo is found inside the h1's ancestor
+            // section, photo stays NULL. Never fall back. Better to have no
+            // photo (Gravatar/initials fallback in frontend) than the wrong one.
+            photoUrl = null;
+            const allH1s = [...document.querySelectorAll('h1')];
+            // The profile owner's h1 is the one inside <main>, not in any
+            // nav/header/dialog.
+            const profileH1 = allH1s.find(h => {
+                const inMain = h.closest('main');
+                const inNav = h.closest('header, nav, [role="dialog"]');
+                return inMain && !inNav;
+            });
+            if (profileH1) {
+                // Find the nearest ancestor that's likely the top-card container.
+                // Walk up looking for a section or large container that holds
+                // both the h1 and the photo, but stop before reaching <main>
+                // (which would be too broad and include sidebars).
+                let topCard = profileH1.closest('section, article');
+                if (!topCard || topCard.tagName === 'MAIN') topCard = profileH1.parentElement;
+                // Walk up a couple of levels if needed — sometimes the h1 is
+                // in a sub-container of the top card.
+                for (let i = 0; i < 4 && topCard; i++) {
+                    const photos = topCard.querySelectorAll('img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]');
+                    if (photos.length > 0) break;
+                    const parent = topCard.parentElement;
+                    if (!parent || parent.tagName === 'MAIN' || parent.tagName === 'BODY') break;
+                    topCard = parent;
+                }
+                if (topCard) {
+                    const candidates = [...topCard.querySelectorAll(
+                        'img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]'
+                    )];
+                    for (const img of candidates) {
+                        const src = img.src || '';
+                        if (!src.startsWith('http')) continue;
+                        if (navAvatarSrcs.has(src)) continue;
+                        photoUrl = src;
+                        break;
+                    }
                 }
             }
 
@@ -449,7 +521,7 @@ def _is_already_enriched(attendee: dict) -> bool:
     return bool(li.get("headline"))
 
 
-async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False, verify_company: bool = False, missing_photos_only: bool = False, names: list[str] | None = None):
+async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bool = False, include_enriched: bool = False, verify_company: bool = True, missing_photos_only: bool = False, names: list[str] | None = None):
     print("=== LinkedIn Profile Scraper (Playwright) ===\n")
 
     # Fetch attendees
@@ -596,17 +668,42 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
                     await asyncio.sleep(DELAY_SECONDS)
                     continue
 
-                # Company-signal verification: only enforced when this URL was
-                # auto-discovered AND --verify-company is on. URLs already on
-                # file are trusted (ops curated them).
-                if url_was_discovered and verify_company:
-                    signals = _company_signal_set(attendee)
-                    matched, evidence = _verify_company_match(data, signals)
-                    if not matched:
-                        print(f"    ❌ Company verify failed: {evidence}")
-                        skipped_count += 1
-                        await asyncio.sleep(DELAY_SECONDS)
-                        continue
+                # Company-signal verification — now enforced on EVERY scrape,
+                # not just auto-discovered URLs. The 2026-05-18 batch produced
+                # multiple wrong-person attributions because URLs constructed
+                # from name slugs (e.g. /in/pavankaur, /in/juanbruce) are not
+                # unique and were collected without verification — Pavan Kaur
+                # at Rulespark was scraped as "Graduate at NUS"; tony
+                # mclaughlin at Ubyx was scraped as a generic "Operations
+                # manager". The verification compares the attendee's company
+                # name against the scraped headline / summary / experience
+                # company fields.
+                #
+                # On verification failure: mark the row with
+                # `enriched_profile.linkedin_unscrapable=verification_failed`
+                # so the script auto-skips it in future batches until an
+                # operator fixes the URL. --no-verify-company opts out.
+                signals = _company_signal_set(attendee)
+                matched, evidence = _verify_company_match(data, signals)
+                if verify_company and not matched:
+                    print(f"    ❌ Company verify failed: {evidence}")
+                    print(f"       scraped headline: {(data.get('headline') or '')[:80]}")
+                    if not dry_run:
+                        # Preserve scraped data under linkedin_unverified so
+                        # the operator can review what was actually scraped.
+                        # The matching engine reads `linkedin` (not
+                        # `linkedin_unverified`), so this data has no effect
+                        # until an operator promotes it.
+                        ep = dict(attendee.get("enriched_profile") or {})
+                        ep["linkedin_unverified"] = data
+                        ep["linkedin_unscrapable"] = "verification_failed"
+                        ep["linkedin_verify_failed_at"] = __import__("datetime").datetime.utcnow().isoformat()
+                        ep["linkedin_verify_evidence"] = evidence
+                        patch_attendee(attendee["id"], {"enriched_profile": ep})
+                    skipped_count += 1
+                    await asyncio.sleep(DELAY_SECONDS)
+                    continue
+                if url_was_discovered:
                     print(f"    🔎 Company verify ok: {evidence}")
                     discovered_count += 1
                     if not dry_run:
@@ -702,7 +799,8 @@ if __name__ == "__main__":
     parser.add_argument("--dry-run", action="store_true", help="Preview without writing to Supabase")
     parser.add_argument("--limit", type=int, default=None, help="Max profiles to process")
     parser.add_argument("--discover", action="store_true", help="Also try to find URLs for attendees without one")
-    parser.add_argument("--verify-company", action="store_true", help="When discovering URLs, only accept candidates whose scraped LinkedIn page contains the attendee's company name or email-domain slug. Lower false-positive risk; recommended for any --discover run.")
+    parser.add_argument("--verify-company", dest="verify_company", action="store_true", default=True, help="(default on) Reject scrapes whose page doesn't mention the attendee's company name or email-domain slug. On failure, flag the row enriched_profile.linkedin_unscrapable=verification_failed so it's skipped in future batches. Use --no-verify-company to disable.")
+    parser.add_argument("--no-verify-company", dest="verify_company", action="store_false", help="Disable company-name verification. Useful when an operator has manually curated URLs they want to trust without a company-text check.")
     parser.add_argument("--only-missing", action="store_true", help="Only process attendees without linkedin_url (retry failed discoveries, skip the ones we already have)")
     parser.add_argument("--include-enriched", action="store_true", help="Re-scrape attendees who already have LinkedIn data (default: skip them)")
     parser.add_argument("--missing-photos-only", action="store_true", help="Only scrape rows where linkedin_url is set AND photo_url is NULL. Targets photo gaps without re-touching profiles that already have a photo.")
