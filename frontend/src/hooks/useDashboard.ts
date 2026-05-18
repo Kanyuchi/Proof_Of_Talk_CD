@@ -7,20 +7,11 @@ import {
   triggerProcessing,
   triggerMatching,
 } from "../api/client";
-import { demoStats, demoQuality } from "../data/demo";
 
 export function useDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-stats"],
-    queryFn: async () => {
-      try {
-        const s = await getDashboardStats();
-        return s.total_attendees > 0 ? s : demoStats;
-      } catch {
-        return demoStats;
-      }
-    },
-    placeholderData: demoStats,
+    queryFn: getDashboardStats,
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
@@ -29,15 +20,7 @@ export function useDashboardStats() {
 export function useMatchQuality() {
   return useQuery({
     queryKey: ["match-quality"],
-    queryFn: async () => {
-      try {
-        const q = await getMatchQuality();
-        return q.total_matches > 0 ? q : demoQuality;
-      } catch {
-        return demoQuality;
-      }
-    },
-    placeholderData: demoQuality,
+    queryFn: getMatchQuality,
     staleTime: 15_000,
   });
 }
