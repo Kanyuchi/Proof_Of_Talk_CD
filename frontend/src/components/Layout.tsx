@@ -1,6 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Users, Sparkles, BarChart3, LogIn, LogOut, UserPlus, UserCog, Heart, MessageSquare, MessageCircle } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getPendingMatchCount } from "../api/client";
 import { useAuth } from "../hooks/useAuth";
 import ChatWidget from "./chat/ChatWidget";
@@ -8,7 +8,15 @@ import InstallBanner from "./InstallBanner";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated, logout } = useAuth();
+
+  const handleSignOut = () => {
+    logout();
+    queryClient.clear();
+    navigate("/", { replace: true });
+  };
   const { data: pendingData } = useQuery({
     queryKey: ["pending-match-count"],
     queryFn: getPendingMatchCount,
@@ -17,6 +25,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     refetchInterval: 30_000,
   });
   const pendingCount = pendingData?.pending_count ?? 0;
+
+  // /preview-landing renders Z's full-bleed marketing draft — no top nav,
+  // no chat widget, no install banner so the design can be evaluated cleanly.
+  // Placed AFTER all hook calls to keep React's hook-order invariant intact.
+  if (location.pathname === "/preview-landing") {
+    return <>{children}</>;
+  }
 
   const isActive = (to: string) =>
     to === "/" ? location.pathname === to : location.pathname.startsWith(to);
@@ -112,7 +127,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <UserCog className="w-4 h-4" />
                 </Link>
                 <button
-                  onClick={logout}
+                  onClick={handleSignOut}
                   className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-white/50 text-xs hover:text-white/80 hover:border-white/20 transition-all min-h-[44px]"
                 >
                   <LogOut className="w-3.5 h-3.5" />
@@ -202,7 +217,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             )}
             <button
-              onClick={logout}
+              onClick={handleSignOut}
               className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium text-white/40 active:text-white/70 transition-all"
             >
               <LogOut className="w-5 h-5" />

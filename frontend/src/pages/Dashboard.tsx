@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
 import {
   Users, Handshake, Check, TrendingUp, BarChart3, Brain,
   Lightbulb, DollarSign, Activity, Zap, RefreshCw, X, Sparkles, Download,
@@ -66,7 +67,7 @@ function DrillDownModal({
 }
 
 export default function Dashboard() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAuthenticated, isLoading: authLoading } = useAuth();
   const { data: stats } = useDashboardStats();
   const { data: quality } = useMatchQuality();
   const [drillType, setDrillType] = useState<string | null>(null);
@@ -225,6 +226,13 @@ export default function Dashboard() {
       setGeneratingReport(false);
     }
   };
+
+  if (authLoading) {
+    return <div className="text-center py-20 text-white/30">Loading…</div>;
+  }
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (!stats || !quality) return null;
 
