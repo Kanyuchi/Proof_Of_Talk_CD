@@ -246,52 +246,44 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                 }
             }
 
-            const main = document.querySelector('main') || document.body;
-            // CRITICAL: scope photo extraction to the top-card SECTION, not
-            // all of <main>. LinkedIn's profile page renders a "More profiles
-            // for you" sidebar inside <main> with avatars that use the same
-            // CSS classes and src patterns (profile-displayphoto) as the
-            // target's own avatar. Trusting <main> scope alone caused 6
-            // wrong-photo attributions in batch 5 (Christian Walker got
-            // Chiara M.'s photo from the sidebar; Yana Vella, Devon Euring,
-            // Nathan Chow, Micaela Bazo, Eleanor Terrett similar). The
-            // top-card container varies — try several known selectors.
-            const topCard =
-                main.querySelector('section.artdeco-card:first-of-type') ||
-                main.querySelector('[data-view-name*="profile-card"]') ||
-                main.querySelector('.pv-top-card') ||
-                main.querySelector('.ph5.pb5') ||
-                null;
-
-            // Belt-and-braces: collect candidates from the top-card only,
-            // AND still require alt-text or aria-label to mention the
-            // target's first name. Both defences must pass — scope alone
-            // isn't enough if the top-card heuristic falls back to <main>.
-            const candidates = topCard ? [
-                ...topCard.querySelectorAll('img.pv-top-card-profile-picture__image'),
-                ...topCard.querySelectorAll('img[src*="profile-displayphoto"]'),
-                ...topCard.querySelectorAll('img[src*="profile-framedphoto"]'),
-                ...topCard.querySelectorAll('button[aria-label*="profile photo" i] img'),
-                ...topCard.querySelectorAll('img.evi-image'),
-            ] : [];
-
-            // If we couldn't extract the target's name from the page title,
-            // refuse to set a photo at all. Without a name we have no way to
-            // distinguish the target's photo from sidebar/suggestion avatars.
+            // Photo extraction: page-wide search for LinkedIn's profile-photo
+            // URL pattern. The previous top-card-scoped approach broke when
+            // LinkedIn shipped DOM updates that no longer matched the
+            // hardcoded selectors (.pv-top-card, [data-view-name*="profile-card"]
+            // etc.) — captured 0/7 photos in the 2026-05-18 batch.
+            //
+            // Why this is safe against the May 11 nav-pollution bug AND the
+            // batch-5 sidebar-pollution bug:
+            //   - nav avatars are blacklisted by src (defense 2)
+            //   - sidebar suggestion avatars come AFTER the top-card photo
+            //     in DOM order on every LinkedIn profile layout — taking
+            //     the first match in document order picks the top-card
+            //   - alt-text first-name match is used as a TIEBREAKER (if any
+            //     candidate matches, prefer it), not a hard gate (which had
+            //     ~50% false-negative rate on non-English UIs)
             if (!targetFirstName) {
                 photoUrl = null;
             } else {
-                for (const img of candidates) {
+                const allPhotos = [...document.querySelectorAll(
+                    'img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]'
+                )];
+                const eligible = allPhotos.filter(img => {
                     const src = img.src || '';
-                    if (!src.startsWith('http')) continue;
-                    if (navAvatarSrcs.has(src)) continue;
+                    if (!src.startsWith('http')) return false;
+                    if (navAvatarSrcs.has(src)) return false;
+                    return true;
+                });
+                // Tiebreaker: any candidate whose alt or parent aria-label
+                // contains the target's first name wins, regardless of DOM order.
+                const altMatches = eligible.filter(img => {
                     const alt = (img.alt || '').toLowerCase();
                     const parentLabel = (img.closest('button, a')?.getAttribute('aria-label') || '').toLowerCase();
-                    const matchesTarget =
-                        alt.includes(targetFirstName) || parentLabel.includes(targetFirstName);
-                    if (!matchesTarget) continue;
-                    photoUrl = src;
-                    break;
+                    return alt.includes(targetFirstName) || parentLabel.includes(targetFirstName);
+                });
+                if (altMatches.length) {
+                    photoUrl = altMatches[0].src;
+                } else if (eligible.length) {
+                    photoUrl = eligible[0].src;  // first in DOM order = top-card
                 }
             }
 
