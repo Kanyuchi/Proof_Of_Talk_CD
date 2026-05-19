@@ -132,7 +132,11 @@ export default function HomeLanding() {
         .z-landing .d3 { transition-delay: .36s; }
         .z-landing .d4 { transition-delay: .5s; }
 
-        .z-landing .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 120px 0 80px; }
+        /* min-height accounts for the 64px top nav so the hero doesn't
+           overshoot the viewport. Top padding cut from 120px → 40px so
+           the eyebrow lands just below the nav and the CTA is above the
+           fold on a typical 800–900px viewport. */
+        .z-landing .hero { min-height: calc(100vh - 64px); display: flex; flex-direction: column; justify-content: center; padding: 40px 0 60px; }
         .z-landing .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .34em; color: var(--grey); text-transform: uppercase; margin-bottom: 44px; }
         .z-landing .eyebrow .o { color: var(--orange); }
         .z-landing .hero h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(40px,7vw,104px); line-height: 1.05; letter-spacing: -.022em; max-width: 16ch; margin: 0; }
