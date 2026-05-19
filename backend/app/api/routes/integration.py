@@ -219,6 +219,23 @@ async def ticket_purchased(
     email_lower = body.email.strip().lower()
     name = f"{body.first_name.strip()} {body.last_name.strip()}".strip()
 
+    # Same QA-buyer filter as extasy_sync.py / ingest_extasy.py — catches
+    # webhook calls fired for "Test Test" / "Test USA" style test orders
+    # placed against Wello's laura+NN@wello.ai subaddresses.
+    TEST_BUYER_PATTERNS = ("test", "tbd", "placeholder", "demo user")
+    if any(p in name.lower() for p in TEST_BUYER_PATTERNS):
+        logger.info(
+            "ticket_purchased: skipping test-buyer webhook",
+            name=name, email=email_lower,
+        )
+        # Acknowledge so Rhuna stops retrying, but don't persist.
+        return TicketPurchasedResponse(
+            attendee_id="",
+            magic_link_url="",
+            status="skipped_test_buyer",
+            enrichment_status="skipped",
+        )
+
     result = await db.execute(select(Attendee).where(Attendee.email == email_lower))
     existing = result.scalars().first()
 

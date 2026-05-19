@@ -60,6 +60,13 @@ TICKET_TYPE_MAP = {
 # Test / internal tickets to skip
 TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
 
+# Skip orders whose buyer NAME contains any of these substrings (lowercased).
+# Same filter as app/services/extasy_sync.py — catches QA orders like
+# "Test Test" / "Test USA" that Wello places against laura+NN@wello.ai
+# subaddresses to verify Rhuna checkout. Without this filter, these
+# pollute the matchmaker even after manual cleanup.
+TEST_BUYER_NAME_PATTERNS = ("test", "tbd", "placeholder", "demo user")
+
 # Orders with these statuses are real confirmed attendees (includes complimentary tickets)
 VALID_STATUSES = {"PAID", "REDEEMED"}
 
@@ -115,6 +122,11 @@ def map_ticket_type(ticket_name: str) -> str:
 
 def is_test_ticket(ticket_name: str) -> bool:
     return ticket_name.lower().strip() in TEST_TICKET_NAMES
+
+
+def is_test_buyer(first: str, last: str) -> bool:
+    full = f"{first.strip()} {last.strip()}".strip().lower()
+    return any(p in full for p in TEST_BUYER_NAME_PATTERNS)
 
 
 def parse_dt(s: str) -> str | None:
@@ -310,6 +322,12 @@ def run(dry_run: bool, force: bool) -> None:
         # Skip test / internal tickets
         if is_test_ticket(ticket_name):
             print(f"  SKIP (test ticket): {order.get('firstName')} {order.get('lastName')} — {ticket_name}")
+            continue
+
+        # Skip QA/internal test buyers (e.g. Wello's laura+NN@wello.ai with
+        # buyer name "Test Test")
+        if is_test_buyer(order.get("firstName") or "", order.get("lastName") or ""):
+            print(f"  SKIP (test buyer): {order.get('firstName')} {order.get('lastName')} <{order.get('email')}>")
             continue
 
         email = (order.get("email") or "").strip().lower()

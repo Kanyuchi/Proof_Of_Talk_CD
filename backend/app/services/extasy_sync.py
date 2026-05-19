@@ -33,6 +33,14 @@ VALID_STATUSES = {"PAID", "REDEEMED"}
 # Skip internal test tickets
 TEST_TICKET_NAMES = {"test ticket", "test ticket card"}
 
+# Skip orders whose BUYER NAME contains any of these substrings (lowercased).
+# Catches Rhuna orders made for QA — e.g. Wello using `laura+NN@wello.ai`
+# Gmail subaddresses with buyer names "Test Test" / "Test USA" to verify the
+# checkout flow. These look like real PAID orders to Rhuna but should never
+# reach the matchmaker. Without this filter, deleting them from Supabase is
+# pointless because the next sync re-inserts them.
+TEST_BUYER_NAME_PATTERNS = ("test", "tbd", "placeholder", "demo user")
+
 # Extasy ticket name → our TicketType enum
 TICKET_TYPE_MAP: dict[str, str] = {
     "investor pass":                    "vip",
@@ -242,6 +250,12 @@ async def _process_order_chunk(
 
         # Skip test/internal tickets
         if ticket_name.lower().strip() in TEST_TICKET_NAMES:
+            continue
+
+        # Skip Rhuna orders made by QA / internal testers. Match on buyer
+        # first+last combined so "Test Test" and "Test USA" both fire.
+        buyer_full = f"{(order.get('firstName') or '').strip()} {(order.get('lastName') or '').strip()}".strip().lower()
+        if any(p in buyer_full for p in TEST_BUYER_NAME_PATTERNS):
             continue
 
         email = (order.get("email") or "").strip().lower()
