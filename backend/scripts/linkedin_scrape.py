@@ -300,28 +300,32 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                 }
             }
 
-            // Photo extraction: closest-common-ancestor approach.
+            // Photo extraction (v4): closest-common-ancestor primary +
+            // LinkedIn preload-link fallback.
             //
-            // Among all profile-photo IMGs on the page (page-wide search by
+            // PRIMARY (v3): among all profile-photo IMGs (page-wide search by
             // LinkedIn's unique URL pattern), pick the one whose DOM path
             // back up to a common ancestor with the profile owner's <h1> is
-            // SHORTEST. That photo is the top-card avatar; sidebar suggestion
-            // avatars share only `<main>` (or higher) as their common
-            // ancestor with the h1 and therefore have a longer path.
+            // SHORTEST. Sidebar suggestion avatars share only `<main>` (or
+            // higher) with the h1 and therefore have a longer path.
             //
-            // This is more robust than the prior "find section then search"
-            // approach which depended on a specific tagName boundary
-            // (Sneha 2026-05-19 had her photo in a structure where the
-            // section-walk returned no photos and fell back to null).
+            // FALLBACK (v4, 2026-05-19): when there's no <h1> in <main> the
+            // primary returns null even though the photo is sitting in the
+            // DOM (Sneha Yadamari — her top card rendered with a layout
+            // variant that omits the in-main h1). Consult the
+            // <link rel="preload" as="image" imagesrcset="...profile-displayphoto..."/>
+            // that LinkedIn always emits in <head> for the top-card avatar.
+            // That preload is the canonical top-card photo and survives
+            // top-card layout variants.
             //
             // Defenses preserved against historical bugs:
             //   - May 11 nav-pollution: navAvatarSrcs blacklist filters out
             //     the operator's own "Me" avatar in the global nav.
-            //   - Batch-5 sidebar-pollution: sidebar avatars have a longer
-            //     ancestor-path to the h1 than the top-card photo, so the
-            //     closest-ancestor rule picks the right one.
+            //   - Batch-5 sidebar-pollution: closest-ancestor rule picks the
+            //     top-card photo over sidebar suggestions.
             //   - 2026-05-18 wrong-photo-on-no-photo: if NO profile-displayphoto
-            //     imgs exist on the page, photo stays NULL. Never fall back.
+            //     imgs exist on the page AND no preload link, photo stays
+            //     NULL. Never fall back to a guessed/operator avatar.
             // Reuse `ownerH1` from the headline-extraction block above.
             photoUrl = null;
             if (ownerH1) {
@@ -351,6 +355,25 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                     }
                 }
                 if (bestPhoto) photoUrl = bestPhoto.src;
+            }
+
+            // v4 fallback: preload-link signal. Only fires when the h1
+            // anchor failed — keeps the 94 already-extracted profiles on
+            // the proven v3 path.
+            if (!photoUrl) {
+                const preload = document.querySelector(
+                    'link[imagesrcset*="profile-displayphoto"], link[imagesrcset*="profile-framedphoto"]'
+                );
+                if (preload) {
+                    const srcset = preload.getAttribute('imagesrcset') || '';
+                    // Format: "url 100w, url 200w, ..." — first entry is
+                    // the _100_100 variant we store everywhere else.
+                    const first = (srcset.split(',')[0] || '').trim();
+                    const url = first.split(/\\s+/)[0];
+                    if (url && url.startsWith('http') && !navAvatarSrcs.has(url)) {
+                        photoUrl = url;
+                    }
+                }
             }
 
             return { name, headline, summary, experiences, skills: [], education: [], photoUrl };
@@ -704,6 +727,7 @@ async def run(dry_run: bool, limit: int | None, discover: bool, only_missing: bo
                         patch_attendee(attendee["id"], {"linkedin_url": linkedin_url})
 
                 print(f"    ✅ {data['headline'][:60]}")
+                print(f"    📷 photo_url: {data.get('profile_pic_url') or 'NULL'}")
                 if data.get("experiences"):
                     print(f"    📋 {len(data['experiences'])} experiences, {len(data.get('skills', []))} skills")
 
