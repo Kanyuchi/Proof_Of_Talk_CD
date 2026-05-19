@@ -53,18 +53,21 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
 _EXPORT_DIR = Path(__file__).resolve().parents[1] / "exports"
 _STAMP = f"{datetime.now():%Y%m%d}"
 EXPORT_PATH = _EXPORT_DIR / f"companies_with_people_{_STAMP}.csv"
+EXPORT_PATH_PEOPLE = _EXPORT_DIR / f"companies_with_people_{_STAMP}_people.csv"
 EXPORT_PATH_XLSX = _EXPORT_DIR / f"companies_with_people_{_STAMP}.xlsx"
 
-SELECT_FIELDS = "name,title,email,company,ticket_type,linkedin_url,enriched_profile"
+SELECT_FIELDS = (
+    "name,title,email,company,ticket_type,country_iso3,linkedin_url,enriched_profile"
+)
 
 
-def best_position(row: dict) -> str:
+def best_position(row: dict, max_len: int = 120) -> str:
     """Same fallback chain as export_ticket_holders.py: registration title,
     then LinkedIn headline, then first LinkedIn experience title.
 
-    Output is collapsed to a single line and truncated to 120 chars so
-    Excel cells stay readable — some LinkedIn headlines turn out to be
-    pasted post copy, not titles.
+    Output is collapsed to a single line. Default 120-char cap keeps the
+    Companies sheet (people in one cell) readable; the People sheet passes
+    a higher cap so full titles are preserved for filtering.
     """
     raw = ""
     title = (row.get("title") or "").strip()
@@ -83,7 +86,9 @@ def best_position(row: dict) -> str:
     if not raw:
         return ""
     flat = " ".join(raw.split())
-    return flat if len(flat) <= 120 else flat[:117].rstrip() + "…"
+    if max_len <= 0 or len(flat) <= max_len:
+        return flat
+    return flat[: max_len - 1].rstrip() + "…"
 
 
 def fetch_all_attendees() -> list[dict]:
@@ -170,6 +175,7 @@ def main() -> None:
 
     EXPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     rows_out: list[dict] = []
+    people_rows: list[dict] = []  # one row per person — title in its own column
     for key, members_map in groups.items():
         members = list(members_map.values())
         display = casing[key].most_common(1)[0][0]
@@ -177,13 +183,26 @@ def main() -> None:
         people_parts: list[str] = []
         for m in sorted_members:
             name = (m.get("name") or "").strip() or "(unknown)"
-            position = best_position(m)
-            people_parts.append(f"{name} ({position})" if position else name)
+            position_short = best_position(m, max_len=120)
+            position_full = best_position(m, max_len=500)
+            people_parts.append(f"{name} ({position_short})" if position_short else name)
+            # Skip the synthetic placeholder email so Karl's people-list
+            # doesn't surface "@speaker.proofoftalk.io" addresses.
+            email_raw = (m.get("email") or "").strip()
+            email = "" if email_raw.lower().endswith("@speaker.proofoftalk.io") else email_raw
+            people_rows.append({
+                "company": display,
+                "name": name,
+                "title": position_full,
+                "email": email,
+                "ticket_type": (m.get("ticket_type") or "").upper(),
+                "country_iso3": m.get("country_iso3") or "",
+                "linkedin_url": m.get("linkedin_url") or "",
+            })
         domains = sorted({
             (m.get("email") or "").split("@", 1)[1].lower()
             for m in members
             if "@" in (m.get("email") or "")
-            # Hide our synthetic placeholder domain — irrelevant to Karl.
             and not (m.get("email") or "").lower().endswith("@speaker.proofoftalk.io")
         })
         ticket_types = sorted({
@@ -201,13 +220,27 @@ def main() -> None:
 
     # Sort biggest companies first, then alphabetically
     rows_out.sort(key=lambda r: (-r["attendee_count"], r["company"].lower()))
+    # People rows: sort by company (alphabetical), then by name within company
+    people_rows.sort(key=lambda r: (r["company"].lower(), r["name"].lower()))
 
     header = ["company", "attendee_count", "people", "domains", "ticket_types"]
     with EXPORT_PATH.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=header)
         writer.writeheader()
         writer.writerows(rows_out)
-    print(f"CSV written:  {EXPORT_PATH}")
+    print(f"CSV written (companies): {EXPORT_PATH}")
+
+    # Long-format companion CSV: one row per person, title in its own
+    # column so Karl can sort/filter/pivot on titles directly.
+    people_header = [
+        "company", "name", "title", "email",
+        "ticket_type", "country_iso3", "linkedin_url",
+    ]
+    with EXPORT_PATH_PEOPLE.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=people_header)
+        writer.writeheader()
+        writer.writerows(people_rows)
+    print(f"CSV written (people):    {EXPORT_PATH_PEOPLE}")
 
     # Excel version with the same data on a "Companies" sheet plus a
     # "Summary" sheet for the exclusion/coverage stats. Same xlsxwriter
@@ -233,8 +266,11 @@ def main() -> None:
             ],
         }
     )
+    people_df = pd.DataFrame(people_rows, columns=people_header)
+
     with pd.ExcelWriter(EXPORT_PATH_XLSX, engine="xlsxwriter") as writer:
         df.to_excel(writer, sheet_name="Companies", index=False)
+        people_df.to_excel(writer, sheet_name="People", index=False)
         summary_df.to_excel(writer, sheet_name="Summary", index=False)
         workbook = writer.book
         header_fmt = workbook.add_format({
@@ -246,13 +282,27 @@ def main() -> None:
         ws = writer.sheets["Companies"]
         for col_num, value in enumerate(df.columns):
             ws.write(0, col_num, value, header_fmt)
-        ws.set_column(0, 0, 32)   # company
-        ws.set_column(1, 1, 12)   # attendee_count
-        ws.set_column(2, 2, 80, wrap_fmt)  # people
-        ws.set_column(3, 3, 32)   # domains
-        ws.set_column(4, 4, 24)   # ticket_types
+        ws.set_column(0, 0, 32)
+        ws.set_column(1, 1, 12)
+        ws.set_column(2, 2, 80, wrap_fmt)
+        ws.set_column(3, 3, 32)
+        ws.set_column(4, 4, 24)
         ws.freeze_panes(1, 0)
         ws.autofilter(0, 0, len(df), len(df.columns) - 1)
+        # People sheet — one row per person, title in its own column so
+        # Karl can sort/filter/pivot. Per-cell wrap on the title column.
+        pws = writer.sheets["People"]
+        for col_num, value in enumerate(people_df.columns):
+            pws.write(0, col_num, value, header_fmt)
+        pws.set_column(0, 0, 32)              # company
+        pws.set_column(1, 1, 26)              # name
+        pws.set_column(2, 2, 60, wrap_fmt)    # title
+        pws.set_column(3, 3, 30)              # email
+        pws.set_column(4, 4, 12)              # ticket_type
+        pws.set_column(5, 5, 10)              # country_iso3
+        pws.set_column(6, 6, 40)              # linkedin_url
+        pws.freeze_panes(1, 0)
+        pws.autofilter(0, 0, len(people_df), len(people_df.columns) - 1)
         # Summary sheet
         sws = writer.sheets["Summary"]
         for col_num, value in enumerate(summary_df.columns):
@@ -260,6 +310,7 @@ def main() -> None:
         sws.set_column(0, 0, 50)
         sws.set_column(1, 1, 24)
     print(f"XLSX written: {EXPORT_PATH_XLSX}\n")
+    print(f"  People rows: {len(people_rows)} (one per attendee with a company)\n")
     print("── Top 10 by attendee count ────────────────────")
     for r in rows_out[:10]:
         print(f"  {r['attendee_count']:>3}  {r['company']}")
