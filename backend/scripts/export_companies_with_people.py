@@ -177,13 +177,14 @@ def main() -> None:
             test_excluded += 1
             continue
         company = (r.get("company") or "").strip()
-        if not company:
+        if not company or not normalise(company):
+            # Per Karl's request: surface these rather than hide them so the
+            # export shows the full picture and where the gaps live. Bucketed
+            # as a single sentinel "(no company recorded)" group at the
+            # bottom of the Companies sheet.
             no_company += 1
-            continue
+            company = "(no company recorded)"
         key = normalise(company)
-        if not key:
-            no_company += 1
-            continue
         # Dedupe within company by lowercase email; rows with no email fall
         # back to a per-row key so they aren't accidentally merged.
         member_key = (r.get("email") or f"__noemail__{id(r)}").strip().lower()
@@ -192,7 +193,7 @@ def main() -> None:
         casing[key][company] += 1
 
     print(f"  {len(groups)} distinct companies (after normalisation)")
-    print(f"  {no_company} attendees with no company recorded (excluded)")
+    print(f"  {no_company} attendees with no company recorded (grouped as '(no company recorded)')")
     print(f"  {staff_excluded} PoT/XVentures staff excluded")
     print(f"  {test_excluded} test/placeholder rows excluded\n")
 
@@ -272,7 +273,7 @@ def main() -> None:
             "metric": [
                 "Attendees in DB",
                 "Distinct companies (after normalisation)",
-                "Attendees with no company recorded (excluded)",
+                "Attendees with no company recorded (shown as '(no company recorded)')",
                 "PoT / XVentures staff excluded",
                 "Test / placeholder rows excluded",
                 "Generated at",
