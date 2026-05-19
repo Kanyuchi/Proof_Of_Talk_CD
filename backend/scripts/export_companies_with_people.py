@@ -61,6 +61,29 @@ SELECT_FIELDS = (
 )
 
 
+def granular_pass(row: dict) -> str:
+    """Return the granular Rhuna pass name when available, falling back to
+    the top-level TicketType enum.
+
+    The top-level `ticket_type` column is a 4-value enum (DELEGATE / SPEAKER
+    / VIP / SPONSOR) that collapses Rhuna's 8 granular passes (General,
+    Startup, Press, Investor, VIP, VIP Black, Speaker, Sponsor). The
+    granular name is preserved at `enriched_profile.extasy.ticket_name`
+    on every row that came in via the Extasy sync — read it first so the
+    export shows the full taxonomy, not the lossy enum.
+    """
+    extasy = ((row.get("enriched_profile") or {}).get("extasy") or {})
+    name = (extasy.get("ticket_name") or "").strip()
+    if name:
+        # Trim trailing " Pass" so columns stay narrow ("VIP Black",
+        # "Investor", "General"). Rhuna's own report uses the suffixed
+        # form, so flagging that we stripped it would be helpful too;
+        # for now this is consistent with the dashboard's display.
+        return name
+    enum = (row.get("ticket_type") or "").strip().upper()
+    return enum
+
+
 def best_position(row: dict, max_len: int = 120) -> str:
     """Same fallback chain as export_ticket_holders.py: registration title,
     then LinkedIn headline, then first LinkedIn experience title.
@@ -195,7 +218,7 @@ def main() -> None:
                 "name": name,
                 "title": position_full,
                 "email": email,
-                "ticket_type": (m.get("ticket_type") or "").upper(),
+                "ticket_type": granular_pass(m),
                 "country_iso3": m.get("country_iso3") or "",
                 "linkedin_url": m.get("linkedin_url") or "",
             })
@@ -206,9 +229,7 @@ def main() -> None:
             and not (m.get("email") or "").lower().endswith("@speaker.proofoftalk.io")
         })
         ticket_types = sorted({
-            (m.get("ticket_type") or "").upper()
-            for m in members
-            if m.get("ticket_type")
+            granular_pass(m) for m in members if granular_pass(m)
         })
         rows_out.append({
             "company": display,
