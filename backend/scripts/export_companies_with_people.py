@@ -32,6 +32,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
+import pandas as pd
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -49,11 +50,10 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
     print("ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in backend/.env")
     sys.exit(1)
 
-EXPORT_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "exports"
-    / f"companies_with_people_{datetime.now():%Y%m%d}.csv"
-)
+_EXPORT_DIR = Path(__file__).resolve().parents[1] / "exports"
+_STAMP = f"{datetime.now():%Y%m%d}"
+EXPORT_PATH = _EXPORT_DIR / f"companies_with_people_{_STAMP}.csv"
+EXPORT_PATH_XLSX = _EXPORT_DIR / f"companies_with_people_{_STAMP}.xlsx"
 
 SELECT_FIELDS = "name,title,email,company,ticket_type,linkedin_url,enriched_profile"
 
@@ -207,8 +207,59 @@ def main() -> None:
         writer = csv.DictWriter(f, fieldnames=header)
         writer.writeheader()
         writer.writerows(rows_out)
+    print(f"CSV written:  {EXPORT_PATH}")
 
-    print(f"CSV written: {EXPORT_PATH}\n")
+    # Excel version with the same data on a "Companies" sheet plus a
+    # "Summary" sheet for the exclusion/coverage stats. Same xlsxwriter
+    # pattern as generate_master_ticket_file.py.
+    df = pd.DataFrame(rows_out, columns=header)
+    summary_df = pd.DataFrame(
+        {
+            "metric": [
+                "Attendees in DB",
+                "Distinct companies (after normalisation)",
+                "Attendees with no company recorded (excluded)",
+                "PoT / XVentures staff excluded",
+                "Test / placeholder rows excluded",
+                "Generated at",
+            ],
+            "value": [
+                len(attendees),
+                len(groups),
+                no_company,
+                staff_excluded,
+                test_excluded,
+                f"{datetime.now():%Y-%m-%d %H:%M}",
+            ],
+        }
+    )
+    with pd.ExcelWriter(EXPORT_PATH_XLSX, engine="xlsxwriter") as writer:
+        df.to_excel(writer, sheet_name="Companies", index=False)
+        summary_df.to_excel(writer, sheet_name="Summary", index=False)
+        workbook = writer.book
+        header_fmt = workbook.add_format({
+            "bold": True, "bg_color": "#121212", "font_color": "#F76A0C",
+            "border": 1, "align": "left", "valign": "vcenter",
+        })
+        wrap_fmt = workbook.add_format({"text_wrap": True, "valign": "top"})
+        # Companies sheet
+        ws = writer.sheets["Companies"]
+        for col_num, value in enumerate(df.columns):
+            ws.write(0, col_num, value, header_fmt)
+        ws.set_column(0, 0, 32)   # company
+        ws.set_column(1, 1, 12)   # attendee_count
+        ws.set_column(2, 2, 80, wrap_fmt)  # people
+        ws.set_column(3, 3, 32)   # domains
+        ws.set_column(4, 4, 24)   # ticket_types
+        ws.freeze_panes(1, 0)
+        ws.autofilter(0, 0, len(df), len(df.columns) - 1)
+        # Summary sheet
+        sws = writer.sheets["Summary"]
+        for col_num, value in enumerate(summary_df.columns):
+            sws.write(0, col_num, value, header_fmt)
+        sws.set_column(0, 0, 50)
+        sws.set_column(1, 1, 24)
+    print(f"XLSX written: {EXPORT_PATH_XLSX}\n")
     print("── Top 10 by attendee count ────────────────────")
     for r in rows_out[:10]:
         print(f"  {r['attendee_count']:>3}  {r['company']}")
