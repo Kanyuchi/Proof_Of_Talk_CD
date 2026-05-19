@@ -84,13 +84,23 @@ def granular_pass(row: dict) -> str:
     return enum
 
 
-def best_position(row: dict, max_len: int = 120) -> str:
-    """Same fallback chain as export_ticket_holders.py: registration title,
-    then LinkedIn headline, then first LinkedIn experience title.
+def best_position(row: dict, max_len: int = 80) -> str:
+    """Return a CLEAN job title — or blank if we don't have one.
 
-    Output is collapsed to a single line. Default 120-char cap keeps the
-    Companies sheet (people in one cell) readable; the People sheet passes
-    a higher cap so full titles are preserved for filtering.
+    Sources, in priority order:
+      1. attendees.title  — registration-supplied
+      2. enriched_profile.linkedin.experiences[0].title  — formal job title
+
+    Deliberately does NOT fall back to the LinkedIn headline. That field
+    is free-form marketing copy (often a tagline or a pasted post), and
+    Karl was clear: if we don't have a real title, leave blank — don't
+    invent one. Past output had rows like "(Your cameras already see it.
+    Manako acts on it.)" because the headline was the only thing populated.
+
+    Cleanup applied to whichever source wins:
+      - Newlines collapsed to spaces.
+      - Cut at the first " | " (LinkedIn multi-title separator).
+      - If still longer than max_len, blanked (likely still garbage).
     """
     raw = ""
     title = (row.get("title") or "").strip()
@@ -99,19 +109,21 @@ def best_position(row: dict, max_len: int = 120) -> str:
     else:
         enriched = row.get("enriched_profile") or {}
         linkedin = enriched.get("linkedin") or {}
-        headline = (linkedin.get("headline") or "").strip()
-        if headline:
-            raw = headline
-        else:
-            experiences = linkedin.get("experiences") or []
-            if experiences:
-                raw = (experiences[0].get("title") or "").strip()
+        experiences = linkedin.get("experiences") or []
+        if experiences:
+            raw = (experiences[0].get("title") or "").strip()
     if not raw:
         return ""
     flat = " ".join(raw.split())
-    if max_len <= 0 or len(flat) <= max_len:
-        return flat
-    return flat[: max_len - 1].rstrip() + "…"
+    # Cut everything from the first pipe separator onwards. "Co-Founder &
+    # CRO, Manako Labs | Your cameras already see it." → "Co-Founder & CRO,
+    # Manako Labs". Multi-line LinkedIn pipe-lists like "Co-Founder | AI |
+    # Tech Engineer | ..." → "Co-Founder".
+    if "|" in flat:
+        flat = flat.split("|", 1)[0].rstrip(" ,;")
+    if not flat or len(flat) > max_len:
+        return ""
+    return flat
 
 
 def fetch_all_attendees() -> list[dict]:
@@ -207,17 +219,17 @@ def main() -> None:
         people_parts: list[str] = []
         for m in sorted_members:
             name = (m.get("name") or "").strip() or "(unknown)"
-            position_short = best_position(m, max_len=120)
-            position_full = best_position(m, max_len=500)
-            people_parts.append(f"{name} ({position_short})" if position_short else name)
-            # Skip the synthetic placeholder email so Karl's people-list
-            # doesn't surface "@speaker.proofoftalk.io" addresses.
+            # Companies sheet: names only — titles belong on the People sheet.
+            # The previous "Name (Title); ..." format was unreadable in one cell.
+            people_parts.append(name)
+            # People sheet: one clean title per row, blank if we don't have a real one.
+            position = best_position(m)
             email_raw = (m.get("email") or "").strip()
             email = "" if email_raw.lower().endswith("@speaker.proofoftalk.io") else email_raw
             people_rows.append({
                 "company": display,
                 "name": name,
-                "title": position_full,
+                "title": position,
                 "email": email,
                 "ticket_type": granular_pass(m),
                 "country_iso3": m.get("country_iso3") or "",
