@@ -26,12 +26,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
   const pendingCount = pendingData?.pending_count ?? 0;
 
-  // /preview-landing renders Z's full-bleed marketing draft — no top nav,
-  // no chat widget, no install banner so the design can be evaluated cleanly.
-  // Placed AFTER all hook calls to keep React's hook-order invariant intact.
-  if (location.pathname === "/preview-landing") {
-    return <>{children}</>;
-  }
+  // /preview-landing previously bypassed the Layout to render full-bleed,
+  // but the decision is to ship this as the matchmaker app's landing page —
+  // so the preview now renders WITH the top nav around it. A few chrome
+  // elements are still hidden on the landing to preserve Z's restrained
+  // marketing aesthetic: the "Home" nav link (redundant with the logo for
+  // unauth visitors), the mobile bottom-tab bar (covers the close-section
+  // CTA), and the floating ChatWidget (competes with the primary CTA and
+  // is useless to cold visitors anyway).
+  const isLanding = location.pathname === "/preview-landing";
 
   const isActive = (to: string) =>
     to === "/" ? location.pathname === to : location.pathname.startsWith(to);
@@ -66,7 +69,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Desktop nav */}
           <nav className="hidden sm:flex items-center gap-1">
-            {!isAuthenticated && (
+            {!isAuthenticated && !isLanding && (
               <Link to="/" className={linkCls("/")}>
                 <Sparkles className="w-4 h-4" />
                 <span>Home</span>
@@ -156,8 +159,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">{children}</main>
+      {/* Main content — landing page gets full-bleed (no max-width, no
+          padding) so Z's edge-to-edge sections (cream "Dream" panel,
+          texture overlay) render as designed. */}
+      <main
+        className={isLanding ? "" : "max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8"}
+      >
+        {children}
+      </main>
 
       {/* Footer — desktop only */}
       <footer className="hidden sm:block border-t border-white/10 mt-auto">
@@ -168,7 +177,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </footer>
 
       {/* Mobile bottom tab bar — pb-[env(safe-area-inset-bottom)] so the
-          tabs don't sit underneath the iPhone home indicator. */}
+          tabs don't sit underneath the iPhone home indicator. Hidden on
+          /preview-landing so the close-section CTA isn't covered. */}
+      {!isLanding && (
       <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121212]/95 backdrop-blur-xl border-t border-white/10 flex items-stretch pb-[env(safe-area-inset-bottom)]">
         {isAuthenticated ? (
           <>
@@ -254,9 +265,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </>
         )}
       </nav>
+      )}
 
-      {/* Floating AI Concierge */}
-      <ChatWidget />
+      {/* Floating AI Concierge — hidden on /preview-landing so it doesn't
+          compete with the primary CTA. Cold visitors have no profile so
+          the Concierge has no useful context anyway. */}
+      {!isLanding && <ChatWidget />}
 
       {/* PWA install prompt — mobile only, dismissible for 14 days */}
       <InstallBanner />
