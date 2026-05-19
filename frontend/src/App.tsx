@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "./context/AuthContext";
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
+import HomeLanding from "./pages/HomeLanding";
 import Attendees from "./pages/Attendees";
 import AttendeeMatches from "./pages/AttendeeMatches";
 import Dashboard from "./pages/Dashboard";
@@ -36,6 +37,7 @@ export default function App() {
           <Layout>
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/preview-landing" element={<HomeLanding />} />
               <Route path="/attendees" element={<Attendees />} />
               <Route path="/attendees/:id" element={<AttendeeMatches />} />
               <Route path="/dashboard" element={<Dashboard />} />
