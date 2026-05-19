@@ -26,15 +26,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   });
   const pendingCount = pendingData?.pending_count ?? 0;
 
-  // /preview-landing previously bypassed the Layout to render full-bleed,
-  // but the decision is to ship this as the matchmaker app's landing page —
-  // so the preview now renders WITH the top nav around it. A few chrome
-  // elements are still hidden on the landing to preserve Z's restrained
-  // marketing aesthetic: the "Home" nav link (redundant with the logo for
-  // unauth visitors), the mobile bottom-tab bar (covers the close-section
-  // CTA), and the floating ChatWidget (competes with the primary CTA and
-  // is useless to cold visitors anyway).
-  const isLanding = location.pathname === "/preview-landing";
+  // The landing page (/) renders with the top nav but a few chrome
+  // elements are hidden to preserve Z's restrained marketing aesthetic:
+  // the "Home" nav link (redundant with the logo for unauth visitors),
+  // the mobile bottom-tab bar (covers the close-section CTA), and the
+  // floating ChatWidget (competes with the primary CTA and is useless
+  // to cold visitors anyway). Authenticated users get auto-redirected
+  // away from / to /matches inside HomeLanding itself, so these chrome
+  // tweaks only ever apply to cold visitors.
+  const isLanding = location.pathname === "/";
 
   const isActive = (to: string) =>
     to === "/" ? location.pathname === to : location.pathname.startsWith(to);
@@ -178,7 +178,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom tab bar — pb-[env(safe-area-inset-bottom)] so the
           tabs don't sit underneath the iPhone home indicator. Hidden on
-          /preview-landing so the close-section CTA isn't covered. */}
+          the landing page (/) so the close-section CTA isn't covered. */}
       {!isLanding && (
       <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121212]/95 backdrop-blur-xl border-t border-white/10 flex items-stretch pb-[env(safe-area-inset-bottom)]">
         {isAuthenticated ? (
@@ -267,9 +267,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </nav>
       )}
 
-      {/* Floating AI Concierge — hidden on /preview-landing so it doesn't
-          compete with the primary CTA. Cold visitors have no profile so
-          the Concierge has no useful context anyway. */}
+      {/* Floating AI Concierge — hidden on the landing page (/) so it
+          doesn't compete with the primary CTA. Cold visitors have no
+          profile so the Concierge has no useful context anyway. */}
       {!isLanding && <ChatWidget />}
 
       {/* PWA install prompt — mobile only, dismissible for 14 days */}

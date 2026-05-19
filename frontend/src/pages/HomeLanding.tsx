@@ -2,13 +2,12 @@ import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
-// Preview port of Z's `launch/from_Z/matchmaker.html`, now rendering inside
-// the standard Layout so we see what shipping this as the matchmaker app's
-// landing would actually look like. Cold visitors see the full marketing
-// page; authenticated users are auto-redirected to /matches so returning
-// attendees don't get re-pitched every visit (standard SaaS pattern).
-// The floating .mark element is hidden because the top nav already shows
-// the POT wordmark — leaving both creates a duplicate.
+// Matchmaker app landing page (route: /). Long-scroll marketing page
+// ported from Z's `launch/from_Z/matchmaker.html`. Cold visitors see the
+// full page and the "Get your introductions" CTA → /register. Authenticated
+// users auto-redirect to /matches (useEffect below) so returning attendees
+// don't get re-pitched. Layout.tsx hides the Home nav link, mobile bottom
+// tabs, and ChatWidget on this path so Z's design owns the canvas.
 export default function HomeLanding() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
