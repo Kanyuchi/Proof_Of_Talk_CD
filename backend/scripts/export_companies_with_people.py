@@ -84,23 +84,27 @@ def granular_pass(row: dict) -> str:
     return enum
 
 
-def best_position(row: dict, max_len: int = 80) -> str:
-    """Return a CLEAN job title — or blank if we don't have one.
+def best_position(row: dict, max_len: int = 60) -> str:
+    """Return a CLEAN job title — or blank if we can't extract one.
 
     Sources, in priority order:
-      1. attendees.title  — registration-supplied
-      2. enriched_profile.linkedin.experiences[0].title  — formal job title
+      1. attendees.title — registration-supplied
+      2. enriched_profile.linkedin.experiences[0].title — formal job title
+      3. enriched_profile.linkedin.headline — last resort, AFTER cleanup
 
-    Deliberately does NOT fall back to the LinkedIn headline. That field
-    is free-form marketing copy (often a tagline or a pasted post), and
-    Karl was clear: if we don't have a real title, leave blank — don't
-    invent one. Past output had rows like "(Your cameras already see it.
-    Manako acts on it.)" because the headline was the only thing populated.
+    The headline source is messy: LinkedIn lets people type anything,
+    so it's often "Title, Company | tagline | tagline | tagline" or a
+    pasted post share. We extract just the first segment, which is
+    usually the real title ("Co-Founder & CRO, Manako Labs | Your cameras
+    already see it" → "Co-Founder & CRO"), and blank-out anything that
+    doesn't survive the cleanup (e.g. "Catch our CEO Simone Maini on
+    Bloomberg News..." stays > 60 chars → blank).
 
-    Cleanup applied to whichever source wins:
-      - Newlines collapsed to spaces.
-      - Cut at the first " | " (LinkedIn multi-title separator).
-      - If still longer than max_len, blanked (likely still garbage).
+    Cleanup steps (applied to whichever source wins):
+      - Newlines collapsed to single spaces.
+      - Cut at the first " | " (LinkedIn multi-segment separator).
+      - Cut at the first "," (separates title from company in headlines).
+      - If empty or longer than max_len, blanked (still garbage).
     """
     raw = ""
     title = (row.get("title") or "").strip()
@@ -112,15 +116,20 @@ def best_position(row: dict, max_len: int = 80) -> str:
         experiences = linkedin.get("experiences") or []
         if experiences:
             raw = (experiences[0].get("title") or "").strip()
+        if not raw:
+            raw = (linkedin.get("headline") or "").strip()
     if not raw:
         return ""
     flat = " ".join(raw.split())
-    # Cut everything from the first pipe separator onwards. "Co-Founder &
-    # CRO, Manako Labs | Your cameras already see it." → "Co-Founder & CRO,
-    # Manako Labs". Multi-line LinkedIn pipe-lists like "Co-Founder | AI |
-    # Tech Engineer | ..." → "Co-Founder".
+    # Pipe split: "Co-Founder | Bittensor Subnet Owner | AI | ..." → "Co-Founder"
     if "|" in flat:
         flat = flat.split("|", 1)[0].rstrip(" ,;")
+    # Comma split: "Co-Founder & CRO, Manako Labs" → "Co-Founder & CRO".
+    # Conservative — only the FIRST comma, so "VP, Product" stays intact
+    # only if it fits in max_len; usually a comma in a headline means
+    # "title, company".
+    if "," in flat:
+        flat = flat.split(",", 1)[0].strip()
     if not flat or len(flat) > max_len:
         return ""
     return flat
