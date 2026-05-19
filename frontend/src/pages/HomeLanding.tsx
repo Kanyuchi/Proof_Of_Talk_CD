@@ -152,7 +152,11 @@ export default function HomeLanding() {
         .z-landing .btn:hover .arr { transform: translateX(5px); }
         .z-landing .meta { font-family: var(--mono); font-size: 12px; letter-spacing: .18em; color: var(--grey); text-transform: uppercase; }
 
-        .z-landing section { padding: 120px 0; position: relative; }
+        /* Was 120px → 80px per section, so the gap between any two
+           sections drops from ~240px to ~160px. Less dead-black space
+           between e.g. "Watch Matchmaker pull them out of the noise"
+           and "Why it matters here". */
+        .z-landing section { padding: 80px 0; position: relative; }
         .z-landing .kicker { font-family: var(--mono); font-size: 12px; letter-spacing: .32em; color: var(--orange); text-transform: uppercase; margin-bottom: 32px; }
 
         .z-landing .wound h2 { font-family: var(--serif); font-weight: 300; font-style: italic; font-size: clamp(30px,4.8vw,66px);
@@ -218,7 +222,7 @@ export default function HomeLanding() {
         .z-landing .lf h4 { font-family: var(--display); font-size: 18px; font-weight: 500; margin: 14px 0 8px; }
         .z-landing .lf p { font-size: 14px; line-height: 1.55; color: rgba(255,255,255,.46); font-weight: 300; margin: 0; }
 
-        .z-landing .dream { background: var(--cream); color: var(--ink); padding: 160px 0; }
+        .z-landing .dream { background: var(--cream); color: var(--ink); padding: 110px 0; }
         .z-landing .dream::before { content: ""; position: absolute; inset: 0; pointer-events: none;
           background-image: repeating-linear-gradient(45deg, rgba(0,0,0,.012) 0 1px, transparent 1px 7px); }
         .z-landing .dream .kicker { color: var(--orange); }
@@ -228,7 +232,7 @@ export default function HomeLanding() {
         .z-landing .dream .under { margin: 38px 0 0; font-family: var(--serif); font-style: italic; font-weight: 300;
           font-size: clamp(20px,2.4vw,30px); color: rgba(8,8,8,.5); max-width: 24ch; line-height: 1.3; }
 
-        .z-landing .close { text-align: center; padding: 160px 0 140px; }
+        .z-landing .close { text-align: center; padding: 110px 0 90px; }
         .z-landing .close .logo { font-family: var(--display); font-weight: 600; font-size: clamp(28px,4vw,46px); letter-spacing: -.01em; }
         .z-landing .close .logo .o { color: var(--orange); font-style: italic; font-family: var(--serif); font-weight: 400; }
         .z-landing .close .line { margin: 36px auto 0; font-family: var(--serif); font-weight: 300; font-style: italic;
@@ -243,7 +247,7 @@ export default function HomeLanding() {
         @media (max-width: 880px) {
           .z-landing .wrap { padding: 0 24px; }
           .z-landing .mark { left: 24px; top: 28px; }
-          .z-landing section { padding: 88px 0; }
+          .z-landing section { padding: 56px 0; }
           .z-landing .ghosts { grid-template-columns: 1fr 1fr; }
           .z-landing .hero-feats { grid-template-columns: 1fr; }
           .z-landing .list { grid-template-columns: 1fr 1fr; }
