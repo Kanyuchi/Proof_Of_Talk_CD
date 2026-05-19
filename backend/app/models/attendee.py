@@ -13,6 +13,7 @@ class TicketType(str, enum.Enum):
     SPONSOR = "sponsor"
     SPEAKER = "speaker"
     VIP = "vip"
+    TEAM = "team"  # PoT + XVentures organising staff — neither delegate nor speaker
 
 
 class Attendee(Base):

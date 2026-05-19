@@ -300,63 +300,57 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                 }
             }
 
-            // Photo extraction: anchor on the profile owner's <h1> (their name),
-            // walk up to the nearest ancestor section/article, and search for
-            // a profile-photo image ONLY inside that container.
+            // Photo extraction: closest-common-ancestor approach.
             //
-            // Why this anchor approach beats the previous strategies:
-            //   - Page-wide search (the 2026-05-18 v1 of this code) picked up
-            //     wrong photos when the target profile had no photo: the
-            //     operator's own nav avatar OR sidebar suggestion avatars
-            //     became "the first profile-displayphoto in DOM order".
-            //     Hit at least 4 attendees (Chrissy Hill got the operator's
-            //     photo; Devon Euring, Christian Walker, Nathan Chow got
-            //     other wrong photos).
-            //   - Hardcoded top-card selectors (the pre-2026-05-18 strategy)
-            //     break when LinkedIn ships DOM updates.
-            //   - The h1 is structurally stable across LinkedIn redesigns —
-            //     every profile page has exactly one h1 for the owner's name.
+            // Among all profile-photo IMGs on the page (page-wide search by
+            // LinkedIn's unique URL pattern), pick the one whose DOM path
+            // back up to a common ancestor with the profile owner's <h1> is
+            // SHORTEST. That photo is the top-card avatar; sidebar suggestion
+            // avatars share only `<main>` (or higher) as their common
+            // ancestor with the h1 and therefore have a longer path.
             //
-            // STRICT POLICY: if no photo is found inside the h1's ancestor
-            // section, photo stays NULL. Never fall back. Better to have no
-            // photo (Gravatar/initials fallback in frontend) than the wrong one.
+            // This is more robust than the prior "find section then search"
+            // approach which depended on a specific tagName boundary
+            // (Sneha 2026-05-19 had her photo in a structure where the
+            // section-walk returned no photos and fell back to null).
+            //
+            // Defenses preserved against historical bugs:
+            //   - May 11 nav-pollution: navAvatarSrcs blacklist filters out
+            //     the operator's own "Me" avatar in the global nav.
+            //   - Batch-5 sidebar-pollution: sidebar avatars have a longer
+            //     ancestor-path to the h1 than the top-card photo, so the
+            //     closest-ancestor rule picks the right one.
+            //   - 2026-05-18 wrong-photo-on-no-photo: if NO profile-displayphoto
+            //     imgs exist on the page, photo stays NULL. Never fall back.
+            // Reuse `ownerH1` from the headline-extraction block above.
             photoUrl = null;
-            const allH1s = [...document.querySelectorAll('h1')];
-            // The profile owner's h1 is the one inside <main>, not in any
-            // nav/header/dialog.
-            const profileH1 = allH1s.find(h => {
-                const inMain = h.closest('main');
-                const inNav = h.closest('header, nav, [role="dialog"]');
-                return inMain && !inNav;
-            });
-            if (profileH1) {
-                // Find the nearest ancestor that's likely the top-card container.
-                // Walk up looking for a section or large container that holds
-                // both the h1 and the photo, but stop before reaching <main>
-                // (which would be too broad and include sidebars).
-                let topCard = profileH1.closest('section, article');
-                if (!topCard || topCard.tagName === 'MAIN') topCard = profileH1.parentElement;
-                // Walk up a couple of levels if needed — sometimes the h1 is
-                // in a sub-container of the top card.
-                for (let i = 0; i < 4 && topCard; i++) {
-                    const photos = topCard.querySelectorAll('img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]');
-                    if (photos.length > 0) break;
-                    const parent = topCard.parentElement;
-                    if (!parent || parent.tagName === 'MAIN' || parent.tagName === 'BODY') break;
-                    topCard = parent;
-                }
-                if (topCard) {
-                    const candidates = [...topCard.querySelectorAll(
-                        'img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]'
-                    )];
-                    for (const img of candidates) {
-                        const src = img.src || '';
-                        if (!src.startsWith('http')) continue;
-                        if (navAvatarSrcs.has(src)) continue;
-                        photoUrl = src;
-                        break;
+            if (ownerH1) {
+                const allPhotos = [...document.querySelectorAll(
+                    'img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]'
+                )].filter(img => {
+                    const src = img.src || '';
+                    if (!src.startsWith('http')) return false;
+                    if (navAvatarSrcs.has(src)) return false;
+                    return true;
+                });
+                let bestPhoto = null;
+                let bestDepth = Infinity;
+                for (const img of allPhotos) {
+                    // Walk up from the img until we find an ancestor that
+                    // also contains the h1. Depth = number of steps up.
+                    let depth = 0;
+                    let ancestor = img;
+                    while (ancestor && !ancestor.contains(ownerH1)) {
+                        ancestor = ancestor.parentElement;
+                        depth++;
+                        if (depth > 20) break;  // safety cap
+                    }
+                    if (ancestor && depth < bestDepth) {
+                        bestDepth = depth;
+                        bestPhoto = img;
                     }
                 }
+                if (bestPhoto) photoUrl = bestPhoto.src;
             }
 
             return { name, headline, summary, experiences, skills: [], education: [], photoUrl };

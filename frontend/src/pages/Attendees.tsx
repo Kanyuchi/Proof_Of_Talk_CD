@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link, Navigate } from "react-router-dom";
 import {
-  Search, Crown, Mic, Megaphone, User, ChevronRight, Brain,
+  Search, Crown, Mic, Megaphone, User, ChevronRight, Brain, Sparkles,
 } from "lucide-react";
 import { useAttendees } from "../hooks/useAttendees";
 import { useMatches } from "../hooks/useMatches";
@@ -15,6 +15,7 @@ const ticketIcons: Record<string, React.ReactNode> = {
   speaker: <Mic className="w-3.5 h-3.5 text-purple-400" />,
   sponsor: <Megaphone className="w-3.5 h-3.5 text-emerald-400" />,
   delegate: <User className="w-3.5 h-3.5 text-blue-400" />,
+  team: <Sparkles className="w-3.5 h-3.5 text-amber-300" />,
 };
 
 const ticketColors: Record<string, string> = {
@@ -22,9 +23,10 @@ const ticketColors: Record<string, string> = {
   speaker: "bg-purple-400/10 text-purple-400 border-purple-400/20",
   sponsor: "bg-emerald-400/10 text-emerald-400 border-emerald-400/20",
   delegate: "bg-blue-400/10 text-blue-400 border-blue-400/20",
+  team: "bg-amber-300/10 text-amber-300 border-amber-300/20",
 };
 
-const TICKET_TYPES = ["vip", "speaker", "delegate"] as const;
+const TICKET_TYPES = ["vip", "speaker", "delegate", "team"] as const;
 
 const matchScoreColor: Record<string, string> = {
   deal_ready:    "bg-emerald-400/15 text-emerald-400 border-emerald-400/25",

@@ -4,7 +4,7 @@ export interface Attendee {
   email: string;
   company: string;
   title: string;
-  ticket_type: "delegate" | "sponsor" | "speaker" | "vip";
+  ticket_type: "delegate" | "sponsor" | "speaker" | "vip" | "team";
   interests: string[];
   goals: string | null;
   target_companies: string | null;
