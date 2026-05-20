@@ -51,3 +51,9 @@ launch/our_version/figures/
 launch/our_version/.DS_Store
 launch/our_version/pot_matchmaker_*.mp4
 launch/our_version/.render_frames/
+
+# WhatsApp Zohair bridge — never commit credentials or message data
+tools/whatsapp-mcp/whatsapp-bridge/store/
+tools/whatsapp-mcp/.env
+tools/whatsapp-mcp/**/*.db
+tools/whatsapp-mcp/**/*.db-journal
