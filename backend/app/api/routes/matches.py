@@ -1,6 +1,7 @@
 import secrets
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import select, or_, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -163,6 +164,128 @@ async def get_matches_by_magic_link(
         match_responses.append(resp)
 
     return MatchListResponse(matches=match_responses, attendee_id=attendee.id)
+
+
+def _unsub_html(title: str, heading: str, body: str, link_href: str | None = None, link_label: str | None = None) -> str:
+    """Minimal branded HTML page for unsubscribe/resubscribe confirmations."""
+    cream = "#F6F4EF"
+    terracotta = "#C2632A"
+    ink = "#211500"
+    muted = "#7A7268"
+    link_block = ""
+    if link_href and link_label:
+        link_block = (
+            f'<p style="margin:16px 0 0; font-size:14px; color:{muted};">'
+            f'Changed your mind? <a href="{link_href}" style="color:{terracotta}; text-decoration:underline;">{link_label}</a>'
+            f'</p>'
+        )
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title}</title>
+  <style>
+    body {{ margin:0; padding:0; background:{cream}; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; }}
+  </style>
+</head>
+<body>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{cream}; min-height:100vh;">
+    <tr><td align="center" style="padding:60px 20px;">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:100%; background:#ffffff; border-radius:8px; padding:48px 40px;">
+        <tr><td>
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:{terracotta}; margin-bottom:16px;">Proof of Talk 2026</div>
+          <h1 style="margin:0 0 16px; font-size:24px; font-weight:600; color:{ink}; font-family:Georgia,'Times New Roman',serif;">{heading}</h1>
+          <p style="margin:0; font-size:16px; line-height:1.6; color:{ink};">{body}</p>
+          {link_block}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+
+@router.get("/m/{token}/unsubscribe", response_class=HTMLResponse)
+async def unsubscribe_via_magic_link(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Unsubscribe from engagement emails via magic link — no login required."""
+    if not token or len(token) < 16:
+        return HTMLResponse(
+            _unsub_html(
+                title="Invalid link",
+                heading="This link is invalid",
+                body="The unsubscribe link you followed is not recognised. If you believe this is an error, please reply to the email you received.",
+            )
+        )
+
+    result = await db.execute(
+        select(Attendee).where(Attendee.magic_access_token == token)
+    )
+    attendee = result.scalars().first()
+    if not attendee:
+        return HTMLResponse(
+            _unsub_html(
+                title="Invalid link",
+                heading="This link is invalid",
+                body="The unsubscribe link you followed is not recognised. If you believe this is an error, please reply to the email you received.",
+            )
+        )
+
+    attendee.email_opt_out = True
+    await db.commit()
+
+    return HTMLResponse(
+        _unsub_html(
+            title="Unsubscribed",
+            heading="You've been unsubscribed",
+            body="You won't receive further matchmaking emails from Proof of Talk.",
+            link_href=f"/api/v1/matches/m/{token}/resubscribe",
+            link_label="Re-subscribe",
+        )
+    )
+
+
+@router.get("/m/{token}/resubscribe", response_class=HTMLResponse)
+async def resubscribe_via_magic_link(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-subscribe to engagement emails via magic link — no login required."""
+    if not token or len(token) < 16:
+        return HTMLResponse(
+            _unsub_html(
+                title="Invalid link",
+                heading="This link is invalid",
+                body="The re-subscribe link you followed is not recognised.",
+            )
+        )
+
+    result = await db.execute(
+        select(Attendee).where(Attendee.magic_access_token == token)
+    )
+    attendee = result.scalars().first()
+    if not attendee:
+        return HTMLResponse(
+            _unsub_html(
+                title="Invalid link",
+                heading="This link is invalid",
+                body="The re-subscribe link you followed is not recognised.",
+            )
+        )
+
+    attendee.email_opt_out = False
+    await db.commit()
+
+    return HTMLResponse(
+        _unsub_html(
+            title="Resubscribed",
+            heading="You're resubscribed",
+            body="You'll receive matchmaking emails from Proof of Talk again.",
+        )
+    )
 
 
 class MagicProfileUpdate(BaseModel):
@@ -360,13 +483,14 @@ async def update_match_status(
             attendee_b = await db.get(Attendee, match.attendee_b_id)
             if attendee_a and attendee_b:
                 for recipient, partner in [(attendee_a, attendee_b), (attendee_b, attendee_a)]:
-                    if recipient.email:
+                    if recipient.email and not getattr(recipient, "email_opt_out", False):
                         send_mutual_match_email(
                             to_email=recipient.email,
                             attendee_name=recipient.name,
                             other_name=partner.name,
                             other_title=partner.title or "",
                             other_company=partner.company or "",
+                            magic_token=recipient.magic_access_token,
                         )
         except Exception as exc:  # noqa: BLE001
             import logging

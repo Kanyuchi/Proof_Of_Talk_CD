@@ -78,6 +78,11 @@ class Attendee(Base):
         String(32), server_default="not_required", nullable=False
     )
 
+    # Email opt-out — set via the /m/{token}/unsubscribe public endpoint.
+    # Only gates engagement emails (match intro, mutual match, welcome).
+    # Transactional emails (password reset, meeting confirmation) ignore this.
+    email_opt_out: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
+
 
 class Match(Base):
     __tablename__ = "matches"

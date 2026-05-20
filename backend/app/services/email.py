@@ -123,6 +123,7 @@ def _render_email(
     cta_url: str | None = None,
     footer_note: str | None = None,
     unsubscribe: bool = False,
+    unsubscribe_token: str | None = None,
     accent: str = "#C2632A",
 ) -> str:
     """Shared branded email shell, matching the Proof of Talk newsletter:
@@ -171,9 +172,15 @@ def _render_email(
 
     unsub_block = ""
     if unsubscribe:
+        if unsubscribe_token:
+            unsub_url = f"{EMAIL_APP_URL}/api/v1/matches/m/{unsubscribe_token}/unsubscribe"
+            prefs_url = f"{EMAIL_APP_URL}/m/{unsubscribe_token}"
+        else:
+            unsub_url = f"{EMAIL_APP_URL}/unsubscribe"
+            prefs_url = f"{EMAIL_APP_URL}/profile"
         unsub_block = f"""
             <tr><td align="center" style="padding: 14px 0 0; font-family:{sans}; font-size:12px; color:{muted};">
-              <a href="{EMAIL_APP_URL}/unsubscribe" style="color:{muted}; text-decoration:underline;">Unsubscribe</a> &middot; <a href="{EMAIL_APP_URL}/profile" style="color:{muted}; text-decoration:underline;">Preferences</a>
+              <a href="{unsub_url}" style="color:{muted}; text-decoration:underline;">Unsubscribe</a> &middot; <a href="{prefs_url}" style="color:{muted}; text-decoration:underline;">Preferences</a>
             </td></tr>"""
 
     return f"""<!DOCTYPE html>
@@ -325,6 +332,7 @@ def send_match_intro_email(
         cta_label="View all your introductions",
         cta_url=dashboard_url,
         unsubscribe=True,
+        unsubscribe_token=magic_token,
     )
     body_text = (
         f"Your introductions for Proof of Talk 2026 are ready, {first_name}\n\n"
@@ -345,6 +353,7 @@ def send_mutual_match_email(
     other_title: str,
     other_company: str,
     app_url: str | None = None,
+    magic_token: str | None = None,
 ) -> None:
     """Send a 'mutual match confirmed' notification email.
 
@@ -355,6 +364,7 @@ def send_mutual_match_email(
         other_title: Title of the other party.
         other_company: Company of the other party.
         app_url: Base URL of the app for the CTA link.
+        magic_token: Recipient's magic_access_token for personalised unsubscribe link.
     """
 
     settings = get_settings()
@@ -376,6 +386,7 @@ def send_mutual_match_email(
         cta_label="Schedule your meeting",
         cta_url=f"{app_url}/matches",
         unsubscribe=True,
+        unsubscribe_token=magic_token,
     )
     body_text = (
         f"Mutual match confirmed\n\n"
@@ -476,6 +487,7 @@ def send_welcome_email(
         cta_label="Open your matches",
         cta_url=dashboard_url,
         unsubscribe=True,
+        unsubscribe_token=magic_token,
     )
     body_text = (
         f"Welcome to Proof of Talk 2026, {first_name}.\n\n"

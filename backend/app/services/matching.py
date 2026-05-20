@@ -755,7 +755,7 @@ Return ONLY the JSON array. No markdown, no commentary."""
                     top.attendee_b_id if top.attendee_a_id == attendee.id else top.attendee_a_id
                 )
                 top_candidate = await self.db.get(Attendee, top_candidate_id)
-                if top_candidate and attendee.email:
+                if top_candidate and attendee.email and not getattr(attendee, "email_opt_out", False):
                     # Respect privacy mode — show company name instead of personal name for b2b_only
                     if getattr(top_candidate, "privacy_mode", "full") == "b2b_only":
                         display_name = top_candidate.company or "Anonymous"
