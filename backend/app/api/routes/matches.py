@@ -531,7 +531,7 @@ async def schedule_meeting(
             )
 
     match.meeting_time = data.meeting_time
-    match.meeting_location = data.meeting_location or "Louvre Palace, Paris — TBD at venue"
+    match.meeting_location = data.meeting_location or "Louvre Palace, Paris (exact spot shared at the venue)"
 
     await db.commit()
     await db.refresh(match)
