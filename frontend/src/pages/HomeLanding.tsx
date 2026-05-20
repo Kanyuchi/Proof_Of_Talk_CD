@@ -335,7 +335,7 @@ export default function HomeLanding() {
             <div className="lf r d1"><div className="ix">03</div><h4>Auto Profile</h4><p>Your profile, drafted by the Concierge. One tap to publish.</p></div>
             <div className="lf r d2"><div className="ix">04</div><h4>Mutual Match</h4><p>Both sides say yes before the handshake. No cold intros.</p></div>
             <div className="lf r d3"><div className="ix">05</div><h4>Smart Booking</h4><p>One tap. Availability checked. Room and invite locked.</p></div>
-            <div className="lf r d4"><div className="ix">06</div><h4>Magic Link</h4><p>One link, every meeting. No login, no app, no friction.</p></div>
+            <div className="lf r d4"><div className="ix">06</div><h4>Magic Link</h4><p>One link, every meeting. No login, no sign-up, no friction.</p></div>
           </div>
         </div>
       </section>
