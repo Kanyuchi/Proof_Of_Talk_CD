@@ -201,7 +201,11 @@ export default function HomeLanding() {
         .z-landing .stat .n { font-family: var(--serif); font-size: clamp(34px,5vw,60px); font-weight: 300; line-height: 1; }
         .z-landing .stat .n.o { color: var(--orange); }
         .z-landing .stat .l { margin-top: 14px; font-family: var(--mono); font-size: 11px; letter-spacing: .2em; color: var(--grey); text-transform: uppercase; }
-        .z-landing .stakes .turn { margin: 54px 0 0; max-width: 46ch; font-size: 19px; line-height: 1.66; color: rgba(255,255,255,.62); font-weight: 300; }
+        /* max-width removed + size trimmed so the line fits on one row on
+           desktop (was clamped to 46ch → wrapped to 3 lines). Top margin
+           cut 54px → 28px to pull it up under the stat row. Still wraps
+           gracefully on narrow viewports. */
+        .z-landing .stakes .turn { margin: 28px 0 0; max-width: none; font-size: 17px; line-height: 1.6; color: rgba(255,255,255,.62); font-weight: 300; }
         .z-landing .stakes .turn strong { color: #fff; font-weight: 500; }
 
         .z-landing .feat h2 { font-family: var(--serif); font-weight: 300; font-size: clamp(30px,4.6vw,60px); line-height: 1.12; letter-spacing: -.015em; max-width: 15ch; margin: 0; }
