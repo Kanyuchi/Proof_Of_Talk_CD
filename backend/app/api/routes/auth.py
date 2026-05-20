@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.core.database import get_db, async_session
 from app.core.security import verify_password, get_password_hash, create_access_token, create_reset_token, decode_reset_token
 from app.core.deps import require_auth
@@ -83,6 +84,20 @@ async def register(
             existing_attendee.magic_access_token = secrets.token_urlsafe(32)
         attendee = existing_attendee
     else:
+        # Ticket gate: no attendee row at this email = no Proof of Talk
+        # ticket on file. Block self-registration so the pool stays
+        # ticket-verified. Toggle off via REQUIRE_TICKET_TO_REGISTER if it
+        # ever locks out a legitimate group.
+        if get_settings().REQUIRE_TICKET_TO_REGISTER:
+            logger.info("register: blocked non-ticket email %s", data.email)
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "We couldn't find a Proof of Talk ticket for this email. "
+                    "Please register with the email address you used to buy your pass. "
+                    "If you believe this is an error, contact the Proof of Talk team."
+                ),
+            )
         # Fresh registration — create a new attendee row.
         attendee = Attendee(
             name=data.name,

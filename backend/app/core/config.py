@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     #   allowlist — only addresses in EMAIL_ALLOWLIST receive (team testing)
     #   all       — everyone receives (full rollout)
     # Rollout team→everyone is a Railway env-var change only, no redeploy.
+    # Registration gate — when True, only people already in the attendees
+    # table (bought a Rhuna ticket or added by ops/speaker-sheet) can create
+    # a login. Blocks random non-ticket-holders from self-registering into
+    # the pool. Kept as a flag so it can be flipped off via env if it locks
+    # out a legitimate group (e.g. speakers whose row has a placeholder email).
+    REQUIRE_TICKET_TO_REGISTER: bool = True
+
     EMAIL_MODE: str = "off"
     # Comma-separated; used when EMAIL_MODE=allowlist. Entries starting with
     # "@" match a whole domain (e.g. "@proofoftalk.io"), others are exact
