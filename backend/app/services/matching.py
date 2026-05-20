@@ -232,6 +232,11 @@ class MatchingEngine:
         if is_internal_staff(candidate):
             return False
 
+        # Consent gate: high-profile speakers withheld until they consent.
+        from app.services.consent_filter import is_match_gated
+        if is_match_gated(candidate):
+            return False
+
         # Respect each side's explicit exclusions.
         attendee_exclusions = self._norm_set(getattr(attendee, "not_looking_for", []))
         candidate_exclusions = self._norm_set(getattr(candidate, "not_looking_for", []))
@@ -618,6 +623,10 @@ Return ONLY the JSON array. No markdown, no commentary."""
         attendee = await self.db.get(Attendee, attendee_id)
         if not attendee:
             raise ValueError(f"Attendee {attendee_id} not found")
+
+        from app.services.consent_filter import is_match_gated
+        if is_match_gated(attendee):
+            return []  # gated — generate no matches for this attendee
 
         # Stage 1: Ensure attendee is processed
         if attendee.embedding is None:
