@@ -87,6 +87,9 @@ def _send_email(
         "subject": subject,
         "html": html,
     }
+    reply_to = (getattr(settings, "EMAIL_REPLY_TO", "") or "").strip()
+    if reply_to:
+        payload["reply_to"] = reply_to
     if text:
         payload["text"] = text
     if attachments:

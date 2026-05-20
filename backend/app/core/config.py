@@ -36,7 +36,13 @@ class Settings(BaseSettings):
 
     # Resend (primary email provider)
     RESEND_API_KEY: str = ""
-    RESEND_FROM_EMAIL: str = "Proof of Talk <matches@proofoftalk.io>"
+    # Send from the warm, established xventures.de domain (team@ is a real
+    # monitored inbox that also RECEIVES, so replies don't bounce). Switch to
+    # matchmaker@xventures.de once that mailbox/alias exists on Workspace.
+    RESEND_FROM_EMAIL: str = "Proof of Talk <team@xventures.de>"
+    # Reply-To so attendee replies land in a monitored inbox even if the
+    # From address ever becomes send-only (e.g. matchmaker@). Blank = omit.
+    EMAIL_REPLY_TO: str = "team@xventures.de"
 
     # Email gating — controls who actually receives mail. Safe default is
     # "off" so a deploy never sends until explicitly flipped via env var.
