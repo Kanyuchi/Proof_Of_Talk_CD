@@ -71,6 +71,13 @@ class Attendee(Base):
     pot_history: Mapped[dict] = mapped_column(JSONB, default=dict)   # Previous POT event attendance
     enriched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # Last enrichment run
 
+    # Speaker consent gate. "not_required" (default, matchable) / "pending"
+    # (flagged high-profile, awaiting consent) / "granted" (consented) /
+    # "declined" (said no). pending+declined are excluded from matching.
+    matching_consent: Mapped[str] = mapped_column(
+        String(32), server_default="not_required", nullable=False
+    )
+
 
 class Match(Base):
     __tablename__ = "matches"
