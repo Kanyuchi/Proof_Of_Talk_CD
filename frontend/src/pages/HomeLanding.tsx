@@ -328,7 +328,7 @@ export default function HomeLanding() {
             <div className="hf r d2">
               <div className="ix">02 · The edge</div>
               <h3>AI Concierge</h3>
-              <p>Ask anything about anyone in the room. Walk into every meeting fully briefed from one question, sourced from real data.</p>
+              <p>Ask the questions you care about, on anyone in the room. Walk into every meeting fully briefed, sourced from real data.</p>
             </div>
           </div>
           <div className="list">
