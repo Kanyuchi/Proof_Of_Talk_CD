@@ -28,10 +28,39 @@ def _send_email(
     text: str | None = None,
     attachments: list[dict] | None = None,
 ) -> bool:
-    """Send an email via Resend. Returns True on success, False on failure."""
+    """Send an email via Resend. Returns True on success, False on failure.
+
+    Central gate for ALL outbound mail. EMAIL_MODE controls who actually
+    receives:
+      off       — nothing sends (safe default)
+      allowlist — only addresses in EMAIL_ALLOWLIST (team testing)
+      all       — everyone
+    This replaced the per-function `return # BLOCKED` guards so gating
+    lives in exactly one place and rollout is a config change, not a code
+    change.
+    """
     settings = get_settings()
     if not settings.RESEND_API_KEY:
         logger.debug("RESEND_API_KEY not set — email skipped")
+        return False
+
+    mode = (settings.EMAIL_MODE or "off").strip().lower()
+    if mode == "off":
+        logger.info("EMAIL_MODE=off — skipped send to %s (subject: %s)", to_email, subject[:50])
+        return False
+    if mode == "allowlist":
+        allow = {e.strip().lower() for e in (settings.EMAIL_ALLOWLIST or "").split(",") if e.strip()}
+        if to_email.strip().lower() not in allow:
+            logger.info(
+                "EMAIL_MODE=allowlist — %s not in allowlist, skipped (subject: %s)",
+                to_email, subject[:50],
+            )
+            return False
+    # mode == "all" (or anything else falls through to send only if it
+    # passed the explicit checks above) — for safety, treat unknown modes
+    # as "off".
+    if mode not in ("allowlist", "all"):
+        logger.warning("EMAIL_MODE=%r unrecognised — treating as off, skipped %s", mode, to_email)
         return False
 
     payload: dict = {
@@ -77,7 +106,6 @@ def send_password_reset_email(
         reset_token: JWT reset token.
         app_url: Base URL of the app for the reset link.
     """
-    return  # BLOCKED: platform not yet open to attendees
 
     settings = get_settings()
     if app_url is None:
@@ -139,12 +167,6 @@ def send_match_intro_email(
 ) -> None:
     """Send the 'we found your top match' email after pipeline completes.
 
-    TEMPORARILY DISABLED — emails going out before platform is ready for
-    attendees to sign in. Re-enable when registration flow is live.
-    """
-    return  # BLOCKED: attendees receiving emails but can't access platform yet
-
-    """
     Args:
         to_email: Recipient email address.
         attendee_name: First name (or full name) of the recipient.
@@ -228,7 +250,6 @@ def send_mutual_match_email(
         other_company: Company of the other party.
         app_url: Base URL of the app for the CTA link.
     """
-    return  # BLOCKED: platform not yet open to attendees
 
     settings = get_settings()
     if app_url is None:
@@ -300,7 +321,6 @@ def send_meeting_confirmation_email(
         meeting_location: Meeting location string.
         app_url: Base URL of the app.
     """
-    return  # BLOCKED: platform not yet open to attendees
 
     settings = get_settings()
     if app_url is None:
@@ -376,7 +396,6 @@ def send_morning_schedule_email(
     meetings_today: list of dicts with keys name, company, time, location.
     event_day: "Day 1 — June 2" or "Day 2 — June 3".
     """
-    return  # BLOCKED: platform not yet open to attendees
 
 
 def send_post_event_wrapup_email(
@@ -393,7 +412,6 @@ def send_post_event_wrapup_email(
 
     top_connections: list of dicts with keys name, company, title, linkedin_url.
     """
-    return  # BLOCKED: platform not yet open to attendees
 
 
 def send_followup_nudge_email(
@@ -407,4 +425,3 @@ def send_followup_nudge_email(
 
     connections: list of dicts with keys name, company, linkedin_url.
     """
-    return  # BLOCKED: platform not yet open to attendees

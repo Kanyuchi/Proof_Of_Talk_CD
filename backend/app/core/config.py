@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = "Proof of Talk <matches@proofoftalk.io>"
 
+    # Email gating — controls who actually receives mail. Safe default is
+    # "off" so a deploy never sends until explicitly flipped via env var.
+    #   off       — nothing sends (current behaviour, now config-driven)
+    #   allowlist — only addresses in EMAIL_ALLOWLIST receive (team testing)
+    #   all       — everyone receives (full rollout)
+    # Rollout team→everyone is a Railway env-var change only, no redeploy.
+    EMAIL_MODE: str = "off"
+    EMAIL_ALLOWLIST: str = ""  # comma-separated addresses, used when EMAIL_MODE=allowlist
+
     # Auth
     SECRET_KEY: str = "change-me-in-production"
     # 30 days — covers the multi-week pre-event window + the 2-day event
