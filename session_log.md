@@ -1086,3 +1086,8 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - **Engagement senders updated:** `send_match_intro_email` + `send_welcome_email` pass their existing `magic_token` as `unsubscribe_token`. `send_mutual_match_email` gained a new `magic_token` param and passes it through.
 - **Opt-out enforcement:** `send_match_intro_email` skipped in `matching.py` when `attendee.email_opt_out`. `send_mutual_match_email` skipped in `matches.py` for each recipient independently when `email_opt_out` is True. Password reset + meeting confirmation unaffected (transactional, not gated).
 - Commit `4fa22ee`, pushed to origin/main.
+
+## 2026-05-20 (cont.) — [email + copy] Full 5-email review sent to team; Smart Booking overclaim fixed
+
+- **All 5 emails verified live + sent to team for review.** Reset/welcome/match-intro/mutual-match/meeting-confirmation rendered ([email-*.png]) and sent as real emails (from `Proof of Talk <team@xventures.de>`, reply_to team@, all `delivered`) to shaun@, z@, nupur@ for feedback. From/Reply-To switch verified live via Resend.
+- **Fixed Smart-Booking overclaim (commit 8d38d67).** Landing said "Room and invite locked" — but the app books a time SLOT (one tap, availability checked, 409 on clash) and offers a downloadable .ics; it does NOT book a physical room or auto-send invites (`meeting_location` is free text defaulting to a generic Louvre string). Reworded to "One tap. Both sides' availability checked, your slot locked, calendar invite ready." Also removed an em dash from the default `meeting_location`. Pushed → Netlify + Railway.
