@@ -14,6 +14,12 @@ from whatsapp import (
     send_audio_message as whatsapp_audio_voice_message,
     download_media as whatsapp_download_media
 )
+from pathlib import Path
+from dotenv import load_dotenv
+from recipient_guard import is_allowed_recipient
+
+# Load the gitignored allowlist (.env at the tools/whatsapp-mcp/ root)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Initialize FastMCP server
 mcp = FastMCP("whatsapp")
@@ -175,7 +181,14 @@ def send_message(
             "success": False,
             "message": "Recipient must be provided"
         }
-    
+
+    # Enforce the recipient allowlist (defense-in-depth: never message a non-allowlisted number)
+    if not is_allowed_recipient(recipient):
+        return {
+            "success": False,
+            "message": f"Refused: {recipient} is not in WHATSAPP_ALLOWED_JIDS.",
+        }
+
     # Call the whatsapp_send_message function with the unified recipient parameter
     success, status_message = whatsapp_send_message(recipient, message)
     return {
