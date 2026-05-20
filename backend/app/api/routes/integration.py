@@ -293,6 +293,17 @@ async def ticket_purchased(
     await db.commit()
 
     background_tasks.add_task(_enrich_attendee_background, str(attendee.id))
+    # First-touch welcome email with the attendee's magic link. Fire-and-forget
+    # and gated by EMAIL_MODE (only the team receives until EMAIL_MODE=all), so
+    # wiring it now is safe. Only fires for newly-created attendees — the
+    # already_exists branch above returns before reaching here.
+    from app.services.email import send_welcome_email
+    background_tasks.add_task(
+        send_welcome_email,
+        to_email=email_lower,
+        attendee_name=name,
+        magic_token=attendee.magic_access_token,
+    )
     logger.info("integration: ticket purchased", email=email_lower, attendee_id=str(attendee.id))
 
     return TicketPurchasedResponse(
