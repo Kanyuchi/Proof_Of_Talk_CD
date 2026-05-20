@@ -3,9 +3,9 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Brain, Target, MessageSquare,
-  Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText,
+  Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
-import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink } from "../api/client";
+import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink, claimAccount } from "../api/client";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import GridOrgCard from "../components/GridOrgCard";
 import AttendeeAvatar from "../components/AttendeeAvatar";
@@ -20,6 +20,9 @@ export default function MagicMatches() {
     goals: "",
   });
   const [enrichSaved, setEnrichSaved] = useState(false);
+  const [claimForm, setClaimForm] = useState({ email: "", password: "" });
+  const [claimError, setClaimError] = useState("");
+  const [claimOpen, setClaimOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["magic-matches", token],
@@ -45,6 +48,26 @@ export default function MagicMatches() {
       setEnrichSaved(true);
       queryClient.invalidateQueries({ queryKey: ["attendee", attendeeId] });
       setTimeout(() => setEnrichSaved(false), 3000);
+    },
+  });
+
+  // Claim a full account from this magic link. The token authenticates the
+  // request server-side, so it bypasses the registration ticket gate — this
+  // is how placeholder-email speakers get a real login. On success we store
+  // the JWT and hard-navigate so AuthProvider picks up the session on mount.
+  const claimMutation = useMutation({
+    mutationFn: () => claimAccount({
+      magic_token: token!,
+      password: claimForm.password,
+      email: claimForm.email.trim() || undefined,
+    }),
+    onSuccess: (tok) => {
+      localStorage.setItem("token", tok.access_token);
+      window.location.href = "/matches";
+    },
+    onError: (e: unknown) => {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setClaimError(detail || "Couldn't create your account. Please try again.");
     },
   });
 
@@ -107,6 +130,65 @@ export default function MagicMatches() {
           <FileText className="w-4 h-4" /> View Meeting Prep Brief
         </Link>
       </div>
+
+      {/* Claim full account — token-authenticated, bypasses the ticket gate */}
+      {attendee && (
+        <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.03]">
+          <button
+            onClick={() => setClaimOpen((v) => !v)}
+            className="w-full flex items-center gap-2 text-left"
+          >
+            <KeyRound className="w-5 h-5 text-[#E76315]" />
+            <div className="flex-1">
+              <h3 className="font-semibold">Unlock full access</h3>
+              <p className="text-xs text-white/40">
+                Set a password to message your matches and use the AI Concierge.
+              </p>
+            </div>
+            <span className="text-white/30 text-sm">{claimOpen ? "−" : "+"}</span>
+          </button>
+          {claimOpen && (
+            <div className="space-y-3 mt-4">
+              <div>
+                <label className="text-xs text-white/50 block mb-1">
+                  Email <span className="text-white/25">(only if it's not already on your ticket)</span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="you@company.com"
+                  value={claimForm.email}
+                  onChange={(e) => setClaimForm((p) => ({ ...p, email: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/50 block mb-1">Choose a password</label>
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  value={claimForm.password}
+                  onChange={(e) => setClaimForm((p) => ({ ...p, password: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-white placeholder:text-white/20 outline-none focus:border-[#E76315]/30"
+                />
+                <p className="text-[10px] text-white/30 mt-1">
+                  At least 8 characters, with an uppercase letter and a number.
+                </p>
+              </div>
+              {claimError && <p className="text-xs text-red-400">{claimError}</p>}
+              <button
+                onClick={() => { setClaimError(""); claimMutation.mutate(); }}
+                disabled={claimMutation.isPending || !claimForm.password}
+                className="w-full py-2.5 rounded-lg bg-[#E76315] text-white text-sm font-semibold hover:bg-[#E76315]/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {claimMutation.isPending ? "Creating your account…" : "Create my account"}
+              </button>
+              <p className="text-[10px] text-white/30 text-center">
+                Already have a password? <Link to="/login" className="text-[#E76315] hover:underline">Sign in</Link>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Profile enrichment card */}
       {showEnrichCard && !enrichSaved && (

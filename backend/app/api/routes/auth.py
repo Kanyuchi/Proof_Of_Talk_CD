@@ -13,7 +13,7 @@ from app.core.deps import require_auth
 from app.core.limiter import limiter
 from app.models.user import User
 from app.models.attendee import Attendee
-from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse, ForgotPasswordRequest, ResetPasswordRequest
+from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse, ForgotPasswordRequest, ResetPasswordRequest, ClaimAccountRequest
 from app.services.matching import MatchingEngine
 from app.services.email import send_password_reset_email
 
@@ -136,6 +136,85 @@ async def register(
     # hold the worker until processing finishes, causing edge timeouts
     # on slow OpenAI/Grid pipelines (William Raulin's 504, 2026-05-15).
     asyncio.create_task(_process_attendee_bg(attendee.id))
+
+    token = create_access_token({"sub": str(user.id)})
+    return Token(access_token=token)
+
+
+@router.post("/claim-account", response_model=Token, status_code=201)
+@limiter.limit("5/minute")
+async def claim_account(
+    request: Request,
+    data: ClaimAccountRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Convert an existing attendee (speaker / ticket-holder pre-loaded by ops)
+    into a full login, authenticated by their magic-link token.
+
+    The token proves ownership of the attendee row, so this deliberately
+    bypasses REQUIRE_TICKET_TO_REGISTER — it's how the 25 speakers with
+    @speaker.proofoftalk.io placeholder emails (and any mismatched-email
+    ticket-holder) get a real account without being blocked by the gate.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    if not data.magic_token or len(data.magic_token) < 16:
+        raise HTTPException(status_code=400, detail="Invalid link")
+
+    attendee = (await db.execute(
+        select(Attendee).where(Attendee.magic_access_token == data.magic_token)
+    )).scalars().first()
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+
+    # Already claimed? Send them to sign in instead of creating a duplicate.
+    if (await db.execute(
+        select(User).where(User.attendee_id == attendee.id)
+    )).scalars().first():
+        raise HTTPException(
+            status_code=400,
+            detail="This profile already has an account — please sign in instead.",
+        )
+
+    placeholder = (attendee.email or "").lower().endswith("@speaker.proofoftalk.io")
+    if placeholder and not data.email:
+        raise HTTPException(
+            status_code=400,
+            detail="Please provide your email address to finish setting up your account.",
+        )
+
+    new_email = (data.email or attendee.email).strip().lower()
+
+    # Don't let a claim hijack an email that already belongs to a login.
+    if (await db.execute(
+        select(User).where(User.email == new_email)
+    )).scalars().first():
+        raise HTTPException(
+            status_code=400,
+            detail="That email already has an account — please sign in instead.",
+        )
+
+    # Promote a real email onto the attendee row if they supplied one
+    # (replaces the placeholder). attendees.email is unique, so a collision
+    # with another attendee surfaces as IntegrityError below.
+    if data.email and new_email != (attendee.email or "").lower():
+        attendee.email = new_email
+
+    user = User(
+        email=new_email,
+        hashed_password=get_password_hash(data.password),
+        full_name=attendee.name,
+        attendee_id=attendee.id,
+    )
+    db.add(user)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="That email is already in use. Try signing in, or use a different address.",
+        )
 
     token = create_access_token({"sub": str(user.id)})
     return Token(access_token=token)

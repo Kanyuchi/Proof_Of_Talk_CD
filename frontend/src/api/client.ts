@@ -357,6 +357,19 @@ export async function registerUser(body: {
   return data;
 }
 
+// Claim a full account from a magic-link token (speakers / pre-loaded
+// attendees). Token proves ownership, so this bypasses the registration
+// ticket gate. `email` is only required when the attendee's current email
+// is a placeholder.
+export async function claimAccount(body: {
+  magic_token: string;
+  password: string;
+  email?: string;
+}): Promise<Token> {
+  const { data } = await api.post("/auth/claim-account", body);
+  return data;
+}
+
 export async function forgotPassword(email: string): Promise<{ message: string }> {
   const { data } = await api.post("/auth/forgot-password", { email });
   return data;
