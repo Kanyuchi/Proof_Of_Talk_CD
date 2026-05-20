@@ -408,10 +408,52 @@ func extractMediaInfo(msg *waProto.Message) (mediaType string, filename string, 
 	return "", "", "", nil, nil, nil, 0
 }
 
+// allowedChatJIDs holds the user-part of each allowlisted JID. nil = allow all.
+var allowedChatJIDs map[string]bool
+
+// loadAllowedChatJIDs reads WHATSAPP_ALLOWED_JIDS (comma-separated) into allowedChatJIDs.
+// Empty/unset keeps upstream allow-all behavior.
+func loadAllowedChatJIDs() {
+	raw := strings.TrimSpace(os.Getenv("WHATSAPP_ALLOWED_JIDS"))
+	if raw == "" {
+		allowedChatJIDs = nil
+		return
+	}
+	set := make(map[string]bool)
+	for _, j := range strings.Split(raw, ",") {
+		if j = strings.TrimSpace(j); j != "" {
+			set[chatUserPart(j)] = true
+		}
+	}
+	allowedChatJIDs = set
+}
+
+// chatUserPart returns the bare user/number portion of a JID (before @ and any :device suffix).
+func chatUserPart(jid string) string {
+	if i := strings.IndexByte(jid, '@'); i >= 0 {
+		jid = jid[:i]
+	}
+	if i := strings.IndexByte(jid, ':'); i >= 0 {
+		jid = jid[:i]
+	}
+	return jid
+}
+
+// isAllowedChat reports whether messages from chatJID should be persisted.
+func isAllowedChat(chatJID string) bool {
+	if allowedChatJIDs == nil {
+		return true
+	}
+	return allowedChatJIDs[chatUserPart(chatJID)]
+}
+
 // Handle regular incoming messages with media support
 func handleMessage(client *whatsmeow.Client, messageStore *MessageStore, msg *events.Message, logger waLog.Logger) {
 	// Save message to database
 	chatJID := msg.Info.Chat.String()
+	if !isAllowedChat(chatJID) {
+		return
+	}
 	sender := msg.Info.Sender.User
 
 	// Get appropriate chat name (pass nil for conversation since we don't have one for regular messages)
@@ -787,6 +829,8 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 }
 
 func main() {
+	loadAllowedChatJIDs()
+
 	// Set up logger
 	logger := waLog.Stdout("Client", "INFO", true)
 	logger.Infof("Starting WhatsApp client...")
@@ -1017,6 +1061,9 @@ func handleHistorySync(client *whatsmeow.Client, messageStore *MessageStore, his
 		}
 
 		chatJID := *conversation.ID
+		if !isAllowedChat(chatJID) {
+			continue
+		}
 
 		// Try to parse the JID
 		jid, err := types.ParseJID(chatJID)
