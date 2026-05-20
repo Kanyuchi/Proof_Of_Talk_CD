@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_SES_FROM_EMAIL: str = ""  # Verified SES sender address (legacy, use Resend)
-    APP_PUBLIC_URL: str = "http://54.89.55.202"  # Override when frontend moves
+    APP_PUBLIC_URL: str = "https://meet.proofoftalk.io"  # production frontend (was old AWS IP)
 
     # Resend (primary email provider)
     RESEND_API_KEY: str = ""
@@ -45,7 +45,10 @@ class Settings(BaseSettings):
     #   all       — everyone receives (full rollout)
     # Rollout team→everyone is a Railway env-var change only, no redeploy.
     EMAIL_MODE: str = "off"
-    EMAIL_ALLOWLIST: str = ""  # comma-separated addresses, used when EMAIL_MODE=allowlist
+    # Comma-separated; used when EMAIL_MODE=allowlist. Entries starting with
+    # "@" match a whole domain (e.g. "@proofoftalk.io"), others are exact
+    # addresses. For team testing: "@proofoftalk.io,@xventures.de".
+    EMAIL_ALLOWLIST: str = ""
 
     # Auth
     SECRET_KEY: str = "change-me-in-production"

@@ -49,8 +49,16 @@ def _send_email(
         logger.info("EMAIL_MODE=off — skipped send to %s (subject: %s)", to_email, subject[:50])
         return False
     if mode == "allowlist":
-        allow = {e.strip().lower() for e in (settings.EMAIL_ALLOWLIST or "").split(",") if e.strip()}
-        if to_email.strip().lower() not in allow:
+        entries = [e.strip().lower() for e in (settings.EMAIL_ALLOWLIST or "").split(",") if e.strip()]
+        # Entries starting with "@" match a whole domain (e.g. "@proofoftalk.io"
+        # covers every team member, current and future); other entries are
+        # exact addresses. Domain matching is preferred for the team list so
+        # the env var doesn't need editing as people join.
+        domains = {e[1:] for e in entries if e.startswith("@")}
+        exacts = {e for e in entries if not e.startswith("@")}
+        to_norm = to_email.strip().lower()
+        to_domain = to_norm.rsplit("@", 1)[-1] if "@" in to_norm else ""
+        if to_norm not in exacts and to_domain not in domains:
             logger.info(
                 "EMAIL_MODE=allowlist — %s not in allowlist, skipped (subject: %s)",
                 to_email, subject[:50],
