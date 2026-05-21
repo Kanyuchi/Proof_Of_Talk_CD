@@ -77,3 +77,7 @@
 - Fix (commit fbfd954): moved `/pending-count` above the `/{attendee_id}` catch-all, with a guard comment ("static routes before parameterized"). Added `tests/test_pending_count_route.py` (TestClient + dep overrides for require_auth/get_db, `raise_server_exceptions=False`) — reproduced 422 first, then green. Full suite **97 passed**.
 - Deploy: Railway 149906df SUCCESS (19:15:06 +02:00). Prod verify: `GET /api/v1/matches/pending-count` unauth now **401 "Not authenticated"** (was 422) → route no longer shadowed; authed users get `{"pending_count": N}`.
 - General lesson for this router: any future literal GET path must go ABOVE line ~100 `/{attendee_id}`, or it'll be swallowed and 422.
+
+## 2026-05-21 — [matching] Bulk-rebuild blast guard + [launch] welcome wave 3
+- Guard (commit 85b41d3): `generate_matches_for_attendee` gains `notify` (default True); `generate_all_matches` now passes `notify=False` so a full match rebuild no longer fires one intro email per attendee (~739-blast). Genuine new-match paths (registration, nightly new-attendee cron) keep notify=True. This removes the last footgun blocking the EMAIL_MODE=all launch flip. Test: `tests/test_generate_all_no_notify.py`; full suite **98 passed**. Railway auto-deploy triggered on push.
+- Welcome wave 3: `send_welcome_batch.py --limit 100 --confirm` → **sent=100, failed=0**. Ledger now **261 sent / 462 eligible remaining**.
