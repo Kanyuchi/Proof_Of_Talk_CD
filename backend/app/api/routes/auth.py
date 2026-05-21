@@ -15,7 +15,7 @@ from app.models.user import User
 from app.models.attendee import Attendee
 from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse, ForgotPasswordRequest, ResetPasswordRequest, ClaimAccountRequest
 from app.services.matching import MatchingEngine
-from app.services.email import send_password_reset_email
+from app.services.email import send_password_reset_email, send_welcome_email
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +315,30 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Asy
         )
         logger.info("Password reset email queued for %s", data.email)
     else:
-        logger.info("Password reset requested for non-existent email %s", data.email)
+        # No login account at this email — but this may be one of the ~700
+        # pre-loaded attendees (ticket/speaker rows) who have never claimed an
+        # account, so there's no password to "reset". Plain reset would be a
+        # silent dead-end. If an attendee row with a magic link exists, send the
+        # welcome email instead: its CTA lands on /m/{token}?unlock=1 where they
+        # SET a password (claim the account). This is the self-service recovery
+        # path for the unclaimed pool. Gated by EMAIL_MODE like all automated
+        # mail — no force=True from a request path — so it reaches everyone only
+        # once EMAIL_MODE flips to "all"; until then ops resend via the batch.
+        attendee = (await db.execute(
+            select(Attendee).where(Attendee.email == data.email)
+        )).scalars().first()
+        if attendee and attendee.magic_access_token:
+            asyncio.create_task(
+                asyncio.to_thread(
+                    send_welcome_email,
+                    to_email=attendee.email,
+                    attendee_name=attendee.name or "",
+                    magic_token=attendee.magic_access_token,
+                )
+            )
+            logger.info("forgot-password: unclaimed attendee %s — sent magic-link claim email", data.email)
+        else:
+            logger.info("Password reset requested for non-existent email %s", data.email)
     return {"message": "If that email exists, a reset link has been sent"}
 
 
