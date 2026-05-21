@@ -1,6 +1,7 @@
 # Project State — backend
 
 ## What's Working
+- [auth] Login requires claiming a pre-loaded attendee via the welcome email's magic link (`/m/{token}?unlock=1` → set password). forgot-password now falls back to that claim email for unclaimed attendees instead of silently doing nothing (gated by EMAIL_MODE). As of 2026-05-21: 40/739 claimed, 700 unclaimed.
 - Extasy → RDS pipeline pulls PAID + REDEEMED orders (complimentary tickets included)
 - 38 attendees in RDS + Supabase, 129 matches, 100% enrichment coverage
 - All 38 attendees have `vertical_tags` (1000minds sectors) + `intent_tags` (intents)
