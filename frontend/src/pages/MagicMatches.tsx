@@ -187,7 +187,7 @@ export default function MagicMatches() {
               <button
                 onClick={() => { setClaimError(""); claimMutation.mutate(); }}
                 disabled={claimMutation.isPending || !claimForm.password}
-                className="w-full py-2.5 rounded-lg bg-[#E76315] text-white text-sm font-semibold hover:bg-[#E76315]/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="w-full py-2.5 rounded-lg bg-[#E76315] text-white text-sm font-semibold hover:bg-[#E76315]/90 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
               >
                 {claimMutation.isPending ? "Creating your account…" : "Create my account"}
               </button>
