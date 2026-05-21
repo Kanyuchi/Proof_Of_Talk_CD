@@ -18,7 +18,7 @@
 - Supabase Edge Functions for real-time match notifications
 
 ## Done ✓
-- [sync] All Sync Health errors + partials fixed (commit 8293c9b): connection-drop retry (run_with_db_retry) for grid_audit + match_refresh; extasy mis-count fixed + error_reasons persisted; speaker dup-row collision handled. Verify on next nightly run (02:00–03:30 UTC). (2026-05-21)
+- [sync] All Sync Health errors + partials fixed (commit 8293c9b) AND smoke-tested green on prod (20e8026): all 4 jobs flipped sync_status to ok — match_refresh (32 matches), speakers (errors 1→0), extasy (errors 58→0), grid_audit (terminal INSERT persisted). connection-drop retry (run_with_db_retry); extasy mis-count fixed + error_reasons persisted; speaker dup-row collision handled. (2026-05-21)
 - [matching] Bulk-rebuild blast guard: `generate_all_matches` passes `notify=False` so a full rebuild can't email ~739 intros — unblocks EMAIL_MODE=all (commit 85b41d3) (2026-05-21)
 - [launch] Welcome wave 3 sent: 100/100, 0 failed (261 total sent / 462 remaining) (2026-05-21)
 - [matches] Fixed `/pending-count` 422 (route shadowing by `/{attendee_id}`) — DEPLOYED + verified on prod (commit fbfd954, Railway 149906df) (2026-05-21)
