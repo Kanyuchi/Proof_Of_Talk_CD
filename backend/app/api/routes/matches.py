@@ -69,6 +69,34 @@ async def _build_match_response(db: AsyncSession, match: Match, viewer_id: UUID)
     return resp
 
 
+# IMPORTANT: static routes MUST be declared before the parameterized
+# "/{attendee_id}" catch-all below. Starlette matches in declaration order, so
+# a static path placed after it (e.g. "/pending-count") gets captured as an
+# attendee_id and 422s on UUID validation. Keep all literal GET paths up here.
+@router.get("/pending-count")
+async def get_pending_match_count(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Count matches where the other party accepted but the current user hasn't responded yet."""
+    if not user.attendee_id:
+        return {"pending_count": 0}
+
+    aid = user.attendee_id
+    result = await db.execute(
+        select(func.count(Match.id)).where(
+            or_(
+                # I'm attendee_a, other accepted, I haven't responded
+                and_(Match.attendee_a_id == aid, Match.status_a == "pending", Match.status_b == "accepted"),
+                # I'm attendee_b, other accepted, I haven't responded
+                and_(Match.attendee_b_id == aid, Match.status_b == "pending", Match.status_a == "accepted"),
+            )
+        )
+    )
+    count = result.scalar() or 0
+    return {"pending_count": count}
+
+
 @router.get("/{attendee_id}", response_model=MatchListResponse)
 async def get_matches(
     attendee_id: UUID,
@@ -377,30 +405,6 @@ async def update_profile_via_magic_link(
 
     await db.commit()
     return {"status": "updated"}
-
-
-@router.get("/pending-count")
-async def get_pending_match_count(
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_auth),
-):
-    """Count matches where the other party accepted but the current user hasn't responded yet."""
-    if not user.attendee_id:
-        return {"pending_count": 0}
-
-    aid = user.attendee_id
-    result = await db.execute(
-        select(func.count(Match.id)).where(
-            or_(
-                # I'm attendee_a, other accepted, I haven't responded
-                and_(Match.attendee_a_id == aid, Match.status_a == "pending", Match.status_b == "accepted"),
-                # I'm attendee_b, other accepted, I haven't responded
-                and_(Match.attendee_b_id == aid, Match.status_b == "pending", Match.status_a == "accepted"),
-            )
-        )
-    )
-    count = result.scalar() or 0
-    return {"pending_count": count}
 
 
 @router.post("/generate-tokens", status_code=200)
