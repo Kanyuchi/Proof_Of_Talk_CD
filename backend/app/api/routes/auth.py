@@ -321,9 +321,15 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Asy
         # silent dead-end. If an attendee row with a magic link exists, send the
         # welcome email instead: its CTA lands on /m/{token}?unlock=1 where they
         # SET a password (claim the account). This is the self-service recovery
-        # path for the unclaimed pool. Gated by EMAIL_MODE like all automated
-        # mail — no force=True from a request path — so it reaches everyone only
-        # once EMAIL_MODE flips to "all"; until then ops resend via the batch.
+        # path for the unclaimed pool.
+        #
+        # force=True is a DELIBERATE, scoped exception to "never force from a
+        # request path". It bypasses EMAIL_MODE so the recovery works while the
+        # bulk automated triggers (match intros, mutual/meeting alerts) stay
+        # gated on allowlist. Safe because this send is (a) user-initiated,
+        # (b) rate-limited (3/min), and (c) only ever addressed to the email
+        # already on the attendee row — it can't be aimed at an arbitrary
+        # address. Same force path the operator welcome batch uses.
         attendee = (await db.execute(
             select(Attendee).where(Attendee.email == data.email)
         )).scalars().first()
@@ -334,9 +340,10 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Asy
                     to_email=attendee.email,
                     attendee_name=attendee.name or "",
                     magic_token=attendee.magic_access_token,
+                    force=True,
                 )
             )
-            logger.info("forgot-password: unclaimed attendee %s — sent magic-link claim email", data.email)
+            logger.info("forgot-password: unclaimed attendee %s — sent magic-link claim email (force)", data.email)
         else:
             logger.info("Password reset requested for non-existent email %s", data.email)
     return {"message": "If that email exists, a reset link has been sent"}

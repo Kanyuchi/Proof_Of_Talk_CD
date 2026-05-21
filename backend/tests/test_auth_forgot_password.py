@@ -75,6 +75,9 @@ async def test_unclaimed_attendee_gets_magic_link_welcome_email():
     _, kwargs = welcome.call_args
     assert kwargs["to_email"] == "someone@example.com"
     assert kwargs["magic_token"] == "tok-123"
+    # force=True bypasses the EMAIL_MODE gate so the unclaimed pool can
+    # self-recover while bulk automated triggers stay gated on allowlist.
+    assert kwargs["force"] is True
     reset.assert_not_called()
     # Response is identical to the user case (no account enumeration).
     assert "reset link" in out["message"]
