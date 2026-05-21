@@ -364,6 +364,11 @@ export default function AttendeeMatches() {
                   <div className="text-xs text-white/30">Match Score</div>
                   <div className="text-lg font-bold text-[#E76315]">
                     {(match.overall_score * 100).toFixed(0)}%
+                    {match.tier && (
+                      <span className="ml-2 px-2 py-0.5 rounded-md text-[10px] uppercase tracking-wide border border-white/10 text-white/40">
+                        {match.tier}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
