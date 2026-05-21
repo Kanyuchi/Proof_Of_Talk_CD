@@ -219,7 +219,11 @@ export default function MyMatches() {
                 ) : (
                   <span className="text-white">the missing fields</span>
                 )}{" "}
-                gives it much more to work with.
+                gives it much more to work with.{" "}
+                <span className="text-white font-medium">Enrich your profile to unlock more profiles</span>
+                {lockedCount > 0 ? (
+                  <> — <span className="text-[#E76315] font-medium">{lockedCount} more</span> waiting{nextTierAt ? ` (up to ${nextTierAt} at the next tier)` : ""}.</>
+                ) : "."}
               </p>
               <Link
                 to="/profile"
