@@ -472,6 +472,12 @@ def _company_signal_set(attendee: dict) -> set[str]:
             if company.endswith(suffix):
                 company = company[: -len(suffix)].strip()
         signals.add(company)
+        # Space-collapsed variant so "X Ventures" (stored) matches "xventures"
+        # on the page, and vice-versa (the haystack is also space-collapsed in
+        # _verify_company_match). Fixes Karl Rusche ('xventures' vs "X Ventures")
+        # and Nadine Gisdon ('wealth3capital' vs "Wealth3 Capital").
+        if " " in company:
+            signals.add(company.replace(" ", ""))
         # Also add first significant word ("Coinbase Asset Management" → "coinbase")
         first_word = company.split()[0] if company.split() else ""
         if len(first_word) >= 4:
@@ -502,8 +508,12 @@ def _verify_company_match(scraped: dict, signals: set[str]) -> tuple[bool, str |
             for e in (scraped.get("experiences") or [])[:3]
         ),
     ]).lower()
+    # Space-collapsed haystack so a space-free stored company ('xventures')
+    # matches a spaced page rendering ("X Ventures"). Substring check runs
+    # against both the original and the collapsed text.
+    haystack_nospace = haystack.replace(" ", "")
     for s in signals:
-        if s in haystack:
+        if s in haystack or s.replace(" ", "") in haystack_nospace:
             return True, f"signal '{s}' matched"
     return False, f"no signal in {sorted(signals)} matched scraped data"
 
