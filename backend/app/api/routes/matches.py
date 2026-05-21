@@ -1,5 +1,6 @@
 import secrets
 from uuid import UUID
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -18,6 +19,8 @@ from app.schemas.attendee import (
 )
 from app.services.matching import MatchingEngine
 from app.services.slots import mutual_free_slots, has_conflict
+from app.services.match_visibility import ViewerMatch, order_and_cap, tier_limit, next_tier_unlock
+from app.services.concierge import profile_data_quality, compute_completeness_pct
 from app.core.deps import require_auth, require_admin
 from app.models.user import User
 
@@ -36,134 +39,171 @@ def _compute_overall_status(status_a: str, status_b: str) -> str:
     return "pending"
 
 
+def _to_viewer_match(match: Match, viewer_id: UUID) -> ViewerMatch:
+    """Orient a Match row from `viewer_id`'s perspective for ordering/cap."""
+    i_am_a = match.attendee_a_id == viewer_id
+    return ViewerMatch(
+        match=match,
+        viewer_status=match.status_a if i_am_a else match.status_b,
+        other_status=match.status_b if i_am_a else match.status_a,
+        viewer_deferred_at=match.deferred_a_at if i_am_a else match.deferred_b_at,
+        overall_score=match.overall_score or 0.0,
+    )
+
+
+async def _build_match_response(db: AsyncSession, match: Match, viewer_id: UUID) -> MatchResponse:
+    """Build a privacy-redacted MatchResponse for the OTHER party, with free slots."""
+    other_id = (
+        match.attendee_b_id if match.attendee_a_id == viewer_id else match.attendee_a_id
+    )
+    matched = await db.get(Attendee, other_id)
+    resp = MatchResponse.model_validate(match)
+    if matched:
+        is_mutual = match.status_a == "accepted" and match.status_b == "accepted"
+        att_dict = AttendeeResponse.model_validate(matched).model_dump()
+        resp.matched_attendee = AttendeeResponse(
+            **redact_for_privacy(att_dict, is_mutual_match=is_mutual)
+        )
+        if is_mutual and not match.meeting_time:
+            resp.mutual_free_slots = await mutual_free_slots(db, viewer_id, other_id)
+    return resp
+
+
 @router.get("/{attendee_id}", response_model=MatchListResponse)
 async def get_matches(
     attendee_id: UUID,
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_auth),
+    user: User = Depends(require_auth),
 ):
-    """Get AI-generated match recommendations for an attendee."""
+    """Get match recommendations, capped by the viewer's completeness tier.
+
+    Admins bypass the cap and see the full pool (with tier labels) for any
+    attendee. Regular viewers get a tier-limited review window plus all
+    incoming requests and committed matches.
+    """
     attendee = await db.get(Attendee, attendee_id)
     if not attendee:
         raise HTTPException(status_code=404, detail="Attendee not found")
 
-    # Two-pass fetch:
-    #   1. Top-N by score (the AI's best recommendations).
-    #   2. ANY match where the other party has clicked "I'd like to meet"
-    #      but this user hasn't responded yet — regardless of score rank.
-    # Without (2), pending-request matches whose score sits below the
-    # cutoff are invisible to the recipient (May 13 incident:
-    # Sithum→Zohair, score 0.78, rank ~12 of 46 → never reached Zohair's
-    # frontend). The Requests tab depends on these rows being present.
     result = await db.execute(
-        select(Match)
-        .where(
-            or_(
-                Match.attendee_a_id == attendee_id,
-                Match.attendee_b_id == attendee_id,
-            )
+        select(Match).where(
+            or_(Match.attendee_a_id == attendee_id, Match.attendee_b_id == attendee_id)
             & (Match.hidden_by_user.is_(False))
         )
-        .order_by(Match.overall_score.desc())
-        .limit(limit)
     )
-    matches = list(result.scalars().all())
-    matched_ids = {m.id for m in matches}
+    rows = list(result.scalars().all())
 
-    # Append any pending-request matches not already in the top-N.
-    request_result = await db.execute(
-        select(Match)
-        .where(
-            and_(
-                Match.hidden_by_user.is_(False),
-                or_(
-                    and_(Match.attendee_a_id == attendee_id,
-                         Match.status_a == "pending",
-                         Match.status_b == "accepted"),
-                    and_(Match.attendee_b_id == attendee_id,
-                         Match.status_b == "pending",
-                         Match.status_a == "accepted"),
-                ),
-            )
+    tier = profile_data_quality(attendee)
+    pct = compute_completeness_pct(attendee)
+
+    # Admins: full pool, score-ordered, no cap.
+    if getattr(user, "is_admin", False):
+        rows.sort(key=lambda m: m.overall_score or 0.0, reverse=True)
+        responses = [await _build_match_response(db, m, attendee_id) for m in rows[:limit]]
+        return MatchListResponse(
+            matches=responses, attendee_id=attendee_id, tier=tier,
+            visible_count=len(responses), locked_count=0,
+            next_tier_at=None, completeness_pct=pct,
         )
-        .order_by(Match.overall_score.desc())
+
+    vms = [_to_viewer_match(m, attendee_id) for m in rows]
+    visible, locked = order_and_cap(vms, tier_limit(tier))
+    responses = [await _build_match_response(db, vm.match, attendee_id) for vm in visible]
+    return MatchListResponse(
+        matches=responses, attendee_id=attendee_id, tier=tier,
+        visible_count=len(responses), locked_count=locked,
+        next_tier_at=next_tier_unlock(tier), completeness_pct=pct,
     )
-    for m in request_result.scalars().all():
-        if m.id not in matched_ids:
-            matches.append(m)
-            matched_ids.add(m.id)
-
-    match_responses = []
-    for match in matches:
-        # Always return the OTHER party's profile, regardless of a/b position
-        other_id = (
-            match.attendee_b_id
-            if match.attendee_a_id == attendee_id
-            else match.attendee_a_id
-        )
-        matched = await db.get(Attendee, other_id)
-        resp = MatchResponse.model_validate(match)
-        if matched:
-            is_mutual = match.status_a == "accepted" and match.status_b == "accepted"
-            att_dict = AttendeeResponse.model_validate(matched).model_dump()
-            resp.matched_attendee = AttendeeResponse(**redact_for_privacy(att_dict, is_mutual_match=is_mutual))
-            if is_mutual and not match.meeting_time:
-                resp.mutual_free_slots = await mutual_free_slots(db, attendee_id, other_id)
-        match_responses.append(resp)
-
-    return MatchListResponse(matches=match_responses, attendee_id=attendee_id)
 
 
 @router.get("/m/{token}", response_model=MatchListResponse)
 async def get_matches_by_magic_link(
     token: str,
-    limit: int = Query(10, ge=1, le=50),
+    limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get matches via magic link — no login required."""
+    """Get matches via magic link — no login required. Cap applies (the
+    token's own attendee is the viewer)."""
     if not token or len(token) < 16:
         raise HTTPException(status_code=400, detail="Invalid link")
 
-    result = await db.execute(
-        select(Attendee).where(Attendee.magic_access_token == token)
-    )
+    result = await db.execute(select(Attendee).where(Attendee.magic_access_token == token))
     attendee = result.scalars().first()
     if not attendee:
         raise HTTPException(status_code=404, detail="Invalid or expired link")
 
     match_result = await db.execute(
-        select(Match)
-        .where(
-            or_(
-                Match.attendee_a_id == attendee.id,
-                Match.attendee_b_id == attendee.id,
-            )
+        select(Match).where(
+            or_(Match.attendee_a_id == attendee.id, Match.attendee_b_id == attendee.id)
             & (Match.hidden_by_user.is_(False))
         )
-        .order_by(Match.overall_score.desc())
-        .limit(limit)
     )
-    matches = match_result.scalars().all()
+    rows = list(match_result.scalars().all())
 
-    match_responses = []
-    for match in matches:
-        other_id = (
-            match.attendee_b_id
-            if match.attendee_a_id == attendee.id
-            else match.attendee_a_id
-        )
-        matched = await db.get(Attendee, other_id)
-        resp = MatchResponse.model_validate(match)
-        if matched:
-            is_mutual = match.status_a == "accepted" and match.status_b == "accepted"
-            att_dict = AttendeeResponse.model_validate(matched).model_dump()
-            resp.matched_attendee = AttendeeResponse(**redact_for_privacy(att_dict, is_mutual_match=is_mutual))
-            if is_mutual and not match.meeting_time:
-                resp.mutual_free_slots = await mutual_free_slots(db, attendee.id, other_id)
-        match_responses.append(resp)
+    tier = profile_data_quality(attendee)
+    pct = compute_completeness_pct(attendee)
+    vms = [_to_viewer_match(m, attendee.id) for m in rows]
+    visible, locked = order_and_cap(vms, tier_limit(tier))
+    responses = [await _build_match_response(db, vm.match, attendee.id) for vm in visible]
+    return MatchListResponse(
+        matches=responses, attendee_id=attendee.id, tier=tier,
+        visible_count=len(responses), locked_count=locked,
+        next_tier_at=next_tier_unlock(tier), completeness_pct=pct,
+    )
 
-    return MatchListResponse(matches=match_responses, attendee_id=attendee.id)
+
+class MagicDeferRequest(BaseModel):
+    match_id: UUID
+
+
+@router.patch("/{match_id}/defer", response_model=MatchResponse)
+async def defer_match(
+    match_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Soft-defer ("Maybe later") — stamps the viewer's side; the card leaves
+    the visible window and resurfaces at the back once fresh ones run out."""
+    match = await db.get(Match, match_id)
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+    now = datetime.utcnow()
+    if user.attendee_id and str(user.attendee_id) == str(match.attendee_a_id):
+        match.deferred_a_at = now
+    elif user.attendee_id and str(user.attendee_id) == str(match.attendee_b_id):
+        match.deferred_b_at = now
+    else:
+        raise HTTPException(status_code=403, detail="Not your match")
+    await db.commit()
+    await db.refresh(match)
+    return await _build_match_response(db, match, user.attendee_id)
+
+
+@router.patch("/m/{token}/defer", response_model=MatchResponse)
+async def defer_match_by_magic_link(
+    token: str,
+    data: MagicDeferRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Magic-link soft-defer — no login required."""
+    if not token or len(token) < 16:
+        raise HTTPException(status_code=400, detail="Invalid link")
+    result = await db.execute(select(Attendee).where(Attendee.magic_access_token == token))
+    attendee = result.scalars().first()
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    match = await db.get(Match, data.match_id)
+    if not match or attendee.id not in (match.attendee_a_id, match.attendee_b_id):
+        raise HTTPException(status_code=404, detail="Match not found")
+    now = datetime.utcnow()
+    if match.attendee_a_id == attendee.id:
+        match.deferred_a_at = now
+    else:
+        match.deferred_b_at = now
+    await db.commit()
+    await db.refresh(match)
+    return await _build_match_response(db, match, attendee.id)
 
 
 def _unsub_html(title: str, heading: str, body: str, link_href: str | None = None, link_label: str | None = None) -> str:

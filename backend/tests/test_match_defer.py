@@ -46,3 +46,59 @@ def test_build_deep_ranked_is_gpt_free_and_templated():
     assert all(r["shared_context"].get("tier") == "deep" for r in ranked)
     # candidate_index is 1-based and within range
     assert sorted(r["candidate_index"] for r in ranked) == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_defer_stamps_viewer_a_side():
+    from app.api.routes.matches import defer_match
+    match = SimpleNamespace(
+        id="m1", attendee_a_id="A", attendee_b_id="B",
+        deferred_a_at=None, deferred_b_at=None,
+        status_a="pending", status_b="pending", meeting_time=None,
+    )
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=match)
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    user = SimpleNamespace(attendee_id="A", is_admin=False)
+    with patch("app.api.routes.matches._build_match_response", AsyncMock(return_value="ok")):
+        out = await defer_match("m1", db, user)
+    assert match.deferred_a_at is not None
+    assert match.deferred_b_at is None
+    assert out == "ok"
+
+
+@pytest.mark.asyncio
+async def test_defer_stamps_viewer_b_side():
+    from app.api.routes.matches import defer_match
+    match = SimpleNamespace(
+        id="m1", attendee_a_id="A", attendee_b_id="B",
+        deferred_a_at=None, deferred_b_at=None,
+        status_a="pending", status_b="pending", meeting_time=None,
+    )
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=match)
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    user = SimpleNamespace(attendee_id="B", is_admin=False)
+    with patch("app.api.routes.matches._build_match_response", AsyncMock(return_value="ok")):
+        await defer_match("m1", db, user)
+    assert match.deferred_b_at is not None
+    assert match.deferred_a_at is None
+
+
+@pytest.mark.asyncio
+async def test_defer_rejects_non_party():
+    from fastapi import HTTPException
+    from app.api.routes.matches import defer_match
+    match = SimpleNamespace(
+        id="m1", attendee_a_id="A", attendee_b_id="B",
+        deferred_a_at=None, deferred_b_at=None,
+        status_a="pending", status_b="pending", meeting_time=None,
+    )
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=match)
+    user = SimpleNamespace(attendee_id="Z", is_admin=False)
+    with pytest.raises(HTTPException) as exc:
+        await defer_match("m1", db, user)
+    assert exc.value.status_code == 403
