@@ -4,9 +4,8 @@
 
 ## Now (immediate next steps)
 1. [launch] Continue welcome waves — 162 sent / 561 eligible remaining (~100/day from warm team@xventures.de via `send_welcome_batch.py --limit 100 --confirm`)
-2. [auth] Pre-launch: fix `GET /api/v1/matches/pending-count` returning 422 for live users (missing/!required query param — seen in prod logs 2026-05-21)
-3. [auth] EMAIL_MODE=all is now a pure LAUNCH decision (self-recovery already solved surgically via forced forgot-password). Before flipping, neutralise the `generate_all_matches` 739-blast footgun (it emails every attendee's top match).
-4. Confirm attendee count with Chiara (email drafted — 24 valid from Extasy API)
+2. [auth] EMAIL_MODE=all is now a pure LAUNCH decision (self-recovery already solved surgically via forced forgot-password). Before flipping, neutralise the `generate_all_matches` 739-blast footgun (it emails every attendee's top match).
+3. Confirm attendee count with Chiara (email drafted — 24 valid from Extasy API)
 3. Verify frontend at meet.proofoftalk.io shows vertical_tags in attendee profiles
 4. Re-generate matches using vertical_tags as a matching signal (improve match quality)
 
@@ -19,6 +18,7 @@
 - Supabase Edge Functions for real-time match notifications
 
 ## Done ✓
+- [matches] Fixed `/pending-count` 422 (route shadowing by `/{attendee_id}`) — DEPLOYED + verified on prod (commit fbfd954, Railway 149906df) (2026-05-21)
 - [auth] forgot-password self-recovery DEPLOYED (commit 3c303de, Railway c8a80f7c) — unclaimed attendees get a force-sent magic-link claim email; EMAIL_MODE stays allowlist so bulk triggers remain gated (2026-05-21)
 - [launch] Welcome wave 2 sent: 100/100, 0 failed; Mauricio Magaldi Suguihura included (2026-05-21)
 - [auth] forgot-password no longer dead-ends the 700 unclaimed attendees — falls back to magic-link claim email; resent Tommi Vuorenmaa's welcome (2026-05-21)
