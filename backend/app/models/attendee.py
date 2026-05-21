@@ -120,3 +120,9 @@ class Match(Base):
     decline_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     hidden_by_user: Mapped[bool] = mapped_column(Boolean, default=False)
     explanation_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Pool tier — "curated" (GPT-explained top) | "deep" (similarity-only tail)
+    tier: Mapped[str] = mapped_column(String(20), default="curated", server_default="curated")
+    # Per-viewer "Maybe later" soft-defer timestamps (mirrors status_a/status_b)
+    deferred_a_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    deferred_b_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
