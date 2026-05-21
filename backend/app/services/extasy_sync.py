@@ -10,6 +10,7 @@ Called from POST /api/v1/dashboard/sync-extasy (admin only).
 import csv
 import io
 import logging
+from collections import Counter
 from datetime import datetime, timezone
 
 import httpx
@@ -20,6 +21,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.attendee import Attendee, TicketType
 
 logger = logging.getLogger(__name__)
+
+# Connection-drop errors that mean the SESSION is dead, not that one row's
+# data is bad. These must NOT be caught by the per-row handler — if they were,
+# every remaining row in the chunk would raise the same error on the poisoned
+# session and get counted as a per-row "error", inflating the error total far
+# beyond the chunk's true size (the May-2026 "58 errors / 1 chunk_failed"
+# pattern: ~28 phantom per-row errors + 30 chunk-level errors from a SINGLE
+# pooler drop). Re-raising lets the chunk-level handler retry on a fresh
+# session instead. Mirrors DB_RETRYABLE_ERRORS in app.core.database.
+_CONNECTION_ERRORS = (DBAPIError, OperationalError, InterfaceError)
 
 # ── Extasy config ──────────────────────────────────────────────────────────────
 EXTASY_EVENT_ID = "32b1b684-0e87-4633-92ef-b47272aa3fce"
@@ -150,6 +161,10 @@ async def sync_extasy_to_db() -> dict:
     chunks_failed = 0
     inserted_ids: list[str] = []
     seen_emails: set[str] = set()
+    # Bucketed reasons for every error (per-row data errors AND chunk-level
+    # connection failures) so a PARTIAL run is diagnosable from sync_status
+    # alone — previously only counts were persisted.
+    error_reasons: Counter = Counter()
 
     # Chunk size of 30: small enough that a pooler drop loses ≤30 rows of
     # progress, large enough that session-create overhead stays in the noise.
@@ -157,33 +172,61 @@ async def sync_extasy_to_db() -> dict:
 
     for chunk_start in range(0, len(valid_orders), CHUNK_SIZE):
         chunk = valid_orders[chunk_start:chunk_start + CHUNK_SIZE]
-        try:
-            async with async_session() as db:
-                chunk_stats = await _process_order_chunk(
-                    db, chunk, seen_emails, inserted_ids,
-                )
+        chunk_label = f"{chunk_start}-{chunk_start + len(chunk) - 1}"
+
+        # One transient pooler drop should not lose a whole chunk: try the
+        # chunk on a fresh session, retry ONCE on a connection error before
+        # giving up. `seen_emails` makes a retry idempotent (a re-processed
+        # row is skipped as already-seen), and a rolled-back chunk wrote
+        # nothing, so no partial state leaks between attempts.
+        succeeded = False
+        last_conn_exc: Exception | None = None
+        for attempt in (1, 2):
+            try:
+                async with async_session() as db:
+                    chunk_stats = await _process_order_chunk(
+                        db, chunk, seen_emails, inserted_ids, error_reasons,
+                    )
+                    await db.commit()
+                # Only credit the chunk's work AFTER the commit succeeds, so a
+                # failed commit can't inflate inserted/backfilled with rows that
+                # never actually persisted.
                 inserted   += chunk_stats["inserted"]
                 upgraded   += chunk_stats["upgraded"]
                 backfilled += chunk_stats["backfilled"]
                 skipped    += chunk_stats["skipped"]
                 errors     += chunk_stats["errors"]
-                await db.commit()
-        except (DBAPIError, OperationalError, InterfaceError) as exc:
-            # Connection-level failure (pooler drop, server reset, asyncpg
-            # ConnectionDoesNotExistError, etc). Lose this chunk, keep going
-            # with a fresh session for the next one.
+                succeeded = True
+                break
+            except _CONNECTION_ERRORS as exc:
+                last_conn_exc = exc
+                logger.warning(
+                    "extasy_sync: chunk %s connection drop on attempt %d/2: %s",
+                    chunk_label, attempt, exc,
+                )
+                continue
+            except Exception as exc:
+                # Non-connection chunk failure — don't retry (would just fail
+                # again). Record and move on.
+                chunks_failed += 1
+                errors += len(chunk)
+                error_reasons[f"chunk_failed/{type(exc).__name__}: {str(exc).splitlines()[0][:120]}"] += 1
+                logger.error("extasy_sync: chunk %s unexpected failure: %s", chunk_label, exc)
+                succeeded = True  # handled; skip the post-loop failure record
+                break
+
+        if not succeeded:
+            # Both attempts hit a connection drop. Lose this chunk, continue
+            # with the next on a fresh session.
             chunks_failed += 1
             errors += len(chunk)
+            error_reasons[
+                f"chunk_failed/{type(last_conn_exc).__name__}: "
+                f"{str(last_conn_exc).splitlines()[0][:120]}"
+            ] += 1
             logger.error(
-                "extasy_sync: chunk %d-%d failed on connection error, will continue with fresh session: %s",
-                chunk_start, chunk_start + len(chunk) - 1, exc,
-            )
-        except Exception as exc:
-            chunks_failed += 1
-            errors += len(chunk)
-            logger.error(
-                "extasy_sync: chunk %d-%d unexpected failure: %s",
-                chunk_start, chunk_start + len(chunk) - 1, exc,
+                "extasy_sync: chunk %s failed after 2 connection-drop attempts, "
+                "skipping chunk: %s", chunk_label, last_conn_exc,
             )
 
     stats = {
@@ -195,6 +238,7 @@ async def sync_extasy_to_db() -> dict:
         "skipped":        skipped,
         "errors":         errors,
         "chunks_failed":  chunks_failed,
+        "error_reasons":  dict(error_reasons),
         "inserted_ids":   inserted_ids,
     }
 
@@ -239,9 +283,17 @@ async def _process_order_chunk(
     chunk: list[dict],
     seen_emails: set[str],
     inserted_ids: list[str],
+    error_reasons: Counter | None = None,
 ) -> dict:
     """Process one chunk of orders within a single session. Per-row
-    SAVEPOINTs continue to isolate per-row data errors as before."""
+    SAVEPOINTs continue to isolate per-row data errors as before.
+
+    `error_reasons` (a Counter) accumulates a bucketed reason string for each
+    per-row error so the caller can persist WHY rows failed (not just a count)
+    into sync_status.stats — making a PARTIAL run diagnosable next morning.
+    """
+    if error_reasons is None:
+        error_reasons = Counter()
     inserted = upgraded = backfilled = skipped = errors = 0
 
     for order in chunk:
@@ -371,6 +423,13 @@ async def _process_order_chunk(
                     await db.flush()   # get the auto-assigned UUID
                     inserted_ids.append(str(attendee.id))
                     inserted += 1
+        except _CONNECTION_ERRORS:
+            # The SESSION/connection is dead (pooler drop, server reset). Do
+            # NOT swallow this as a per-row error — every remaining row in the
+            # chunk would raise the same thing on the poisoned session and
+            # inflate the error count. Re-raise so the chunk-level handler can
+            # abandon this session and retry the chunk on a fresh one.
+            raise
         except IntegrityError as exc:
             # Rare race: SELECT didn't find the row but INSERT hit the unique
             # index. Savepoint already rolled back; outer transaction is healthy.
@@ -380,9 +439,11 @@ async def _process_order_chunk(
                 order_id, email, exc,
             )
             errors += 1
+            error_reasons[f"IntegrityError: {str(exc).splitlines()[0][:120]}"] += 1
         except Exception as exc:
             logger.error("extasy_sync: error processing order %s: %s", order_id, exc)
             errors += 1
+            error_reasons[f"{type(exc).__name__}: {str(exc).splitlines()[0][:120]}"] += 1
 
     return {
         "inserted":   inserted,

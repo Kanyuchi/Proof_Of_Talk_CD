@@ -937,7 +937,7 @@ async def refresh_matches_for_new_attendees(db: AsyncSession, top_k: int = 10) -
     extra session-open calls.
     """
     from sqlalchemy.exc import DBAPIError, OperationalError, InterfaceError
-    from app.core.database import async_session
+    from app.core.database import async_session, run_with_db_retry
 
     admin_ids_subq = select(User.attendee_id).where(
         User.is_admin.is_(True),
@@ -946,32 +946,27 @@ async def refresh_matches_for_new_attendees(db: AsyncSession, top_k: int = 10) -
     matched_a = select(Match.attendee_a_id)
     matched_b = select(Match.attendee_b_id)
 
-    # Fetch the target ID list. Retry once on a connection drop so the
-    # daily cron doesn't die on the first SELECT.
-    target_ids: list = []
-    for attempt in (1, 2):
-        try:
-            res = await db.execute(
-                select(Attendee.id).where(
-                    Attendee.embedding.isnot(None),
-                    ~Attendee.id.in_(admin_ids_subq),
-                    ~Attendee.id.in_(matched_a),
-                    ~Attendee.id.in_(matched_b),
-                )
+    # Fetch the target ID list in its OWN fresh session, retrying once on a
+    # connection drop. Previously this ran on the long-lived `db` session
+    # passed in by the cron wrapper; on a drop the old retry opened a fresh
+    # session but `break`'d out WITHOUT re-running the SELECT, so target_ids
+    # stayed empty and the whole refresh silently produced zero matches.
+    # Running the SELECT inside run_with_db_retry actually re-executes it on
+    # the fresh session, closing that gap.
+    async def _fetch_targets(session) -> list:
+        res = await session.execute(
+            select(Attendee.id).where(
+                Attendee.embedding.isnot(None),
+                ~Attendee.id.in_(admin_ids_subq),
+                ~Attendee.id.in_(matched_a),
+                ~Attendee.id.in_(matched_b),
             )
-            target_ids = list(res.scalars().all())
-            break
-        except (DBAPIError, OperationalError, InterfaceError):
-            if attempt == 2:
-                raise
-            await asyncio.sleep(1.0)
-            # Refresh the session for the retry
-            async with async_session() as fresh:
-                db = fresh
-                break  # fall through to per-target loop, will retry below if needed
-    else:
-        # Should not be reached because we either break or raise above.
-        target_ids = []
+        )
+        return list(res.scalars().all())
+
+    target_ids: list = await run_with_db_retry(
+        _fetch_targets, label="refresh_matches: target fetch"
+    )
 
     total_new_matches = 0
     failed = 0

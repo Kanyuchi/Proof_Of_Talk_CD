@@ -26,14 +26,13 @@ import asyncio
 import httpx
 from dotenv import load_dotenv
 from sqlalchemy import select, desc
-from sqlalchemy.exc import DBAPIError, OperationalError, InterfaceError
 
 # Load .env so the service works whether invoked via uvicorn (env already
 # present), the APScheduler hook (env already present), or a one-off
 # `python -m`/`python -c` command line (which won't have loaded .env yet).
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-from app.core.database import async_session
+from app.core.database import async_session, run_with_db_retry
 from app.models.attendee import Attendee
 from app.models.grid_audit_run import GridAuditRun
 from app.services.grid_enrichment import (
@@ -63,22 +62,15 @@ async def _fetch_attendee_domains() -> list[dict]:
     we don't depend on SUPABASE_SERVICE_ROLE_KEY staying in sync with key
     rotations on Railway.
     """
-    # Retry once on a Supabase pooler disconnect (May 5-11 silent-fail pattern):
+    # Retry once on a Supabase connection drop (May 5-11 silent-fail pattern):
     # connection drops mid-query, asyncpg surfaces ConnectionDoesNotExistError,
     # we open a fresh session and try again. Without this the daily 02:30 UTC
     # cron dies on this very first SELECT and nothing else in the audit runs.
-    rows = None
-    for attempt in (1, 2):
-        try:
-            async with async_session() as session:
-                result = await session.execute(select(Attendee.email, Attendee.enriched_profile))
-                rows = result.all()
-            break
-        except (DBAPIError, OperationalError, InterfaceError) as exc:
-            if attempt == 2:
-                raise
-            logger.warning("grid_audit: pooler disconnect on attendee fetch, retrying with fresh session: %s", exc)
-            await asyncio.sleep(1.0)
+    async def _fetch(session) -> list:
+        result = await session.execute(select(Attendee.email, Attendee.enriched_profile))
+        return result.all()
+
+    rows = await run_with_db_retry(_fetch, label="grid_audit: attendee fetch")
 
     buckets: dict[str, dict] = {}
     for email, enriched_profile in rows:
@@ -200,8 +192,16 @@ async def run_grid_audit() -> dict:
 
 
 async def persist_audit_run(summary: dict) -> str:
-    """Write a row to grid_audit_runs and return the new row id."""
-    async with async_session() as session:
+    """Write a row to grid_audit_runs and return the new row id.
+
+    This is the TERMINAL write after the ~448s Grid API loop. The direct
+    Supabase connection routinely drops a connection during that long
+    non-DB phase, so even a freshly-checked-out connection can be dead by
+    the time this INSERT runs (pool_pre_ping validates at checkout, not
+    mid-statement). run_with_db_retry opens a fresh session per attempt so
+    a single drop never loses the run's only persisted record.
+    """
+    async def _write(session) -> str:
         row = GridAuditRun(
             run_at=datetime.fromisoformat(summary["run_at"]).replace(tzinfo=None),
             total_domains=summary["total_domains"],
@@ -216,6 +216,8 @@ async def persist_audit_run(summary: dict) -> str:
         session.add(row)
         await session.commit()
         return str(row.id)
+
+    return await run_with_db_retry(_write, label="grid_audit: persist run")
 
 
 async def last_audit() -> dict | None:
@@ -264,7 +266,9 @@ async def run_and_persist() -> dict:
         return summary
     except Exception as exc:
         # Persist the failure so dashboard surfaces "audit broken" clearly.
-        async with async_session() as session:
+        # Use the retry helper: the failure itself may be a connection drop,
+        # in which case the very write that records it would also fail.
+        async def _write_failure(session) -> None:
             row = GridAuditRun(
                 total_domains=0,
                 total_attendees=0,
@@ -275,5 +279,10 @@ async def run_and_persist() -> dict:
             )
             session.add(row)
             await session.commit()
+
+        try:
+            await run_with_db_retry(_write_failure, label="grid_audit: persist failure")
+        except Exception as write_exc:  # noqa: BLE001
+            logger.error("grid_audit: could not persist failure row: %s", write_exc)
         logger.error("grid_audit: failed: %s", exc)
         raise

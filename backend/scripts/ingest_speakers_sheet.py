@@ -293,7 +293,18 @@ def parse_csv(csv_text: str) -> list[dict]:
 
 
 def find_existing(client: httpx.Client, speaker: dict) -> dict | None:
-    """Look up an existing attendee by email, then by name+company."""
+    """Look up an existing attendee by email, then by name+company, then by the
+    deterministic placeholder email.
+
+    The placeholder-email lookup (step 3) is what prevents the nightly
+    duplicate-INSERT failure: when a speaker has no real email, the row we'd
+    INSERT uses a slugified `{name}@speaker.proofoftalk.io` address. If the same
+    person already exists under that placeholder — e.g. the sheet lists them
+    twice with DIFFERENT companies (Nathan Chow: BitMart on one row, another
+    company on a second), so the name+company match in step 2 misses — we'd
+    POST a row whose email collides with the unique index and get a 409 every
+    single night. Resolving the placeholder here turns that into a PATCH/noop.
+    """
     rest = f"{SUPABASE_URL}/rest/v1/attendees"
     select = "id,name,email,company,title,ticket_type,goals,linkedin_url,twitter_handle"
 
@@ -316,6 +327,19 @@ def find_existing(client: httpx.Client, speaker: dict) -> dict | None:
         if speaker["company"]:
             params["company"] = f"ilike.{speaker['company']}"
         resp = client.get(rest, headers=supabase_headers(), params=params)
+        if resp.status_code == 200 and resp.json():
+            return resp.json()[0]
+
+    # 3. Placeholder-email lookup — only when this speaker has NO real email,
+    #    so the INSERT path would mint a placeholder. Catches the same person
+    #    re-listed with a different company (name+company miss above).
+    if not speaker["email"] and speaker["name"]:
+        placeholder = slugify_email(speaker["name"])
+        resp = client.get(
+            rest,
+            headers=supabase_headers(),
+            params={"email": f"eq.{placeholder}", "select": select},
+        )
         if resp.status_code == 200 and resp.json():
             return resp.json()[0]
 
@@ -454,6 +478,15 @@ def run(csv_path: Path, fetch: bool, dry_run: bool) -> dict:
                     print(f"  INSERT: {rec['name']} <{rec['email']}> ({rec['ticket_type']})")
                     inserted += 1
                     new_attendee_ids.append(rec["id"])
+                elif resp.status_code == 409 and "23505" in resp.text:
+                    # Unique-violation on email (Postgres 23505). The row already
+                    # exists under this (likely placeholder) address but
+                    # find_existing didn't resolve it — treat as a noop, not a
+                    # hard error, so a duplicate sheet row can't flip the whole
+                    # run to PARTIAL. find_existing's placeholder lookup should
+                    # normally prevent reaching here.
+                    print(f"  SKIP (already exists, 409): {rec['name']} <{rec['email']}>")
+                    noop += 1
                 else:
                     print(f"  ERROR {resp.status_code} INSERT {rec['name']}: {resp.text}")
                     errors += 1
