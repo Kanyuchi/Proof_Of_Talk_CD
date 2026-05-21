@@ -75,15 +75,3 @@ export function profileCompleteness(attendee: Attendee | undefined | null): {
 
   return { percent, fields, missingHighImpact };
 }
-
-/**
- * How many matches the user is allowed to see, based on profile completeness.
- * Sparse profiles get the top few; only complete profiles see the long tail.
- * This is the locked-match-preview mechanic that drives self-enrichment.
- */
-export function visibleMatchLimit(percent: number, totalMatches: number): number {
-  if (percent >= 80) return totalMatches;
-  if (percent >= 60) return Math.min(totalMatches, 8);
-  if (percent >= 40) return Math.min(totalMatches, 5);
-  return Math.min(totalMatches, 3);
-}
