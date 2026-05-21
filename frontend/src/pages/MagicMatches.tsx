@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles, Brain, Target, MessageSquare,
@@ -22,7 +22,16 @@ export default function MagicMatches() {
   const [enrichSaved, setEnrichSaved] = useState(false);
   const [claimForm, setClaimForm] = useState({ email: "", password: "" });
   const [claimError, setClaimError] = useState("");
-  const [claimOpen, setClaimOpen] = useState(false);
+  // Arriving from the welcome email's "Unlock Full Access" CTA (?unlock=1)
+  // pre-opens the claim panel and scrolls to it.
+  const [searchParams] = useSearchParams();
+  const [claimOpen, setClaimOpen] = useState(searchParams.get("unlock") === "1");
+  const claimRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (searchParams.get("unlock") === "1") {
+      claimRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [searchParams]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["magic-matches", token],
@@ -133,7 +142,7 @@ export default function MagicMatches() {
 
       {/* Claim full account — token-authenticated, bypasses the ticket gate */}
       {attendee && (
-        <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.03]">
+        <div ref={claimRef} className="p-5 rounded-2xl border border-white/10 bg-white/[0.03]">
           <button
             onClick={() => setClaimOpen((v) => !v)}
             className="w-full flex items-center gap-2 text-left"

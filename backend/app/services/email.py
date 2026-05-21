@@ -129,6 +129,7 @@ def _render_email(
     body_html: str,
     cta_label: str | None = None,
     cta_url: str | None = None,
+    cta_color: str | None = None,
     footer_note: str | None = None,
     unsubscribe: bool = False,
     unsubscribe_token: str | None = None,
@@ -167,7 +168,7 @@ def _render_email(
         cta_block = f"""
         <tr><td style="padding: 12px 0 8px;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-            <td align="center" bgcolor="{accent}" style="border-radius: 4px;">
+            <td align="center" bgcolor="{cta_color or accent}" style="border-radius: 4px;">
               <a href="{cta_url}" style="display: inline-block; padding: 15px 32px; font-family: {sans}; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #ffffff; text-decoration: none; border-radius: 4px;">{cta_label} &rarr;</a>
             </td>
           </tr></table>
@@ -488,7 +489,9 @@ def send_welcome_email(
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
     first_name = attendee_name.split()[0] if attendee_name else attendee_name
-    dashboard_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
+    # CTA lands on the magic-link page with the "Unlock full access" panel
+    # pre-opened (?unlock=1) so they go straight to setting a password.
+    unlock_url = f"{app_url}/m/{magic_token}?unlock=1" if magic_token else f"{app_url}/register"
     subject = "Welcome to the Official Networking Tool - Proof of Talk 2026"
     body_html = _render_email(
         preheader="Your private matchmaking for Proof of Talk 2026 is ready.",
@@ -496,18 +499,21 @@ def send_welcome_email(
         heading=f"Welcome, {first_name}",
         body_html=(
             "<tr><td style=\"padding:0 0 14px;\">This is the official networking tool for Proof of Talk 2026, the Louvre Palace, June 2 and 3. We use it to find the few conversations most worth your time, before you arrive.</td></tr>"
-            "<tr><td style=\"padding:0 0 4px;\">Open your dashboard to see your matches, complete your profile so we can match you better, and book meetings in one tap.</td></tr>"
+            "<tr><td style=\"padding:0 0 14px;\">You are already pre-logged in with the <strong>same email you used to buy your ticket</strong>. It is the same address you are reading this email from. Click below to set your password and unlock full access: see your matches, message them, and book meetings in one tap.</td></tr>"
         ),
-        cta_label="Open your matches",
-        cta_url=dashboard_url,
+        cta_label="Unlock Full Access",
+        cta_url=unlock_url,
+        cta_color="#E76315",
         footer_note="On your phone? Add it to your home screen for one-tap access all event. It runs full-screen like a real app, no App Store needed.",
         unsubscribe=True,
         unsubscribe_token=magic_token,
     )
     body_text = (
         f"Welcome to Proof of Talk 2026, {first_name}.\n\n"
-        f"This is the official networking tool for the event at the Louvre Palace, June 2 and 3.\n"
-        f"Open your matches: {dashboard_url}\n\n"
+        f"This is the official networking tool for the event at the Louvre Palace, June 2 and 3.\n\n"
+        f"You are already pre-logged in with the same email you used to buy your ticket. "
+        f"It is the same address you are reading this email from.\n"
+        f"Click to set your password and unlock full access: {unlock_url}\n\n"
         f"On your phone? Add it to your home screen for one-tap access all event. "
         f"It runs full-screen like a real app, no App Store needed.\n\n"
         f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"

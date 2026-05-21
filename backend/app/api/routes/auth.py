@@ -301,8 +301,19 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Asy
     user = (await db.execute(select(User).where(User.email == data.email))).scalars().first()
     if user:
         token = create_reset_token(str(user.id))
-        send_password_reset_email(to_email=user.email, user_name=user.full_name, reset_token=token)
-        logger.info("Password reset email sent to %s", data.email)
+        # Fire-and-forget. send_password_reset_email is a SYNC httpx call;
+        # awaiting it inline blocks the event loop and was hanging the request
+        # ~60s on prod. Run it in a thread, detached, so the response returns
+        # immediately (same rationale as _process_attendee_bg above).
+        asyncio.create_task(
+            asyncio.to_thread(
+                send_password_reset_email,
+                to_email=user.email,
+                user_name=user.full_name,
+                reset_token=token,
+            )
+        )
+        logger.info("Password reset email queued for %s", data.email)
     else:
         logger.info("Password reset requested for non-existent email %s", data.email)
     return {"message": "If that email exists, a reset link has been sent"}
