@@ -2,6 +2,7 @@ import axios from "axios";
 import type {
   Attendee,
   Match,
+  MatchListResult,
   DashboardStats,
   MatchQuality,
   Token,
@@ -82,8 +83,8 @@ export async function submitOnboarding(body: {
 
 export async function getMatches(
   attendeeId: string,
-  limit = 10
-): Promise<{ matches: Match[]; attendee_id: string }> {
+  limit = 50
+): Promise<MatchListResult> {
   const { data } = await api.get(`/matches/${attendeeId}`, { params: { limit } });
   return data;
 }
@@ -104,8 +105,8 @@ export async function updateProfileViaMagicLink(
 
 export async function getMatchesByMagicLink(
   token: string,
-  limit = 10
-): Promise<{ matches: Match[]; attendee_id: string }> {
+  limit = 50
+): Promise<MatchListResult> {
   const { data } = await api.get(`/matches/m/${token}`, { params: { limit } });
   return data;
 }
@@ -138,6 +139,19 @@ export async function updateMatchStatus(
   decline_reason?: string
 ): Promise<Match> {
   const { data } = await api.patch(`/matches/${matchId}/status`, { status, decline_reason });
+  return data;
+}
+
+export async function deferMatch(matchId: string): Promise<Match> {
+  const { data } = await api.patch(`/matches/${matchId}/defer`);
+  return data;
+}
+
+export async function deferMatchByMagicLink(
+  token: string,
+  matchId: string
+): Promise<Match> {
+  const { data } = await api.patch(`/matches/m/${token}/defer`, { match_id: matchId });
   return data;
 }
 

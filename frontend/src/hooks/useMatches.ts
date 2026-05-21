@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getMatches, updateMatchStatus, scheduleMeeting, updateMeetingFeedback } from "../api/client";
+import { getMatches, updateMatchStatus, scheduleMeeting, updateMeetingFeedback, deferMatch } from "../api/client";
 import { demoMatches } from "../data/demo";
 
 export function useMatches(attendeeId: string | undefined) {
@@ -44,6 +44,32 @@ export function useUpdateMatchStatus(attendeeId: string | undefined) {
           matches: old.matches.map((m) => (m.id === matchId ? { ...m, status } : m)),
         };
       });
+    },
+  });
+}
+
+export function useDeferMatch(attendeeId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (matchId: string) => deferMatch(matchId),
+    // Optimistically drop the deferred card so the next-best slides in instantly.
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["matches", attendeeId] });
+      const prev = queryClient.getQueryData(["matches", attendeeId]);
+      queryClient.setQueryData(
+        ["matches", attendeeId],
+        (old: { matches: { id: string }[] } | undefined) => {
+          if (!old) return old;
+          return { ...old, matches: old.matches.filter((m) => m.id !== matchId) };
+        }
+      );
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["matches", attendeeId], ctx.prev);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["matches", attendeeId] });
     },
   });
 }

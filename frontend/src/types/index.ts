@@ -54,6 +54,7 @@ export interface Match {
   matched_attendee?: Attendee;
   // Slots both parties are free for. Populated server-side on mutual matches with no booking yet.
   mutual_free_slots?: string[];
+  tier?: "curated" | "deep";
 }
 
 export interface DashboardStats {
@@ -138,4 +139,14 @@ export interface ConversationDetail {
     ticket_type: string;
   } | null;
   messages: MessageData[];
+}
+
+export interface MatchListResult {
+  matches: Match[];
+  attendee_id: string;
+  tier?: "SPARSE" | "PARTIAL" | "GOOD";
+  visible_count?: number;
+  locked_count?: number;
+  next_tier_at?: number | null;
+  completeness_pct?: number | null;
 }
