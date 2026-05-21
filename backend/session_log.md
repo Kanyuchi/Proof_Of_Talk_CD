@@ -96,3 +96,9 @@
 - Two rows existed (case-sensitive unique index let a cron insert a lowercase dup next to the original): `70c58bf1` "Sithum@…" (created 05-13, has the login user + 8 matches) vs `9e842cde` "sithum@…" (cron-created 05-14, NO user, 6 matches).
 - Deleted the dup `9e842cde` + its 6 matches atomically (verified: 0 users linked first, FK rules are NO ACTION so matches deleted in the same statement). Only the real login row remains (users_linked=1, 8 matches). First attempt hit a connection timeout (no-op, verified before retry); retry succeeded (matches_deleted=6, attendees_deleted=1).
 - ROOT CAUSE to fix later: `attendees.email` unique index is case-sensitive → recurs whenever an email's case differs between sources. Recommend a case-insensitive unique constraint (lower(email)) + dedupe-by-lower(email) in the syncs.
+
+## 2026-05-21 — [session wrap] LinkedIn enrichment recency check (read-only)
+- Q: when did LinkedIn enrichment last run? Authoritative stamp = `enriched_profile.linkedin_enriched_at` (set by both `scripts/linkedin_scrape.py` AND the enrichment orchestrator's LinkedIn fallback).
+- State: 421 attendees ever LinkedIn-enriched; 242 in last 7d; 37 in last 24h; most recent stamp 2026-05-21T18:06 — but that coincides with today's extasy-sync enrichment of new rows (the auto-fallback path), NOT a manual operator Playwright scrape.
+- Last evidence of a MANUAL operator scrape session: exports `attendees_missing_linkedin_20260504.xlsx` (May 4) + `diagnose_photo_dom.json` photo diagnostic (May 19). `updated_at` is useless as a proxy (sweep/match-refresh touch every row).
+- Session covered: Tommi/forgot-password fix + surgical force (deployed), pending-count 422 fix (deployed+verified), bulk-rebuild blast guard (notify=False), all 4 sync crons fixed + SMOKE-TESTED green on prod, welcome waves 2+3 (261 sent/462 remaining), deleted duplicate sithum attendee row.
