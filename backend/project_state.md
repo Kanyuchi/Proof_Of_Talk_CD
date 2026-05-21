@@ -1,6 +1,7 @@
 # Project State — backend
 
 ## What's Working
+- [matches] `GET /api/v1/matches/pending-count` resolves correctly (was 422 — shadowed by the `/{attendee_id}` UUID route; fixed + verified on prod 2026-05-21, commit fbfd954). Rule: static GET paths must be declared above `/{attendee_id}` in matches router.
 - [auth] Login requires claiming a pre-loaded attendee via the welcome email's magic link (`/m/{token}?unlock=1` → set password). forgot-password now force-sends that claim email for unclaimed attendees (DEPLOYED 2026-05-21, Railway c8a80f7c) — self-service recovery works WITHOUT flipping EMAIL_MODE. As of 2026-05-21: ~40/739 claimed; 162 welcome emails sent (561 remaining). EMAIL_MODE stays `allowlist`; flipping to `all` is a separate launch decision (un-gates match/mutual/meeting emails + a `generate_all_matches` blast footgun).
 - Extasy → RDS pipeline pulls PAID + REDEEMED orders (complimentary tickets included)
 - 38 attendees in RDS + Supabase, 129 matches, 100% enrichment coverage
