@@ -37,6 +37,7 @@ def _send_email(
     html: str,
     text: str | None = None,
     attachments: list[dict] | None = None,
+    force: bool = False,
 ) -> bool:
     """Send an email via Resend. Returns True on success, False on failure.
 
@@ -48,13 +49,20 @@ def _send_email(
     This replaced the per-function `return # BLOCKED` guards so gating
     lives in exactly one place and rollout is a config change, not a code
     change.
+
+    `force=True` bypasses the EMAIL_MODE gate for a single deliberate,
+    operator-initiated send (e.g. a staged welcome wave run from a script).
+    It lets ops push a bounded batch to real attendees while EMAIL_MODE
+    stays "allowlist" — so the *automated* triggers (match intros, mutual
+    matches, password resets) remain gated until the team is ready to flip
+    EMAIL_MODE=all. Never set force=True from a request-triggered path.
     """
     settings = get_settings()
     if not settings.RESEND_API_KEY:
         logger.debug("RESEND_API_KEY not set — email skipped")
         return False
 
-    mode = (settings.EMAIL_MODE or "off").strip().lower()
+    mode = "all" if force else (settings.EMAIL_MODE or "off").strip().lower()
     if mode == "off":
         logger.info("EMAIL_MODE=off — skipped send to %s (subject: %s)", to_email, subject[:50])
         return False
@@ -467,9 +475,15 @@ def send_welcome_email(
     attendee_name: str,
     magic_token: str | None = None,
     app_url: str | None = None,
-) -> None:
+    force: bool = False,
+) -> bool:
     """First-touch welcome email introducing the matchmaker, with the
-    attendee's magic link. Not yet wired to a trigger."""
+    attendee's magic link.
+
+    `force=True` is for the operator-run staged batch (send_welcome_batch.py)
+    and bypasses the EMAIL_MODE gate for this one send. Returns the send
+    result so the batch script can tally successes/failures.
+    """
     settings = get_settings()
     if app_url is None:
         app_url = settings.APP_PUBLIC_URL
@@ -495,7 +509,7 @@ def send_welcome_email(
         f"Open your matches: {dashboard_url}\n\n"
         f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
     )
-    _send_email(to_email, subject, body_html, body_text)
+    return _send_email(to_email, subject, body_html, body_text, force=force)
 
 
 # ── Post-event emails (Phase 6) ─────────────────────────────────────
