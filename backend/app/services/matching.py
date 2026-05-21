@@ -711,7 +711,8 @@ Return ONLY the JSON array. No markdown, no commentary."""
         return persisted
 
     async def generate_matches_for_attendee(
-        self, attendee_id: uuid.UUID, top_k: int = 10, clear_existing: bool = True
+        self, attendee_id: uuid.UUID, top_k: int = 10, clear_existing: bool = True,
+        notify: bool = True,
     ) -> list[Match]:
         """Run full 3-stage pipeline for a single attendee.
 
@@ -719,6 +720,11 @@ Return ONLY the JSON array. No markdown, no commentary."""
             clear_existing: When True (single-attendee call), removes all existing
                 matches involving this attendee before regenerating. When False
                 (batch call), relies on the caller to have cleared matches upfront.
+            notify: When True, email the attendee an intro to their top match.
+                MUST be False for bulk regeneration (generate_all_matches) — a full
+                rebuild would otherwise fire one intro email per attendee (739-blast)
+                the moment EMAIL_MODE=all. Genuine new-match paths (registration,
+                nightly new-attendee cron) keep notify=True.
         """
         attendee = await self.db.get(Attendee, attendee_id)
         if not attendee:
@@ -827,8 +833,9 @@ Return ONLY the JSON array. No markdown, no commentary."""
 
         await self.db.commit()
 
-        # Fire-and-forget: notify attendee of their top match via email
-        if matches:
+        # Fire-and-forget: notify attendee of their top match via email.
+        # Skipped for bulk regeneration (notify=False) to avoid a 739-email blast.
+        if matches and notify:
             try:
                 from app.services.email import send_match_intro_email
                 top = matches[0]
@@ -892,9 +899,10 @@ Return ONLY the JSON array. No markdown, no commentary."""
         for i in range(0, len(attendees), batch_size):
             batch = attendees[i : i + batch_size]
             for attendee in batch:
-                # clear_existing=False because we wiped above and use dedup check
+                # clear_existing=False because we wiped above and use dedup check.
+                # notify=False: a full rebuild must NOT email all 739 attendees.
                 matches = await self.generate_matches_for_attendee(
-                    attendee.id, top_k, clear_existing=False
+                    attendee.id, top_k, clear_existing=False, notify=False
                 )
                 total += len(matches)
                 # Explicit yield to keep event loop responsive under load.
