@@ -141,7 +141,7 @@ export default function MagicMatches() {
       </div>
 
       {/* Claim full account — token-authenticated, bypasses the ticket gate */}
-      {attendee && (
+      {data?.attendee_id && (
         <div ref={claimRef} className="p-5 rounded-2xl border border-white/10 bg-white/[0.03]">
           <button
             onClick={() => setClaimOpen((v) => !v)}
@@ -149,7 +149,7 @@ export default function MagicMatches() {
           >
             <KeyRound className="w-5 h-5 text-[#E76315]" />
             <div className="flex-1">
-              <h3 className="font-semibold">Unlock full access</h3>
+              <h3 className="font-semibold text-[#E76315]">Unlock full access</h3>
               <p className="text-xs text-white/40">
                 Set a password to message your matches and use the AI Concierge.
               </p>
