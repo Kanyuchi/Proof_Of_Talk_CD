@@ -10,6 +10,8 @@
 4. Re-generate matches using vertical_tags as a matching signal (improve match quality)
 
 ## Soon
+- [enrichment] LinkedIn coverage: 421/~739 enriched. Last MANUAL operator scrape ~May 4/19; auto-fallback runs on new rows. Schedule the next `linkedin_scrape.py` pass for the pending/missing-photo queue. (Authoritative recency = enriched_profile.linkedin_enriched_at)
+- [data] Make `attendees.email` uniqueness case-insensitive (lower(email)) + dedupe-by-lower in syncs — root cause of the sithum duplicate
 - Automate daily Extasy → RDS → Supabase sync
 - Add LinkedIn/Twitter URLs for Extasy attendees (enrichment sources currently empty)
 
