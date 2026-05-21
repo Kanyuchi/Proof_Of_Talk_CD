@@ -500,6 +500,7 @@ def send_welcome_email(
         ),
         cta_label="Open your matches",
         cta_url=dashboard_url,
+        footer_note="On your phone? Add it to your home screen for one-tap access all event. It runs full-screen like a real app, no App Store needed.",
         unsubscribe=True,
         unsubscribe_token=magic_token,
     )
@@ -507,6 +508,8 @@ def send_welcome_email(
         f"Welcome to Proof of Talk 2026, {first_name}.\n\n"
         f"This is the official networking tool for the event at the Louvre Palace, June 2 and 3.\n"
         f"Open your matches: {dashboard_url}\n\n"
+        f"On your phone? Add it to your home screen for one-tap access all event. "
+        f"It runs full-screen like a real app, no App Store needed.\n\n"
         f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
     )
     return _send_email(to_email, subject, body_html, body_text, force=force)
