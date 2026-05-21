@@ -165,7 +165,7 @@ Copy `backend/.env.example` to `backend/.env` and fill in:
 - `DATABASE_URL` — Supabase PostgreSQL connection string; format: `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres`
 - `OPENAI_API_KEY` — required for embeddings and match explanations
 - `RESEND_API_KEY` — Resend email delivery (production, no sandbox)
-- `RESEND_FROM_EMAIL` — sender address (`matches@proofoftalk.io`)
+- `RESEND_FROM_EMAIL` — sender address (`Proof of Talk <team@xventures.de>` — warm domain; the correct value is also the default in `app/core/config.py`, so leaving this env var unset is safe. Do NOT set it to `matches@proofoftalk.io` — that cold domain lands in spam. Keep local `.env` in sync with Railway.)
 - `SECRET_KEY` — JWT signing key
 - `APP_PUBLIC_URL` — public URL (`https://meet.proofoftalk.io`)
 - `INTEGRATION_API_KEY` — Runa integration auth

@@ -54,6 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from app.services.email import send_welcome_email  # noqa: E402
+from app.core.config import get_settings  # noqa: E402
 
 SUPA_URL = os.getenv("SUPABASE_URL")
 SUPA_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -171,9 +172,21 @@ def main() -> None:
     else:
         targets = classified["eligible"][: args.limit]
 
+    # Resolve and SHOW the sender before anything goes out. The From address
+    # comes from RESEND_FROM_EMAIL (env) and silently drifts if this machine's
+    # .env lags Railway — which once shipped a whole wave from the wrong, cold
+    # domain. Printing it here makes a wrong sender impossible to miss.
+    settings = get_settings()
+    from_addr = settings.RESEND_FROM_EMAIL
+    reply_to = (getattr(settings, "EMAIL_REPLY_TO", "") or "").strip() or "(none)"
+    # Tripwire: warn loudly on the cold proofoftalk.io domain (lands in spam).
+    from_warn = "  <-- WARNING: cold domain, expect spam" if "proofoftalk.io" in from_addr else ""
+
     print("Welcome-batch plan:")
     _print_summary(len(rows), classified)
-    print(f"\n  this wave:            {len(targets)} {'(--only)' if args.only else f'(limit {args.limit})'}")
+    print(f"\n  FROM:                 {from_addr}{from_warn}")
+    print(f"  reply-to:             {reply_to}")
+    print(f"  this wave:            {len(targets)} {'(--only)' if args.only else f'(limit {args.limit})'}")
     print(f"  mode:                 {'SEND (force, bypasses EMAIL_MODE)' if args.confirm else 'PREVIEW (no send)'}\n")
 
     for a in targets[:10]:
