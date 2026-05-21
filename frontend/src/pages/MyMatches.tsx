@@ -7,9 +7,9 @@ import {
 import AttendeeAvatar from "../components/AttendeeAvatar";
 import { useAuth } from "../hooks/useAuth";
 import { useAttendee } from "../hooks/useAttendee";
-import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedback } from "../hooks/useMatches";
+import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedback, useDeferMatch } from "../hooks/useMatches";
 import { useSendMatchMessage } from "../hooks/useMessages";
-import { profileCompleteness, visibleMatchLimit } from "../utils/profileCompleteness";
+import { profileCompleteness } from "../utils/profileCompleteness";
 import { Lock, Zap } from "lucide-react";
 import { useState } from "react";
 import {
@@ -27,6 +27,7 @@ export default function MyMatches() {
   const { data: matchData, isLoading: loadingMatches } = useMatches(attendeeId);
   const { data: myAttendee } = useAttendee(attendeeId);
   const updateStatus = useUpdateMatchStatus(attendeeId);
+  const defer = useDeferMatch(attendeeId);
   const scheduleMeeting = useScheduleMeeting(attendeeId);
   const feedback = useMeetingFeedback(attendeeId);
   const sendIntro = useSendMatchMessage();
@@ -36,8 +37,6 @@ export default function MyMatches() {
   const [selectedDay, setSelectedDay] = useState<string>("June 2");
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [decliningMatchId, setDecliningMatchId] = useState<string | null>(null);
-  const [declineReason, setDeclineReason] = useState("");
   const [sentIntroIds, setSentIntroIds] = useState<Set<string>>(new Set());
   const [savedMatchIds, setSavedMatchIds] = useState<Set<string>>(() => {
     try {
@@ -74,10 +73,11 @@ export default function MyMatches() {
   // attendees to enrich their own profiles (added 2026-05-13).
   // Admins always see everything; the gate only applies to regular users.
   const completeness = profileCompleteness(myAttendee);
-  const maxVisible = isAdmin
-    ? matches.length
-    : visibleMatchLimit(completeness.percent, matches.length);
-  const lockedCount = Math.max(0, matches.length - maxVisible);
+  // Backend is the source of truth for the cap (deeper-match-pool spec).
+  const lockedCount = matchData?.locked_count ?? 0;
+  const completenessPct = matchData?.completeness_pct ?? completeness.percent;
+  const tier = matchData?.tier;
+  const nextTierAt = matchData?.next_tier_at ?? null;
 
   const myAvgScore =
     matches.length > 0
@@ -106,16 +106,6 @@ export default function MyMatches() {
     updateStatus.mutate({ matchId, status, decline_reason });
   };
 
-  const handleDecline = (matchId: string) => {
-    setDecliningMatchId(matchId);
-    setDeclineReason("");
-  };
-
-  const confirmDecline = (matchId: string) => {
-    handleStatus(matchId, "declined", declineReason.trim() || undefined);
-    setDecliningMatchId(null);
-    setDeclineReason("");
-  };
 
   const handleMarkMet = (matchId: string) => {
     handleStatus(matchId, "met");
@@ -205,7 +195,7 @@ export default function MyMatches() {
               Quantifies the cost of an incomplete profile and links to the
               fix. Hidden when the profile is already ≥80% complete or for
               admins (who see everything). */}
-          {!isAdmin && completeness.percent < 80 && matches.length > 0 && (
+          {!isAdmin && completenessPct < 80 && matches.length > 0 && (
             <div className="rounded-2xl border border-[#E76315]/30 bg-gradient-to-br from-[#E76315]/[0.08] to-transparent p-5">
               <div className="flex items-center gap-3 mb-3">
                 <Zap className="w-5 h-5 text-[#E76315]" />
@@ -213,7 +203,7 @@ export default function MyMatches() {
                   Your current match quality is {myAvgScore.toFixed(2)}
                 </div>
                 <div className="ml-auto text-xs text-white/40">
-                  Profile {completeness.percent}% complete
+                  Profile {completenessPct}% complete
                 </div>
               </div>
               <p className="text-sm text-white/60 leading-relaxed">
@@ -361,7 +351,7 @@ export default function MyMatches() {
                 ? matches.filter((m) => savedMatchIds.has(m.id))
                 : activeTab === "requests"
                 ? requestMatches
-                : matches.slice(0, maxVisible)
+                : matches
             ).map((match, idx) => {
               const config = matchTypeConfig[match.match_type] ?? matchTypeConfig.complementary;
               const Icon = config.icon;
@@ -579,34 +569,6 @@ export default function MyMatches() {
                         >
                           <ThumbsDown className="w-3 h-3" /> Not relevant
                         </button>
-                      </div>
-                    )}
-
-                    {/* Inline decline panel */}
-                    {decliningMatchId === match.id && (
-                      <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 space-y-3">
-                        <p className="text-sm text-white/60">Let us know why — it helps improve future matches (optional)</p>
-                        <textarea
-                          value={declineReason}
-                          onChange={(e) => setDeclineReason(e.target.value)}
-                          placeholder="Not the right fit right now…"
-                          rows={2}
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-white/20 focus:outline-none focus:border-red-400/40 resize-none"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => confirmDecline(match.id)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-all"
-                          >
-                            <X className="w-3.5 h-3.5" /> Maybe later
-                          </button>
-                          <button
-                            onClick={() => setDecliningMatchId(null)}
-                            className="px-4 py-2 text-white/40 text-sm hover:text-white/60 transition-all"
-                          >
-                            Cancel
-                          </button>
-                        </div>
                       </div>
                     )}
 
@@ -877,7 +839,7 @@ export default function MyMatches() {
                                 You accepted — waiting for {person?.name.split(" ")[0] ?? "them"} to respond
                               </div>
                               <button
-                                onClick={() => handleDecline(match.id)}
+                                onClick={() => handleStatus(match.id, "declined")}
                                 className="ml-auto flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-white/30 border border-white/10 rounded-lg text-xs hover:text-white/50 transition-all"
                               >
                                 <X className="w-3 h-3" /> Cancel
@@ -952,8 +914,8 @@ export default function MyMatches() {
                               {otherAccepted ? "I'd like to meet — confirm" : "I'd like to meet"}
                             </button>
                             <button
-                              onClick={() => handleDecline(match.id)}
-                              disabled={updateStatus.isPending}
+                              onClick={() => defer.mutate(match.id)}
+                              disabled={defer.isPending}
                               className="w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-1 disabled:opacity-50"
                             >
                               Maybe later
@@ -979,7 +941,8 @@ export default function MyMatches() {
                   </span>
                 </div>
                 <p className="text-sm text-white/60 max-w-md mx-auto">
-                  Your profile is {completeness.percent}% complete. Add{" "}
+                  Your profile is {completenessPct}% complete
+                  {tier && nextTierAt ? ` — reach the next tier to unlock up to ${nextTierAt} matches` : ""}. Add{" "}
                   {completeness.missingHighImpact.length > 0
                     ? completeness.missingHighImpact.map((f) => f.label.toLowerCase()).join(", ")
                     : "the missing fields"}{" "}

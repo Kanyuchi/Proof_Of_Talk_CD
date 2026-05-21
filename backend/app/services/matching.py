@@ -23,6 +23,15 @@ MIN_MATCH_SCORE = 0.60
 # pairing at 0.60 is worse than no match.
 MIN_NON_OBVIOUS_SCORE = 0.65
 
+# Deep-pool tiers (deeper-match-pool spec, 2026-05-21)
+CURATED_COUNT = 8          # top candidates that get the full GPT-4o rerank + explanation
+DEEP_POOL_SIZE = 20        # total ranked candidates persisted per attendee (curated + deep)
+DEEP_MATCH_SCORE = 0.45    # lower floor for the similarity-only deep tier
+DEEP_TIER_EXPLANATION = (
+    "Surfaced from your deeper match pool — a strong profile-similarity match "
+    "worth a look. Complete your profile to unlock a richer AI explanation."
+)
+
 # Cross-sector verticals that create high-value complementary matches
 COMPLEMENTARY_VERTICALS = {
     "policy_regulation_macro": ["infrastructure_and_scaling", "tokenisation_of_finance", "decentralized_finance", "privacy"],
@@ -530,7 +539,13 @@ Return ONLY the JSON array. No markdown, no commentary."""
             return str(synergies[0]).strip().lower()
         return "unknown"
 
-    def _deterministic_rerank(self, ranked: list[dict], attendee: Attendee, candidates: list[tuple]) -> list[dict]:
+    def _deterministic_rerank(
+        self,
+        ranked: list[dict],
+        attendee: Attendee,
+        candidates: list[tuple],
+        suppress_duplicate_topics: bool = True,
+    ) -> list[dict]:
         """Apply deterministic boosts/penalties after LLM ranking."""
         adjusted = []
         seen_topics = set()
@@ -545,10 +560,11 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 score += 0.03
 
             # Penalize repeated primary topics to reduce duplicate recommendations.
-            if topic in seen_topics:
-                score -= 0.05
-            else:
-                seen_topics.add(topic)
+            if suppress_duplicate_topics:
+                if topic in seen_topics:
+                    score -= 0.05
+                else:
+                    seen_topics.add(topic)
 
             # Vertical affinity boost — combine explicit tags + Grid sector intelligence
             idx = entry.get("candidate_index", 0) - 1
@@ -610,6 +626,90 @@ Return ONLY the JSON array. No markdown, no commentary."""
 
     # ── Full Pipeline ───────────────────────────────────────────────────
 
+    def _build_deep_ranked(
+        self, attendee: Attendee, deep_candidates: list[tuple]
+    ) -> list[dict]:
+        """Synthesize ranked entries for the deep tier from pure similarity,
+        then apply the deterministic rerank (vertical affinity + ICP boosts).
+        No GPT call — this tier adds no LLM cost.
+        """
+        ranked = [
+            {
+                "candidate_index": i + 1,
+                "overall_score": sim,
+                "complementary_score": sim,
+                "match_type": "complementary",
+                "explanation": DEEP_TIER_EXPLANATION,
+                "shared_context": {"tier": "deep"},
+                "explanation_confidence": round(float(sim), 3),
+            }
+            for i, (_cand, sim) in enumerate(deep_candidates)
+        ]
+        if settings.AI_RERANK_ENABLED:
+            ranked = self._deterministic_rerank(
+                ranked, attendee, deep_candidates, suppress_duplicate_topics=False
+            )
+        return ranked
+
+    async def _persist_ranked(
+        self,
+        attendee: Attendee,
+        ranked: list[dict],
+        candidates: list[tuple],
+        *,
+        tier: str,
+        floor: float,
+        non_obvious_floor: float,
+    ) -> list[Match]:
+        """Persist ranked candidates above `floor`, tagged with `tier`.
+
+        Dedups against rows already in the session/DB in either direction
+        (autoflush makes prior-tier adds visible to the SELECT).
+        """
+        persisted: list[Match] = []
+        for entry in ranked:
+            idx = entry["candidate_index"] - 1
+            if idx < 0 or idx >= len(candidates):
+                continue
+            candidate, sim_score = candidates[idx]
+
+            overall_score = entry.get("overall_score", sim_score)
+            if overall_score < floor:
+                continue
+            if entry.get("match_type") == "non_obvious" and overall_score < non_obvious_floor:
+                continue
+
+            existing = (
+                await self.db.execute(
+                    select(Match).where(
+                        or_(
+                            (Match.attendee_a_id == attendee.id)
+                            & (Match.attendee_b_id == candidate.id),
+                            (Match.attendee_a_id == candidate.id)
+                            & (Match.attendee_b_id == attendee.id),
+                        )
+                    )
+                )
+            ).scalars().first()
+            if existing:
+                continue
+
+            match = Match(
+                attendee_a_id=attendee.id,
+                attendee_b_id=candidate.id,
+                similarity_score=sim_score,
+                complementary_score=entry.get("complementary_score", sim_score),
+                overall_score=overall_score,
+                match_type=entry.get("match_type", "complementary"),
+                explanation=entry.get("explanation", ""),
+                shared_context=entry.get("shared_context", {}),
+                explanation_confidence=entry.get("explanation_confidence"),
+                tier=tier,
+            )
+            self.db.add(match)
+            persisted.append(match)
+        return persisted
+
     async def generate_matches_for_attendee(
         self, attendee_id: uuid.UUID, top_k: int = 10, clear_existing: bool = True
     ) -> list[Match]:
@@ -644,60 +744,41 @@ Return ONLY the JSON array. No markdown, no commentary."""
             )
             await self.db.commit()
 
-        # Stage 2: Retrieve candidates
-        candidates = await self.retrieve_candidates(attendee, top_k=top_k)
+        # Stage 2: Retrieve a deeper neighbour set so we can split into
+        # a curated head (GPT-explained) and a similarity-only deep tail.
+        pool_size = max(top_k, DEEP_POOL_SIZE)
+        candidates = await self.retrieve_candidates(attendee, top_k=pool_size)
         if not candidates:
             return []
 
-        # Stage 3: Rank & explain
-        ranked = await self.rank_and_explain(attendee, candidates)
+        curated_candidates = candidates[:CURATED_COUNT]
+        deep_candidates = candidates[CURATED_COUNT:]
 
-        # Persist matches — with deduplication and score threshold
-        matches = []
-        for entry in ranked:
-            idx = entry["candidate_index"] - 1
-            if idx < 0 or idx >= len(candidates):
-                continue
-            candidate, sim_score = candidates[idx]
+        matches: list[Match] = []
 
-            # Apply minimum quality threshold — avoid padding with weak matches
-            overall_score = entry.get("overall_score", sim_score)
-            if overall_score < MIN_MATCH_SCORE:
-                continue
-            # Non-obvious matches must clear a higher bar — a thin cross-sector
-            # connection that the AI couldn't articulate sharply isn't worth surfacing.
-            if entry.get("match_type") == "non_obvious" and overall_score < MIN_NON_OBVIOUS_SCORE:
-                continue
+        # Curated tier — full GPT-4o rerank + natural-language explanation.
+        curated_ranked = await self.rank_and_explain(attendee, curated_candidates)
+        matches += await self._persist_ranked(
+            attendee,
+            curated_ranked,
+            curated_candidates,
+            tier="curated",
+            floor=MIN_MATCH_SCORE,
+            non_obvious_floor=MIN_NON_OBVIOUS_SCORE,
+        )
 
-            # Deduplication: skip if this pair already exists in either direction
-            existing = (
-                await self.db.execute(
-                    select(Match).where(
-                        or_(
-                            (Match.attendee_a_id == attendee.id)
-                            & (Match.attendee_b_id == candidate.id),
-                            (Match.attendee_a_id == candidate.id)
-                            & (Match.attendee_b_id == attendee.id),
-                        )
-                    )
-                )
-            ).scalars().first()
-            if existing:
-                continue
-
-            match = Match(
-                attendee_a_id=attendee.id,
-                attendee_b_id=candidate.id,
-                similarity_score=sim_score,
-                complementary_score=entry.get("complementary_score", sim_score),
-                overall_score=overall_score,
-                match_type=entry.get("match_type", "complementary"),
-                explanation=entry.get("explanation", ""),
-                shared_context=entry.get("shared_context", {}),
-                explanation_confidence=entry.get("explanation_confidence"),
+        # Deep tier — similarity + deterministic rerank only. No GPT call,
+        # so no new LLM cost. Lower floor surfaces a longer tail.
+        if deep_candidates:
+            deep_ranked = self._build_deep_ranked(attendee, deep_candidates)
+            matches += await self._persist_ranked(
+                attendee,
+                deep_ranked,
+                deep_candidates,
+                tier="deep",
+                floor=DEEP_MATCH_SCORE,
+                non_obvious_floor=DEEP_MATCH_SCORE,
             )
-            self.db.add(match)
-            matches.append(match)
 
         # Company-similarity fallback — if the threshold filter produced zero
         # matches, surface up to 3 peers that share Grid sector or vertical tags

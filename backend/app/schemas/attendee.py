@@ -98,6 +98,7 @@ class MatchResponse(BaseModel):
     decline_reason: str | None = None
     hidden_by_user: bool = False
     explanation_confidence: float | None = None
+    tier: str = "curated"
     created_at: datetime
 
     # Populated in the endpoint
@@ -112,6 +113,12 @@ class MatchResponse(BaseModel):
 class MatchListResponse(BaseModel):
     matches: list[MatchResponse]
     attendee_id: UUID
+    # Enrichment-gated visibility metadata (deeper-match-pool spec).
+    tier: str | None = None             # viewer completeness tier: SPARSE/PARTIAL/GOOD
+    visible_count: int = 0              # review-pool matches actually returned
+    locked_count: int = 0              # review-pool matches hidden behind the cap
+    next_tier_at: int | None = None     # review matches unlocked at the next tier (None at GOOD)
+    completeness_pct: int | None = None # 0-100, for the nudge copy
 
 
 class MatchStatusUpdate(BaseModel):

@@ -5,7 +5,7 @@ import {
   Sparkles, Brain, Target, MessageSquare,
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
-import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink, claimAccount } from "../api/client";
+import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink } from "../api/client";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import GridOrgCard from "../components/GridOrgCard";
 import AttendeeAvatar from "../components/AttendeeAvatar";
@@ -57,6 +57,13 @@ export default function MagicMatches() {
       setEnrichSaved(true);
       queryClient.invalidateQueries({ queryKey: ["attendee", attendeeId] });
       setTimeout(() => setEnrichSaved(false), 3000);
+    },
+  });
+
+  const deferMutation = useMutation({
+    mutationFn: (matchId: string) => deferMatchByMagicLink(token!, matchId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["magic-matches", token] });
     },
   });
 
@@ -426,6 +433,14 @@ export default function MagicMatches() {
                       ))}
                     </div>
                   )}
+
+                  <button
+                    onClick={() => deferMutation.mutate(match.id)}
+                    disabled={deferMutation.isPending}
+                    className="mt-3 w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-1 disabled:opacity-50"
+                  >
+                    Maybe later
+                  </button>
                 </div>
               </div>
             );

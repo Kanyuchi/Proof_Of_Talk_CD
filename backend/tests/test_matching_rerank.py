@@ -1,6 +1,15 @@
 """Tests for deterministic rerank and confidence scoring helpers."""
 
+from app.models.attendee import Attendee, TicketType
 from app.services.matching import MatchingEngine
+
+
+def _bare_attendee():
+    return Attendee(
+        name="T", email="t@e.com", company="C", title="T",
+        ticket_type=TicketType.DELEGATE, interests=[], goals="",
+        enriched_profile={}, intent_tags=[], vertical_tags=[],
+    )
 
 
 def test_deterministic_rerank_penalizes_duplicate_topics_and_sorts():
@@ -23,7 +32,9 @@ def test_deterministic_rerank_penalizes_duplicate_topics_and_sorts():
             "explanation": "B" * 150,
         },
     ]
-    out = engine._deterministic_rerank(ranked)
+    # Empty candidates list skips the vertical/ICP boosts (idx-bounded), so this
+    # exercises the duplicate-topic penalty + sort path the test name targets.
+    out = engine._deterministic_rerank(ranked, _bare_attendee(), [])
     assert out[0]["overall_score"] >= out[1]["overall_score"]
     assert 0.0 <= out[0]["overall_score"] <= 1.0
 
