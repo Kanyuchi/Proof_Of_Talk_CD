@@ -58,3 +58,9 @@
 - Immediate fix: resent Tommi's welcome email via `send_welcome_batch.py --only to@rayleigh.re --confirm` (removed her stale ledger line first so the dedup wouldn't skip her). FROM = warm `team@xventures.de`, sent=1 failed=0.
 - Systemic fix (`api/routes/auth.py` forgot_password): when no User exists, fall back to looking up an attendee at that email; if found with a magic token, send the welcome/claim email (CTA → set password) instead of doing nothing. NOT force=True (request-triggered), so it stays gated by EMAIL_MODE like all automated mail — reaches the full pool only once EMAIL_MODE flips to "all"; until then ops resend via the batch. No account-enumeration change (identical generic response).
 - Tests: new `tests/test_auth_forgot_password.py` (4 cases: existing user→reset; unclaimed attendee+token→welcome; unknown→nothing; attendee w/o token→nothing). Full suite **95 passed, 0 failed** (no regression).
+
+## 2026-05-21 — [launch] Welcome wave 2 (next 100) sent
+- Sent the next welcome wave via `send_welcome_batch.py --limit 100 --confirm`: **sent=100, failed=0**, FROM warm `team@xventures.de`. Ledger now **162 sent / 561 eligible remaining**.
+- Mauricio Magaldi Suguihura (`mauricio.magaldi@gmail.com`) confirmed included — landed at position 100 of the wave (sent 18:46:54). Note: a *different* attendee "Mauricio Gonzalez, PhD" (hello@euler-advisory.com) exists; only Magaldi Suguihura was targeted.
+- Lesson: the batch preview prints only the first 10 targets + "… and N more", so grepping preview output for a specific later-positioned email gives a false negative — verify inclusion via the ledger after send, not the preview.
+- Reminder for the 700-unclaimed self-recovery: EMAIL_MODE is still `allowlist` on Railway. The shipped forgot-password fallback (commit 324e8a9) only reaches attendees once EMAIL_MODE is flipped to `all` (launch-wide decision — un-gates all automated mail). Until then, ops resend welcomes via the batch.
