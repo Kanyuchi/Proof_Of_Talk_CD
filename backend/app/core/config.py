@@ -8,8 +8,16 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
 
-    # Database (AWS RDS PostgreSQL + pgvector)
+    # Database (Supabase PostgreSQL + pgvector)
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/pot_matchmaker"
+    # Connection-pool sizing per worker. Defaults are safe for the DIRECT
+    # Supabase connection (db.…:5432), which has a low backend-connection
+    # ceiling: pool_size + max_overflow per Railway worker must stay well
+    # under it. When DATABASE_URL points at the transaction-mode POOLER
+    # (…pooler.supabase.com:6543), pgbouncer multiplexes, so these can be
+    # raised via env for a bigger spike ceiling.
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
 
     # OpenAI
     OPENAI_API_KEY: str = ""
