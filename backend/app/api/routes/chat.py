@@ -1,5 +1,4 @@
 import logging
-import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy import text as sa_text
