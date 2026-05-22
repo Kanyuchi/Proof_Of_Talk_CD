@@ -57,3 +57,14 @@ tools/whatsapp-mcp/whatsapp-bridge/store/
 tools/whatsapp-mcp/.env
 tools/whatsapp-mcp/**/*.db
 tools/whatsapp-mcp/**/*.db-journal
+
+# Playwright MCP browser artifacts (accessibility snapshots, screenshots, console logs)
+.playwright-mcp/
+
+# Root-level scratch screenshots (scene*.png, preview-*.png, email-*.png, dashboard-*.png, etc.)
+# Already-tracked root PNGs stay tracked; this only blocks new clutter.
+/*.png
+
+# Backend operational exports + ledgers (local runtime, not source).
+# The 5 already-tracked files here stay tracked; this only blocks new junk.
+backend/exports/
