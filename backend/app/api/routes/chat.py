@@ -105,6 +105,7 @@ async def chat_concierge(
         message=data.message,
         history=history,
         db=db,
+        viewer_id=aid,
     )
 
     # Persist exchange (only when we know who's chatting)

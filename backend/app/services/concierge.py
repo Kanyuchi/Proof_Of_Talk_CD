@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
@@ -285,6 +286,34 @@ async def _list_attendees(db: AsyncSession) -> list[Attendee]:
     return result.scalars().all()
 
 
+def _is_demo(a: Any) -> bool:
+    return (getattr(a, "email", "") or "").lower().endswith("@demo.proofoftalk.io")
+
+
+def _scope_candidates(attendees: list[Attendee], viewer: Attendee | None) -> list[Attendee]:
+    """Restrict the concierge's candidate pool by who's asking.
+
+    Demo/video personas (@demo.proofoftalk.io) see ONLY other demo personas, so
+    the concierge stays demo-safe on camera. Everyone else sees the real pool
+    with internal staff AND demo personas excluded — mirrors staff_filter so the
+    demo set never leaks into a real attendee's recommendations. Always drops the
+    viewer themselves.
+    """
+    from app.services.staff_filter import is_internal_staff
+    vid = getattr(viewer, "id", None)
+    viewer_is_demo = bool(viewer) and _is_demo(viewer)
+    out = []
+    for a in attendees:
+        if vid is not None and a.id == vid:
+            continue
+        if viewer_is_demo:
+            if _is_demo(a):
+                out.append(a)
+        elif not is_internal_staff(a):
+            out.append(a)
+    return out
+
+
 def _brief_attendee_line(a: Attendee) -> str:
     intents = ", ".join(a.intent_tags) if a.intent_tags else "none"
     deal = f"{a.deal_readiness_score:.0%}" if a.deal_readiness_score else "0%"
@@ -427,9 +456,11 @@ async def concierge_chat(
     message: str,
     history: list[dict],
     db: AsyncSession,
+    viewer_id: uuid.UUID | None = None,
 ) -> str:
     """Run one turn of concierge conversation with optional agentic orchestration."""
-    attendees = await _list_attendees(db)
+    viewer = await db.get(Attendee, viewer_id) if viewer_id else None
+    attendees = _scope_candidates(await _list_attendees(db), viewer)
 
     if settings.AI_AGENT_ENABLED:
         plan = await _agent_plan(message, history, attendees)
