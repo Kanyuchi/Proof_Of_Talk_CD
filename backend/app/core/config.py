@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     # 2026-05-17). Reset SECRET_KEY post-event to force everyone to re-auth.
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 30
 
+    # Supabase REST / Storage. Service-role key bypasses RLS — server-side
+    # only, never expose to the client. Used by the avatar upload service.
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
+
     # Integration (Runa / third-party)
     INTEGRATION_API_KEY: str = ""
     INTEGRATION_API_KEY_SECONDARY: str = ""  # For key rotation

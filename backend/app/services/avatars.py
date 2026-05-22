@@ -30,3 +30,33 @@ def validate_upload(data: bytes, content_type: str) -> None:
         raise AvatarError("Empty file")
     if len(data) > MAX_BYTES:
         raise AvatarError("File too large (max 2 MB)")
+
+
+def upload_avatar(attendee_id: str, data: bytes, content_type: str) -> str:
+    """Validate + store the image; return a public URL with a cache-buster.
+
+    Deterministic key `{attendee_id}.{ext}` so a re-upload overwrites in place
+    (x-upsert). The `?v=` suffix forces clients/CDN to refetch after a replace.
+    """
+    content_type = (content_type or "").strip().lower()
+    validate_upload(data, content_type)
+    settings = get_settings()
+    base = settings.SUPABASE_URL.rstrip("/")
+    key = f"{attendee_id}.{EXT[content_type]}"
+    headers = {
+        "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": content_type,
+        "x-upsert": "true",
+    }
+    try:
+        with httpx.Client(timeout=30) as client:
+            resp = client.post(
+                f"{base}/storage/v1/object/{BUCKET}/{key}",
+                headers=headers,
+                content=data,
+            )
+            resp.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise AvatarError(f"Storage upload failed: {exc}") from exc
+    return f"{base}/storage/v1/object/public/{BUCKET}/{key}?v={int(time.time())}"
