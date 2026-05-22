@@ -45,9 +45,9 @@ export default function SponsorJoin() {
         target_companies: form.target_companies.trim() || undefined,
       });
       navigate("/matches");
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      setError(typeof detail === "string" ? detail : "Something went wrong. Please try again.");
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(detail || "Something went wrong. Please try again.");
       setSubmitting(false);
     }
   };
