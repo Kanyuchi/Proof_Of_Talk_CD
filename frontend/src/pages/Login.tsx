@@ -15,19 +15,19 @@ export default function Login() {
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupSent, setSetupSent] = useState(false);
 
-  const sendSetupLink = async () => {
+  const sendSignInLink = async () => {
     if (!email.trim()) {
-      setError("Enter your email above first, then tap to get a setup link.");
+      setError("Enter your email address first.");
       return;
     }
     setSetupLoading(true);
     try {
       await forgotPassword(email);
     } catch {
-      // fall through — always show the generic confirmation (no enumeration)
+      // fall through — always show confirmation (no enumeration)
     } finally {
       setSetupLoading(false);
-      setError(null); // clear the login error so we don't show red + green at once
+      setError(null); // clear any error so red + green don't clash
       setSetupSent(true);
     }
   };
@@ -62,46 +62,27 @@ export default function Login() {
           onSubmit={handleSubmit}
           className="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4"
         >
+          {/* Confirmation box — shown after link is sent */}
+          {setupSent && (
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+              Check your email — we've sent you a secure link to sign in. (Check spam too.)
+            </div>
+          )}
+
+          {/* Error box */}
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
               {error}
             </div>
           )}
 
-          {error && !setupSent && (
-            <div className="space-y-2">
-              <p className="text-xs text-white/50 text-center">
-                First time here, or haven't set a password yet?
-              </p>
-              <button
-                type="button"
-                onClick={sendSetupLink}
-                disabled={setupLoading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/5 border border-white/10 text-white/80 text-sm font-medium rounded-xl hover:bg-white/10 hover:border-[#E76315]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {setupLoading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
-                ) : (
-                  <Mail className="w-4 h-4 text-[#E76315]" />
-                )}
-                {setupLoading ? "Sending…" : "Email me a setup link"}
-              </button>
-            </div>
-          )}
-
-          {setupSent && (
-            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
-              If your email is in our system, we've sent a link to set your password. Check your inbox (and spam).
-            </div>
-          )}
-
+          {/* Shared email input */}
           <div>
             <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">
               Email
             </label>
             <input
               type="email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
@@ -109,6 +90,34 @@ export default function Login() {
             />
           </div>
 
+          {/* PRIMARY: passwordless action — always visible */}
+          <div>
+            <button
+              type="button"
+              onClick={sendSignInLink}
+              disabled={setupLoading}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-[#E76315] text-black font-semibold rounded-xl hover:bg-[#FF833A] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {setupLoading ? (
+                <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              ) : (
+                <Mail className="w-4 h-4" />
+              )}
+              {setupLoading ? "Sending…" : "Email me a sign-in link"}
+            </button>
+            <p className="text-xs text-white/40 text-center mt-2">
+              No password needed — we'll email a secure link to your inbox.
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="relative flex items-center gap-3">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="text-xs text-white/30 whitespace-nowrap">or sign in with a password</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
+
+          {/* De-emphasized password section */}
           <div>
             <label className="block text-xs text-white/40 uppercase font-medium mb-1.5">
               Password
@@ -116,7 +125,6 @@ export default function Login() {
             <div className="relative">
               <input
                 type={showPw ? "text" : "password"}
-                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -141,14 +149,14 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-[#E76315] text-black font-semibold rounded-xl hover:bg-[#FF833A] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/5 border border-white/10 text-white/80 font-medium rounded-xl hover:bg-white/10 hover:border-[#E76315]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
-              <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
             ) : (
               <LogIn className="w-4 h-4" />
             )}
-            {loading ? "Signing in…" : "Sign In"}
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
 
