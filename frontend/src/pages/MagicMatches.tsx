@@ -169,9 +169,10 @@ export default function MagicMatches() {
           >
             <KeyRound className="w-5 h-5 text-[#E76315]" />
             <div className="flex-1">
-              <h3 className="font-semibold text-[#E76315]">Unlock full access</h3>
+              <h3 className="font-semibold text-[#E76315]">Set your password</h3>
               <p className="text-xs text-white/40">
-                Set a password to message your matches and use the AI Concierge.
+                You already have a profile from your ticket — just choose a password
+                to log in and unlock messaging and the AI Concierge.
               </p>
             </div>
             <span className="text-white/30 text-sm">{claimOpen ? "−" : "+"}</span>
@@ -180,7 +181,7 @@ export default function MagicMatches() {
             <div className="space-y-3 mt-4">
               <div>
                 <label className="text-xs text-white/50 block mb-1">
-                  Email <span className="text-white/25">(only if it's not already on your ticket)</span>
+                  Email <span className="text-white/25">(leave blank — we'll use the email from your ticket)</span>
                 </label>
                 <input
                   type="email"
