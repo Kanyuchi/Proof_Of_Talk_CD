@@ -409,6 +409,7 @@ export async function updateProfile(body: {
   company?: string;
   title?: string;
   goals?: string;
+  target_companies?: string;
   interests?: string[];
   seeking?: string[];
   not_looking_for?: string[];
