@@ -95,7 +95,8 @@ export default function MagicMatches() {
     !attendee.twitter_handle ||
     !attendee.target_companies ||
     !attendee.linkedin_url ||
-    !attendee.goals
+    !attendee.goals ||
+    !attendee.photo_url
   );
 
   const matches = data?.matches ?? [];
