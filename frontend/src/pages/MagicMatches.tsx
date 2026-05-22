@@ -5,7 +5,8 @@ import {
   Sparkles, Brain, Target, MessageSquare,
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
-import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink } from "../api/client";
+import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink } from "../api/client";
+import PhotoUpload from "../components/PhotoUpload";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import GridOrgCard from "../components/GridOrgCard";
 import AttendeeAvatar from "../components/AttendeeAvatar";
@@ -217,6 +218,17 @@ export default function MagicMatches() {
             The more we know, the better your introductions. This takes 30 seconds.
           </p>
           <div className="space-y-3">
+            {!attendee?.photo_url && (
+              <div>
+                <label className="text-xs text-white/50 block mb-1">Profile photo</label>
+                <PhotoUpload
+                  uploadFn={(blob) => uploadPhotoViaMagicLink(token!, blob)}
+                  onUploaded={() =>
+                    queryClient.invalidateQueries({ queryKey: ["attendee", attendeeId] })
+                  }
+                />
+              </div>
+            )}
             {!attendee?.linkedin_url && (
               <div>
                 <label className="text-xs text-white/50 block mb-1">Your LinkedIn URL</label>
