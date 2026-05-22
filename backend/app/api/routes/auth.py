@@ -300,6 +300,8 @@ async def upload_profile_photo(
         raise HTTPException(status_code=400, detail=str(exc))
     attendee.photo_url = url
     await db.commit()
+    # No db.refresh here (unlike update_profile): the response is built from the
+    # local `url`, not the now-expired ORM object, so a reload would be wasted.
     return {"photo_url": url}
 
 

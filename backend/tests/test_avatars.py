@@ -209,14 +209,25 @@ def overrides():
 
 
 def test_auth_photo_requires_jwt(overrides):
-    # Remove any inherited require_auth override so the REAL auth dependency
-    # runs; the fixture restores it afterward.
+    # Remove inherited overrides so the REAL auth dependency runs and fails
+    # first (require_auth is declared before get_db). Fixture restores after.
     overrides.pop(require_auth, None)
+    overrides.pop(get_db, None)
     r = _photo_client.post(
         "/api/v1/auth/profile/photo",
         files={"file": ("a.jpg", b"abc", "image/jpeg")},
     )
     assert r.status_code in (401, 403), r.text
+
+
+def test_auth_photo_404_when_no_attendee_linked(overrides):
+    # A logged-in user whose account isn't linked to an attendee row.
+    overrides[require_auth] = lambda: SimpleNamespace(attendee_id=None)
+    r = _photo_client.post(
+        "/api/v1/auth/profile/photo",
+        files={"file": ("a.jpg", b"abc", "image/jpeg")},
+    )
+    assert r.status_code == 404, r.text
 
 
 def test_auth_photo_sets_url_for_logged_in_user(overrides, monkeypatch):
