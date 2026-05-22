@@ -21,7 +21,7 @@ from app.services.enrichment import EnrichmentService
 logger = logging.getLogger(__name__)
 
 
-async def refresh_profile_matches(attendee_id: uuid.UUID) -> None:
+async def refresh_profile_matches(attendee_id: uuid.UUID, notify: bool = False) -> None:
     try:
         async with async_session() as db:
             engine = MatchingEngine(db)
@@ -29,8 +29,9 @@ async def refresh_profile_matches(attendee_id: uuid.UUID) -> None:
             if not attendee:
                 return
             await engine.process_attendee(attendee)
+            # notify defaults False: saves shouldn't spam match emails; callers may opt in.
             await engine.generate_matches_for_attendee(
-                attendee_id, top_k=10, notify=False
+                attendee_id, top_k=10, notify=notify
             )
     except Exception as exc:
         logger.exception("refresh_profile_matches failed for %s: %s", attendee_id, exc)

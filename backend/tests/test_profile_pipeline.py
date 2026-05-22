@@ -76,3 +76,18 @@ async def test_run_full_enrichment_still_refreshes_when_enrich_fails():
          patch.object(pp, "refresh_profile_matches", AsyncMock()) as refresh:
         await pp.run_full_enrichment(aid)
     refresh.assert_awaited_once_with(aid)
+
+
+@pytest.mark.asyncio
+async def test_run_full_enrichment_noop_when_attendee_missing():
+    aid = uuid.uuid4()
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=None)
+    svc = MagicMock()
+    svc.enrich_attendee = AsyncMock()
+    with patch.object(pp, "async_session", _fake_session(db)), \
+         patch.object(pp, "EnrichmentService", MagicMock(return_value=svc)), \
+         patch.object(pp, "refresh_profile_matches", AsyncMock()) as refresh:
+        await pp.run_full_enrichment(aid)
+    svc.enrich_attendee.assert_not_awaited()
+    refresh.assert_not_awaited()
