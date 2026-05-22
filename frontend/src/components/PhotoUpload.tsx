@@ -29,9 +29,10 @@ export default function PhotoUpload({ uploadFn, onUploaded }: Props) {
       const { photo_url } = await uploadFn(blob);
       setState("success");
       onUploaded?.(photo_url);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
       setState("error");
-      setError(err?.response?.data?.detail || err?.message || "Upload failed.");
+      setError(e?.response?.data?.detail || e?.message || "Upload failed.");
     }
   }
 
@@ -55,6 +56,7 @@ export default function PhotoUpload({ uploadFn, onUploaded }: Props) {
         ref={inputRef}
         type="file"
         accept="image/*"
+        aria-label="Upload or change profile photo"
         className="hidden"
         onChange={handleFile}
       />
