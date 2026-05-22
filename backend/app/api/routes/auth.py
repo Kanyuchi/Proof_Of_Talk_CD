@@ -7,14 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.core.database import get_db, async_session
+from app.core.database import get_db
 from app.core.security import verify_password, get_password_hash, create_access_token, create_reset_token, decode_reset_token
 from app.core.deps import require_auth
 from app.core.limiter import limiter
 from app.models.user import User
 from app.models.attendee import Attendee
-from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse, ForgotPasswordRequest, ResetPasswordRequest, ClaimAccountRequest
-from app.services.matching import MatchingEngine
+from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse, ForgotPasswordRequest, ResetPasswordRequest, ClaimAccountRequest, JoinRequest
+from app.services.profile_pipeline import refresh_profile_matches, run_full_enrichment
 from app.services.email import send_password_reset_email, send_welcome_email
 from app.services.avatars import upload_avatar, AvatarError, MAX_BYTES
 
@@ -23,24 +23,79 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-async def _process_attendee_bg(attendee_id: uuid.UUID) -> None:
-    """Run AI pipeline on a newly registered attendee.
+async def _upsert_attendee_from_payload(
+    db: AsyncSession,
+    data,
+    *,
+    force_ticket_type: str | None,
+    enforce_ticket_gate: bool,
+) -> Attendee:
+    """Create a new attendee from a register/join payload, or merge the payload
+    onto an existing row at the same email. Uses getattr so it tolerates both
+    RegisterRequest and JoinRequest. Caller is responsible for flush/commit.
 
-    Fire-and-forget — invoked via `asyncio.create_task`, NOT FastAPI's
-    BackgroundTasks. Reason: BackgroundTasks holds the request worker
-    until the task completes, so a 10-20s OpenAI/Grid/embed pipeline
-    can cause the Netlify edge to 504 even though the response is ready.
-    asyncio.create_task lets the worker return immediately and the AI
-    processing runs detached on the event loop.
+    force_ticket_type: when set, overrides ticket_type on both new and existing
+      rows (join forces "SPONSOR"). enforce_ticket_gate: when True, a new email
+      with no attendee row is blocked by REQUIRE_TICKET_TO_REGISTER (register);
+      join passes False because the invite code is the gate.
     """
-    try:
-        async with async_session() as db:
-            engine = MatchingEngine(db)
-            attendee = await db.get(Attendee, attendee_id)
-            if attendee:
-                await engine.process_attendee(attendee)
-    except Exception as exc:
-        logger.exception("Detached attendee processing failed for %s: %s", attendee_id, exc)
+    existing = (await db.execute(
+        select(Attendee).where(Attendee.email == data.email)
+    )).scalars().first()
+
+    if existing:
+        for field in ("name", "company", "title", "linkedin_url",
+                      "twitter_handle", "company_website", "goals",
+                      "deal_stage", "target_companies"):
+            val = getattr(data, field, None)
+            if val:
+                setattr(existing, field, val)
+        for list_field in ("interests", "seeking", "not_looking_for",
+                           "preferred_geographies"):
+            val = getattr(data, list_field, None)
+            if val:
+                setattr(existing, list_field, val)
+        if getattr(data, "privacy_mode", None) in ("full", "b2b_only"):
+            existing.privacy_mode = data.privacy_mode
+        if force_ticket_type:
+            existing.ticket_type = force_ticket_type
+        if not existing.magic_access_token:
+            existing.magic_access_token = secrets.token_urlsafe(32)
+        return existing
+
+    if enforce_ticket_gate and get_settings().REQUIRE_TICKET_TO_REGISTER:
+        logger.info("register: blocked non-ticket email %s", data.email)
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "We couldn't find a Proof of Talk ticket for this email. "
+                "Please register with the email address you used to buy your pass. "
+                "If you believe this is an error, contact the Proof of Talk team."
+            ),
+        )
+
+    pm = getattr(data, "privacy_mode", "full")
+    attendee = Attendee(
+        name=data.name,
+        email=data.email,
+        company=getattr(data, "company", "") or "",
+        title=getattr(data, "title", "") or "",
+        ticket_type=force_ticket_type or getattr(data, "ticket_type", "delegate"),
+        interests=getattr(data, "interests", []) or [],
+        goals=getattr(data, "goals", None),
+        target_companies=getattr(data, "target_companies", None),
+        seeking=getattr(data, "seeking", []) or [],
+        not_looking_for=getattr(data, "not_looking_for", []) or [],
+        preferred_geographies=getattr(data, "preferred_geographies", []) or [],
+        deal_stage=getattr(data, "deal_stage", None),
+        linkedin_url=getattr(data, "linkedin_url", None),
+        twitter_handle=getattr(data, "twitter_handle", None),
+        company_website=getattr(data, "company_website", None),
+        magic_access_token=secrets.token_urlsafe(32),
+        privacy_mode=pm if pm in ("full", "b2b_only") else "full",
+    )
+    db.add(attendee)
+    return attendee
 
 
 @router.post("/register", response_model=Token, status_code=201)
@@ -61,64 +116,9 @@ async def register(
     if (await db.execute(select(User).where(User.email == data.email))).scalars().first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    existing_attendee = (await db.execute(
-        select(Attendee).where(Attendee.email == data.email)
-    )).scalars().first()
-
-    if existing_attendee:
-        # Merge non-empty registration fields onto the existing row —
-        # the user is the source of truth for their own profile.
-        for field in ("name", "company", "title", "linkedin_url",
-                      "twitter_handle", "company_website", "goals",
-                      "deal_stage"):
-            val = getattr(data, field, None)
-            if val:
-                setattr(existing_attendee, field, val)
-        for list_field in ("interests", "seeking", "not_looking_for",
-                           "preferred_geographies"):
-            val = getattr(data, list_field, None)
-            if val:
-                setattr(existing_attendee, list_field, val)
-        if data.privacy_mode in ("full", "b2b_only"):
-            existing_attendee.privacy_mode = data.privacy_mode
-        if not existing_attendee.magic_access_token:
-            existing_attendee.magic_access_token = secrets.token_urlsafe(32)
-        attendee = existing_attendee
-    else:
-        # Ticket gate: no attendee row at this email = no Proof of Talk
-        # ticket on file. Block self-registration so the pool stays
-        # ticket-verified. Toggle off via REQUIRE_TICKET_TO_REGISTER if it
-        # ever locks out a legitimate group.
-        if get_settings().REQUIRE_TICKET_TO_REGISTER:
-            logger.info("register: blocked non-ticket email %s", data.email)
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    "We couldn't find a Proof of Talk ticket for this email. "
-                    "Please register with the email address you used to buy your pass. "
-                    "If you believe this is an error, contact the Proof of Talk team."
-                ),
-            )
-        # Fresh registration — create a new attendee row.
-        attendee = Attendee(
-            name=data.name,
-            email=data.email,
-            company=data.company,
-            title=data.title,
-            ticket_type=data.ticket_type,
-            interests=data.interests,
-            goals=data.goals,
-            seeking=data.seeking,
-            not_looking_for=data.not_looking_for,
-            preferred_geographies=data.preferred_geographies,
-            deal_stage=data.deal_stage,
-            linkedin_url=data.linkedin_url,
-            twitter_handle=data.twitter_handle,
-            company_website=data.company_website,
-            magic_access_token=secrets.token_urlsafe(32),
-            privacy_mode=data.privacy_mode if data.privacy_mode in ("full", "b2b_only") else "full",
-        )
-        db.add(attendee)
+    attendee = await _upsert_attendee_from_payload(
+        db, data, force_ticket_type=None, enforce_ticket_gate=True,
+    )
 
     await db.flush()  # ensures attendee.id is populated
 
@@ -132,11 +132,9 @@ async def register(
     db.add(user)
     await db.commit()
 
-    # Fire-and-forget AI processing. asyncio.create_task lets the worker
-    # release the response immediately; FastAPI's BackgroundTasks would
-    # hold the worker until processing finishes, causing edge timeouts
-    # on slow OpenAI/Grid pipelines (William Raulin's 504, 2026-05-15).
-    asyncio.create_task(_process_attendee_bg(attendee.id))
+    # Re-embed + generate matches immediately so new registrants see matches
+    # within seconds instead of waiting for the 02:45 UTC cron.
+    asyncio.create_task(refresh_profile_matches(attendee.id))
 
     token = create_access_token({"sub": str(user.id)})
     return Token(access_token=token)
