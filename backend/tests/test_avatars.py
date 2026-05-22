@@ -6,6 +6,7 @@ from unittest.mock import Mock
 from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import get_db
+from app.core.deps import require_auth
 from app.services import avatars
 
 
@@ -191,3 +192,58 @@ def test_magic_photo_400_on_short_token():
         files={"file": ("a.jpg", b"abc", "image/jpeg")},
     )
     assert r.status_code == 400, r.text
+
+
+# --- authenticated photo endpoint ----------------------------------------------
+@pytest.fixture
+def overrides():
+    """Snapshot/restore app.dependency_overrides so a test's changes can't leak
+    into — or inherit from — other test modules' module-level overrides
+    (e.g. test_pending_count_route sets require_auth/get_db at import time)."""
+    saved = dict(app.dependency_overrides)
+    try:
+        yield app.dependency_overrides
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(saved)
+
+
+def test_auth_photo_requires_jwt(overrides):
+    # Remove any inherited require_auth override so the REAL auth dependency
+    # runs; the fixture restores it afterward.
+    overrides.pop(require_auth, None)
+    r = _photo_client.post(
+        "/api/v1/auth/profile/photo",
+        files={"file": ("a.jpg", b"abc", "image/jpeg")},
+    )
+    assert r.status_code in (401, 403), r.text
+
+
+def test_auth_photo_sets_url_for_logged_in_user(overrides, monkeypatch):
+    attendee = SimpleNamespace(id="att-2", photo_url=None)
+
+    async def _fake_upload(aid, data, ct):
+        return "https://example/public/avatars/y.jpg?v=2"
+
+    monkeypatch.setattr("app.api.routes.auth.upload_avatar", _fake_upload)
+
+    class _FakeDB:
+        async def get(self, model, pk):
+            return attendee
+
+        async def commit(self):
+            pass
+
+    async def _db_dep():
+        yield _FakeDB()
+
+    overrides[get_db] = _db_dep
+    overrides[require_auth] = lambda: SimpleNamespace(attendee_id="att-2")
+
+    r = _photo_client.post(
+        "/api/v1/auth/profile/photo",
+        files={"file": ("a.jpg", b"abc", "image/jpeg")},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["photo_url"] == "https://example/public/avatars/y.jpg?v=2"
+    assert attendee.photo_url == "https://example/public/avatars/y.jpg?v=2"
