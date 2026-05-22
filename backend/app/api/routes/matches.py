@@ -1,3 +1,4 @@
+import asyncio
 import secrets
 from uuid import UUID
 from datetime import datetime
@@ -19,6 +20,7 @@ from app.schemas.attendee import (
 )
 from app.services.avatars import upload_avatar, AvatarError, MAX_BYTES
 from app.services.matching import MatchingEngine
+from app.services.profile_pipeline import refresh_profile_matches
 from app.services.slots import mutual_free_slots, has_conflict
 from app.services.match_visibility import ViewerMatch, order_and_cap, tier_limit, next_tier_unlock
 from app.services.concierge import profile_data_quality, compute_completeness_pct
@@ -409,6 +411,8 @@ async def update_profile_via_magic_link(
         attendee.goals = (data.goals or "").strip() or None
 
     await db.commit()
+    # Self-fill via magic link also unlocks/refreshes matches immediately.
+    asyncio.create_task(refresh_profile_matches(attendee.id))
     return {"status": "updated"}
 
 
