@@ -27,6 +27,7 @@ export default function Login() {
       // fall through — always show the generic confirmation (no enumeration)
     } finally {
       setSetupLoading(false);
+      setError(null); // clear the login error so we don't show red + green at once
       setSetupSent(true);
     }
   };
