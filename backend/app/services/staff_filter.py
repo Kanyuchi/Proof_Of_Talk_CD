@@ -16,7 +16,14 @@ this module is the single source of truth.
 
 from typing import Any
 
-INTERNAL_EMAIL_DOMAINS: set[str] = {"proofoftalk.io", "xventures.de", "x-ventures.de"}
+INTERNAL_EMAIL_DOMAINS: set[str] = {
+    "proofoftalk.io", "xventures.de", "x-ventures.de",
+    # Isolated demo/video personas — full fake profiles that match ONLY each
+    # other (see scripts/seed_demo_profiles.py). Treated as internal so they
+    # never surface in real attendees' candidate retrieval (both directions),
+    # and they're excluded from dashboard counts too.
+    "demo.proofoftalk.io",
+}
 
 INTERNAL_COMPANY_PATTERNS: set[str] = {
     "proof of talk", "proofoftalk", "proof of talk sa",
