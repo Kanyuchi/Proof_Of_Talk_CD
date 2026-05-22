@@ -23,6 +23,7 @@ class AvatarError(Exception):
 
 
 def validate_upload(data: bytes, content_type: str) -> None:
+    content_type = (content_type or "").strip().lower()
     if content_type not in ALLOWED_TYPES:
         raise AvatarError(f"Unsupported image type: {content_type!r}")
     if not data:
