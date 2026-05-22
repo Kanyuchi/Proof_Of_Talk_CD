@@ -34,7 +34,7 @@ export default function MagicMatches() {
     }
   }, [searchParams]);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["magic-matches", token],
     queryFn: () => getMatchesByMagicLink(token!, 10),
     enabled: !!token,
@@ -112,10 +112,23 @@ export default function MagicMatches() {
     return (
       <div className="text-center py-20 space-y-4">
         <Sparkles className="w-8 h-8 text-white/20 mx-auto" />
-        <p className="text-white/40">This link is invalid or has expired.</p>
-        <Link to="/login" className="text-[#E76315] text-sm hover:underline">
-          Log in instead →
-        </Link>
+        <p className="text-white/40">
+          {error ? "We couldn't load this page." : "This link is invalid or has expired."}
+        </p>
+        {error && (
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 rounded-xl font-semibold text-white text-sm"
+            style={{ background: "#E76315" }}
+          >
+            Try again
+          </button>
+        )}
+        <div>
+          <Link to="/login" className="text-[#E76315] text-sm hover:underline">
+            {error ? "If you have an account, you can sign in instead →" : "Log in instead →"}
+          </Link>
+        </div>
       </div>
     );
   }
