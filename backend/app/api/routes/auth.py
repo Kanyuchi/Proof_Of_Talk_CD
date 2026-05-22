@@ -2,7 +2,7 @@ import asyncio
 import logging
 import secrets
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -16,6 +16,7 @@ from app.models.attendee import Attendee
 from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse, ForgotPasswordRequest, ResetPasswordRequest, ClaimAccountRequest
 from app.services.matching import MatchingEngine
 from app.services.email import send_password_reset_email, send_welcome_email
+from app.services.avatars import upload_avatar, AvatarError, MAX_BYTES
 
 logger = logging.getLogger(__name__)
 
@@ -278,6 +279,32 @@ async def update_profile(
         "user": UserResponse.model_validate(user),
         "attendee": AttendeeResponse.model_validate(attendee),
     }
+
+
+@router.post("/profile/photo")
+@limiter.limit("10/minute")
+async def upload_profile_photo(
+    request: Request,
+    file: UploadFile = File(...),
+    user: User = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload the logged-in user's profile photo."""
+    if not user.attendee_id:
+        raise HTTPException(status_code=404, detail="No attendee profile linked")
+    attendee = await db.get(Attendee, user.attendee_id)
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Attendee profile not found")
+    data = await file.read(MAX_BYTES + 1)
+    try:
+        url = await upload_avatar(str(attendee.id), data, file.content_type or "")
+    except AvatarError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    attendee.photo_url = url
+    await db.commit()
+    # No db.refresh here (unlike update_profile): the response is built from the
+    # local `url`, not the now-expired ORM object, so a reload would be wasted.
+    return {"photo_url": url}
 
 
 @router.get("/my-magic-link")

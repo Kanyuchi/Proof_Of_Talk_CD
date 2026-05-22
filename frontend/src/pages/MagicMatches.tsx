@@ -5,7 +5,8 @@ import {
   Sparkles, Brain, Target, MessageSquare,
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
-import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink } from "../api/client";
+import { getMatchesByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink } from "../api/client";
+import PhotoUpload from "../components/PhotoUpload";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import GridOrgCard from "../components/GridOrgCard";
 import AttendeeAvatar from "../components/AttendeeAvatar";
@@ -39,12 +40,10 @@ export default function MagicMatches() {
     enabled: !!token,
   });
 
-  const attendeeId = data?.attendee_id;
-  const { data: attendee } = useQuery({
-    queryKey: ["attendee", attendeeId],
-    queryFn: () => getAttendee(attendeeId!),
-    enabled: !!attendeeId,
-  });
+  // The viewer's own profile rides along on the magic-link match response, so
+  // no-login users get it without the auth-gated GET /attendees/{id} (which
+  // 401s for them and left the enrichment card permanently hidden).
+  const attendee = data?.viewer;
 
   const enrichMutation = useMutation({
     mutationFn: () => updateProfileViaMagicLink(token!, {
@@ -55,7 +54,7 @@ export default function MagicMatches() {
     }),
     onSuccess: () => {
       setEnrichSaved(true);
-      queryClient.invalidateQueries({ queryKey: ["attendee", attendeeId] });
+      queryClient.invalidateQueries({ queryKey: ["magic-matches", token] });
       setTimeout(() => setEnrichSaved(false), 3000);
     },
   });
@@ -94,7 +93,8 @@ export default function MagicMatches() {
     !attendee.twitter_handle ||
     !attendee.target_companies ||
     !attendee.linkedin_url ||
-    !attendee.goals
+    !attendee.goals ||
+    !attendee.photo_url
   );
 
   const matches = data?.matches ?? [];
@@ -217,6 +217,17 @@ export default function MagicMatches() {
             The more we know, the better your introductions. This takes 30 seconds.
           </p>
           <div className="space-y-3">
+            {!attendee?.photo_url && (
+              <div>
+                <label className="text-xs text-white/50 block mb-1">Profile photo</label>
+                <PhotoUpload
+                  uploadFn={(blob) => uploadPhotoViaMagicLink(token!, blob)}
+                  onUploaded={() =>
+                    queryClient.invalidateQueries({ queryKey: ["magic-matches", token] })
+                  }
+                />
+              </div>
+            )}
             {!attendee?.linkedin_url && (
               <div>
                 <label className="text-xs text-white/50 block mb-1">Your LinkedIn URL</label>

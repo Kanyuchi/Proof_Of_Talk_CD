@@ -113,6 +113,10 @@ class MatchResponse(BaseModel):
 class MatchListResponse(BaseModel):
     matches: list[MatchResponse]
     attendee_id: UUID
+    # The viewer's OWN profile. Surfaced so the magic-link (no-login) page can
+    # render its enrichment card + avatar without calling the auth-gated
+    # GET /attendees/{id} (which 401s for no-login users).
+    viewer: AttendeeResponse | None = None
     # Enrichment-gated visibility metadata (deeper-match-pool spec).
     tier: str | None = None             # viewer completeness tier: SPARSE/PARTIAL/GOOD
     visible_count: int = 0              # review-pool matches actually returned
