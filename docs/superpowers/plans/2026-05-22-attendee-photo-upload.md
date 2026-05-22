@@ -30,7 +30,7 @@
 
 **Files:** none (infrastructure).
 
-- [ ] **Step 1: Create the public `avatars` bucket**
+- [x] **Step 1: Create the public `avatars` bucket** ✅ DONE 2026-05-22 (project `mkcememoueziibbpqhfk`)
 
 Via Supabase MCP `execute_sql` (or the dashboard → Storage → New bucket):
 
@@ -40,7 +40,7 @@ values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
 ```
 
-- [ ] **Step 2: Verify it exists and is public**
+- [x] **Step 2: Verify it exists and is public** ✅ DONE — query returned `{id: avatars, public: true}`
 
 ```sql
 select id, name, public from storage.buckets where id = 'avatars';
