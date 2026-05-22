@@ -332,12 +332,20 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Asy
         # awaiting it inline blocks the event loop and was hanging the request
         # ~60s on prod. Run it in a thread, detached, so the response returns
         # immediately (same rationale as _process_attendee_bg above).
+        # force=True: account recovery is transactional and must reach real
+        # (non-team) attendees even while EMAIL_MODE=allowlist gates bulk
+        # engagement mail. Without it, a CLAIMED non-team account (e.g.
+        # @xapo.com) gets a silent no-op and can never reset its password.
+        # Same scoped, safe exception the unclaimed-attendee welcome branch
+        # uses below: user-initiated, rate-limited (3/min), and only ever
+        # addressed to the email already on the User row. (Melana Noory, 2026-05-22.)
         asyncio.create_task(
             asyncio.to_thread(
                 send_password_reset_email,
                 to_email=user.email,
                 user_name=user.full_name,
                 reset_token=token,
+                force=True,
             )
         )
         logger.info("Password reset email queued for %s", data.email)

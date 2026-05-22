@@ -55,6 +55,12 @@ async def test_existing_user_gets_password_reset_not_welcome():
     out, welcome, reset = await _call_forgot(db)
 
     reset.assert_called_once()
+    # force=True so a CLAIMED non-team account (e.g. @xapo.com) can still
+    # recover its password while EMAIL_MODE=allowlist — account recovery is
+    # transactional and must not be blocked by the team-only allowlist. Mirrors
+    # the welcome branch's force. (Regression: Melana Noory, 2026-05-22.)
+    _, reset_kwargs = reset.call_args
+    assert reset_kwargs.get("force") is True
     welcome.assert_not_called()
     assert "reset link" in out["message"]
 
@@ -107,3 +113,22 @@ async def test_attendee_without_token_sends_nothing():
 
     welcome.assert_not_called()
     reset.assert_not_called()
+
+
+def test_send_password_reset_email_forwards_force_to_send_email():
+    """The reset sender must forward `force` to the central _send_email gate so
+    the handler's force=True actually bypasses EMAIL_MODE (not just accepted and
+    dropped). Default stays force=False."""
+    import app.services.email as email_mod
+
+    with patch.object(email_mod, "_send_email", MagicMock(return_value=True)) as se:
+        email_mod.send_password_reset_email(
+            to_email="a@b.com", user_name="A", reset_token="t", force=True
+        )
+    assert se.call_args.kwargs.get("force") is True
+
+    with patch.object(email_mod, "_send_email", MagicMock(return_value=True)) as se2:
+        email_mod.send_password_reset_email(
+            to_email="a@b.com", user_name="A", reset_token="t"
+        )
+    assert not se2.call_args.kwargs.get("force")

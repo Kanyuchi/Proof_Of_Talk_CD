@@ -247,6 +247,7 @@ def send_password_reset_email(
     user_name: str,
     reset_token: str,
     app_url: str | None = None,
+    force: bool = False,
 ) -> None:
     """Send a password reset email with a tokenized link.
 
@@ -255,6 +256,11 @@ def send_password_reset_email(
         user_name: Full name of the user.
         reset_token: JWT reset token.
         app_url: Base URL of the app for the reset link.
+        force: Bypass the EMAIL_MODE gate for this send. Password reset is
+            account recovery (transactional), so it must reach real attendees
+            even while EMAIL_MODE=allowlist holds back bulk engagement mail.
+            Safe from the request path: rate-limited and only ever addressed to
+            the email already on the User row.
     """
 
     settings = get_settings()
@@ -286,7 +292,7 @@ def send_password_reset_email(
         f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
     )
 
-    _send_email(to_email, subject, body_html, body_text)
+    _send_email(to_email, subject, body_html, body_text, force=force)
 
 
 def send_match_intro_email(
