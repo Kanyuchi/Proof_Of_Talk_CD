@@ -1,7 +1,7 @@
 import secrets
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import select, or_, and_, func
@@ -17,6 +17,7 @@ from app.schemas.attendee import (
     AttendeeResponse,
     redact_for_privacy,
 )
+from app.services.avatars import upload_avatar, AvatarError
 from app.services.matching import MatchingEngine
 from app.services.slots import mutual_free_slots, has_conflict
 from app.services.match_visibility import ViewerMatch, order_and_cap, tier_limit, next_tier_unlock
@@ -405,6 +406,28 @@ async def update_profile_via_magic_link(
 
     await db.commit()
     return {"status": "updated"}
+
+
+@router.post("/m/{token}/photo")
+async def upload_photo_via_magic_link(
+    token: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Attendee).where(Attendee.magic_access_token == token)
+    )
+    attendee = result.scalar_one_or_none()
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Invalid link")
+    data = await file.read()
+    try:
+        url = await upload_avatar(str(attendee.id), data, file.content_type or "")
+    except AvatarError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    attendee.photo_url = url
+    await db.commit()
+    return {"photo_url": url}
 
 
 @router.post("/generate-tokens", status_code=200)

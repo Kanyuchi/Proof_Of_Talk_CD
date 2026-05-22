@@ -3,6 +3,9 @@ import pytest
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+from fastapi.testclient import TestClient
+from app.main import app
+from app.core.database import get_db
 from app.services import avatars
 
 
@@ -98,3 +101,61 @@ async def test_upload_avatar_raises_on_storage_error(monkeypatch):
 
     with pytest.raises(avatars.AvatarError, match="Storage upload failed"):
         await avatars.upload_avatar("att-9", b"abc", "image/jpeg")
+
+
+# --- magic-link photo endpoint -------------------------------------------------
+# Endpoint tests use TestClient + dependency_overrides with a mocked DB (this
+# repo has no test database). Pattern mirrors tests/test_pending_count_route.py.
+_photo_client = TestClient(app, raise_server_exceptions=False)
+
+
+def _override_db_returning(attendee):
+    class _Result:
+        def scalar_one_or_none(self):
+            return attendee
+
+    class _FakeDB:
+        async def execute(self, *a, **k):
+            return _Result()
+
+        async def commit(self):
+            pass
+
+    async def _dep():
+        yield _FakeDB()
+
+    return _dep
+
+
+def test_magic_photo_sets_url_for_token_attendee(monkeypatch):
+    attendee = SimpleNamespace(id="att-1", photo_url=None, magic_access_token="tok")
+
+    async def _fake_upload(aid, data, ct):
+        return "https://example/public/avatars/x.jpg?v=1"
+
+    monkeypatch.setattr("app.api.routes.matches.upload_avatar", _fake_upload)
+    app.dependency_overrides[get_db] = _override_db_returning(attendee)
+    try:
+        r = _photo_client.post(
+            "/api/v1/matches/m/tok/photo",
+            files={"file": ("a.jpg", b"abc", "image/jpeg")},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert r.status_code == 200, r.text
+    assert r.json()["photo_url"] == "https://example/public/avatars/x.jpg?v=1"
+    assert attendee.photo_url == "https://example/public/avatars/x.jpg?v=1"
+
+
+def test_magic_photo_404_on_bad_token():
+    app.dependency_overrides[get_db] = _override_db_returning(None)
+    try:
+        r = _photo_client.post(
+            "/api/v1/matches/m/not-a-real-token/photo",
+            files={"file": ("a.jpg", b"abc", "image/jpeg")},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert r.status_code == 404, r.text
