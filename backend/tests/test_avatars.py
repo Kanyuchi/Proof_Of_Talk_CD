@@ -1,4 +1,8 @@
+import httpx
 import pytest
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 from app.services import avatars
 
 
@@ -34,7 +38,14 @@ def test_validate_accepts_exact_max_bytes():
     assert avatars.validate_upload(exactly, "image/jpeg") is None  # boundary is inclusive
 
 
-def test_upload_avatar_puts_bytes_and_returns_public_url(monkeypatch):
+_FAKE_SETTINGS = SimpleNamespace(
+    SUPABASE_URL="https://proj.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY="svc-key",
+)
+
+
+@pytest.mark.asyncio
+async def test_upload_avatar_puts_bytes_and_returns_public_url(monkeypatch):
     captured = {}
 
     class FakeResp:
@@ -42,46 +53,48 @@ def test_upload_avatar_puts_bytes_and_returns_public_url(monkeypatch):
         text = ""
         def raise_for_status(self): pass
 
-    class FakeClient:
+    class FakeAsyncClient:
         def __init__(self, *a, **k): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def post(self, url, headers=None, content=None):
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, url, headers=None, content=None):
             captured["url"] = url
             captured["headers"] = headers
             captured["content"] = content
             return FakeResp()
 
-    monkeypatch.setattr(avatars.httpx, "Client", FakeClient)
+    monkeypatch.setattr(avatars.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(avatars, "get_settings", lambda: _FAKE_SETTINGS)
 
-    url = avatars.upload_avatar("att-123", b"abc", "image/png")
+    url = await avatars.upload_avatar("att-123", b"abc", "image/png")
 
-    assert "/storage/v1/object/avatars/att-123.png" in captured["url"]
+    assert captured["url"] == "https://proj.supabase.co/storage/v1/object/avatars/att-123.png"
     assert captured["headers"]["x-upsert"] == "true"
     assert captured["headers"]["Content-Type"] == "image/png"
+    assert captured["headers"]["apikey"] == "svc-key"
+    assert captured["headers"]["Authorization"] == "Bearer svc-key"
     assert captured["content"] == b"abc"
-    # public URL with cache-buster
-    assert "/storage/v1/object/public/avatars/att-123.png?v=" in url
+    assert url.startswith(
+        "https://proj.supabase.co/storage/v1/object/public/avatars/att-123.png?v="
+    )
 
 
-def test_upload_avatar_raises_on_storage_error(monkeypatch):
-    import httpx as _httpx
-
-    def httpx_err():
-        return _httpx.HTTPStatusError("400", request=None, response=None)
-
+@pytest.mark.asyncio
+async def test_upload_avatar_raises_on_storage_error(monkeypatch):
     class FakeResp:
         status_code = 400
         text = "bad"
         def raise_for_status(self):
-            raise httpx_err()
+            raise httpx.HTTPStatusError("400", request=Mock(), response=Mock())
 
-    class FakeClient:
+    class FakeAsyncClient:
         def __init__(self, *a, **k): pass
-        def __enter__(self): return self
-        def __exit__(self, *a): return False
-        def post(self, *a, **k): return FakeResp()
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def post(self, *a, **k): return FakeResp()
 
-    monkeypatch.setattr(avatars.httpx, "Client", FakeClient)
-    with pytest.raises(avatars.AvatarError):
-        avatars.upload_avatar("att-9", b"abc", "image/jpeg")
+    monkeypatch.setattr(avatars.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(avatars, "get_settings", lambda: _FAKE_SETTINGS)
+
+    with pytest.raises(avatars.AvatarError, match="Storage upload failed"):
+        await avatars.upload_avatar("att-9", b"abc", "image/jpeg")

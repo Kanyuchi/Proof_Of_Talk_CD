@@ -32,7 +32,7 @@ def validate_upload(data: bytes, content_type: str) -> None:
         raise AvatarError("File too large (max 2 MB)")
 
 
-def upload_avatar(attendee_id: str, data: bytes, content_type: str) -> str:
+async def upload_avatar(attendee_id: str, data: bytes, content_type: str) -> str:
     """Validate + store the image; return a public URL with a cache-buster.
 
     Deterministic key `{attendee_id}.{ext}` so a re-upload overwrites in place
@@ -41,6 +41,8 @@ def upload_avatar(attendee_id: str, data: bytes, content_type: str) -> str:
     content_type = (content_type or "").strip().lower()
     validate_upload(data, content_type)
     settings = get_settings()
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise AvatarError("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not configured")
     base = settings.SUPABASE_URL.rstrip("/")
     key = f"{attendee_id}.{EXT[content_type]}"
     headers = {
@@ -50,8 +52,8 @@ def upload_avatar(attendee_id: str, data: bytes, content_type: str) -> str:
         "x-upsert": "true",
     }
     try:
-        with httpx.Client(timeout=30) as client:
-            resp = client.post(
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
                 f"{base}/storage/v1/object/{BUCKET}/{key}",
                 headers=headers,
                 content=data,
