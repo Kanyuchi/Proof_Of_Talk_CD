@@ -282,7 +282,9 @@ async def update_profile(
 
 
 @router.post("/profile/photo")
+@limiter.limit("10/minute")
 async def upload_profile_photo(
+    request: Request,
     file: UploadFile = File(...),
     user: User = Depends(require_auth),
     db: AsyncSession = Depends(get_db),

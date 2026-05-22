@@ -37,6 +37,10 @@ def test_validate_accepts_messy_content_type_casing():
     avatars.validate_upload(b"bytes", " Image/JPEG ")  # normalized, no raise
 
 
+def test_validate_strips_mime_parameters():
+    avatars.validate_upload(b"bytes", "image/jpeg; charset=utf-8")  # no raise
+
+
 def test_validate_accepts_exact_max_bytes():
     exactly = b"x" * avatars.MAX_BYTES
     assert avatars.validate_upload(exactly, "image/jpeg") is None  # boundary is inclusive

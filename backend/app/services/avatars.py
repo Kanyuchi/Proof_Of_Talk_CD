@@ -23,7 +23,7 @@ class AvatarError(Exception):
 
 
 def validate_upload(data: bytes, content_type: str) -> None:
-    content_type = (content_type or "").strip().lower()
+    content_type = (content_type or "").strip().lower().split(";")[0].strip()
     if content_type not in ALLOWED_TYPES:
         raise AvatarError(f"Unsupported image type: {content_type!r}")
     if not data:
@@ -38,7 +38,7 @@ async def upload_avatar(attendee_id: str, data: bytes, content_type: str) -> str
     Deterministic key `{attendee_id}.{ext}` so a re-upload overwrites in place
     (x-upsert). The `?v=` suffix forces clients/CDN to refetch after a replace.
     """
-    content_type = (content_type or "").strip().lower()
+    content_type = (content_type or "").strip().lower().split(";")[0].strip()
     validate_upload(data, content_type)
     settings = get_settings()
     if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:

@@ -1,7 +1,7 @@
 import secrets
 from uuid import UUID
 from datetime import datetime
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import select, or_, and_, func
@@ -23,6 +23,7 @@ from app.services.slots import mutual_free_slots, has_conflict
 from app.services.match_visibility import ViewerMatch, order_and_cap, tier_limit, next_tier_unlock
 from app.services.concierge import profile_data_quality, compute_completeness_pct
 from app.core.deps import require_auth, require_admin
+from app.core.limiter import limiter
 from app.models.user import User
 
 router = APIRouter(prefix="/matches", tags=["matches"])
@@ -409,7 +410,9 @@ async def update_profile_via_magic_link(
 
 
 @router.post("/m/{token}/photo")
+@limiter.limit("10/minute")
 async def upload_photo_via_magic_link(
+    request: Request,
     token: str,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
