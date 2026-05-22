@@ -65,6 +65,14 @@ class Settings(BaseSettings):
     # out a legitimate group (e.g. speakers whose row has a placeholder email).
     REQUIRE_TICKET_TO_REGISTER: bool = True
 
+    # Sponsor self-service invite. Blank = feature OFF (the /join endpoint and
+    # the /join/<code> page both refuse). Set to an unguessable string
+    # (e.g. `python -c "import secrets;print(secrets.token_urlsafe(24))"`) in
+    # Railway env, then share https://meet.proofoftalk.io/join/<code>. Anyone
+    # with the link self-registers a full SPONSOR account; rotating this value
+    # revokes the old link.
+    SPONSOR_INVITE_CODE: str = ""
+
     EMAIL_MODE: str = "off"
     # Comma-separated; used when EMAIL_MODE=allowlist. Entries starting with
     # "@" match a whole domain (e.g. "@proofoftalk.io"), others are exact

@@ -1,6 +1,6 @@
 import { createContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import type { User } from "../types";
-import { loginUser, registerUser, getMe, api } from "../api/client";
+import { loginUser, registerUser, getMe, api, joinViaInvite as joinViaInviteApi } from "../api/client";
 
 interface RegisterData {
   email: string;
@@ -28,6 +28,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
+  joinViaInvite: (data: Parameters<typeof joinViaInviteApi>[0]) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -40,6 +41,7 @@ export const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   login: async () => {},
   register: async () => {},
+  joinViaInvite: async () => {},
   logout: () => {},
   refreshUser: async () => {},
 });
@@ -103,6 +105,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [setAuth]
   );
 
+  const joinViaInvite = useCallback(
+    async (data: Parameters<typeof joinViaInviteApi>[0]) => {
+      const { access_token } = await joinViaInviteApi(data);
+      api.defaults.headers.common["Authorization"] = `Bearer ${access_token}`;
+      const me = await getMe();
+      setAuth(access_token, me);
+    },
+    [setAuth]
+  );
+
   const refreshUser = useCallback(async () => {
     const me = await getMe();
     setUser(me);
@@ -118,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         register,
+        joinViaInvite,
         logout,
         refreshUser,
       }}

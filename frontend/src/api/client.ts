@@ -371,6 +371,25 @@ export async function registerUser(body: {
   return data;
 }
 
+export async function joinViaInvite(body: {
+  invite_code: string;
+  email: string;
+  password: string;
+  name: string;
+  company?: string;
+  title?: string;
+  linkedin_url?: string;
+  twitter_handle?: string;
+  company_website?: string;
+  goals?: string;
+  target_companies?: string;
+  interests?: string[];
+  privacy_mode?: string;
+}): Promise<Token> {
+  const { data } = await api.post("/auth/join", body);
+  return data;
+}
+
 // Claim a full account from a magic-link token (speakers / pre-loaded
 // attendees). Token proves ownership, so this bypasses the registration
 // ticket gate. `email` is only required when the attendee's current email

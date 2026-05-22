@@ -156,6 +156,9 @@ Sponsor intelligence reports pull live data from the CEO Dashboard's Supabase pr
 ### Ferd's Outreach Sheet Sync
 Google Apps Script bound to `PoT26_Master_Email_Database_v3` syncs Supabase attendees + nominations into a `POT Attendees` tab daily at 11 PM. ARRAYFORMULA-based `In Funnel` column on all feeder tabs (COLD, Close network) flags contacts already in the funnel. Repo copy of script at `docs/integrations/sheets_sync/Code.gs`.
 
+### Sponsor self-service invite link
+`/join/:code` (frontend) → `POST /auth/join` (backend) validates the submitted code against `SPONSOR_INVITE_CODE` using constant-time comparison, then creates a full login account tagged `ticket_type=SPONSOR`, bypassing the normal ticket gate. On join, `app/services/profile_pipeline.run_full_enrichment(attendee_id)` runs detached (Grid + website enrichment → re-embed + match generation); LinkedIn is queued for the operator's next manual Playwright pass. Every profile save — Profile page (`PUT /auth/profile`), magic-link enrichment card (`PATCH /matches/m/{token}/profile`), AI Concierge field saves, and registration — now fires `app/services/profile_pipeline.refresh_profile_matches(attendee_id)` so matches refresh in seconds rather than waiting for the 02:45 UTC cron. See `docs/superpowers/specs/2026-05-22-sponsor-invite-link-design.md`.
+
 ### Attendee Profile Embedding
 The embedding is generated from a composite text blob combining: name, title, company, goals, interests, AI summary, and enriched data highlights. This ensures the vector captures the full picture, not just registration keywords.
 
@@ -174,6 +177,7 @@ Copy `backend/.env.example` to `backend/.env` and fill in:
 - `PROXYCURL_API_KEY` — **defunct** (Proxycurl sunset, API returns 410)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — Supabase REST API (for data ingestion scripts)
 - `CEO_DASH_SUPABASE_URL`, `CEO_DASH_SUPABASE_ANON_KEY` — CEO Dashboard Supabase (for live sponsor data)
+- `SPONSOR_INVITE_CODE` — sponsor self-service invite. Blank = feature OFF. Set to an unguessable string, then share `https://meet.proofoftalk.io/join/<code>`. Anyone with the link self-registers a full SPONSOR account; rotating the value revokes the old link.
 
 ## Test Profiles & Production Data
 

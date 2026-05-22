@@ -1,11 +1,11 @@
+import asyncio
 import logging
-import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy import text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import async_session, get_db
+from app.core.database import get_db
 from app.core.deps import require_auth
 from app.core.limiter import limiter
 from app.models.attendee import Attendee
@@ -27,31 +27,11 @@ from app.services.concierge import (
     profile_data_quality,
     select_next_field_to_offer,
 )
+from app.services.profile_pipeline import refresh_profile_matches
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-
-async def _refresh_attendee_matches_bg(attendee_id: uuid.UUID) -> None:
-    """Background task: re-run AI pipeline + regenerate matches for one attendee.
-
-    Fired after a save-field commit so the embedding picks up the new
-    goals/target_companies/interests value and matches reflect the
-    richer profile. Failures are logged; the 02:45 UTC daily refresh
-    is the fallback.
-    """
-    from app.services.matching import MatchingEngine  # local import: avoids circular at module load
-
-    try:
-        async with async_session() as db:
-            engine = MatchingEngine(db)
-            attendee = await db.get(Attendee, attendee_id)
-            if not attendee:
-                return
-            await engine.process_attendee(attendee)
-            await engine.generate_matches_for_attendee(attendee_id, top_k=10)
-    except Exception as e:  # pragma: no cover — log + swallow; cron is fallback
-        logger.exception("concierge save-field background refresh failed: %s", e)
 
 # Keep last N exchanges in the prompt so prompt-cost stays bounded; older
 # turns still live in chat_messages and can be browsed via GET /history.
@@ -237,8 +217,11 @@ async def save_field(
 
     # photo_url doesn't affect embeddings or match quality, so skip the
     # background re-embed — saves an OpenAI call + match-gen round-trip.
+    # Dispatch detached (asyncio.create_task, not BackgroundTasks) per
+    # profile_pipeline's docstring: BackgroundTasks holds the request worker
+    # through the 10-20s pipeline and can 504 the edge.
     if data.field != "photo_url":
-        background_tasks.add_task(_refresh_attendee_matches_bg, attendee.id)
+        asyncio.create_task(refresh_profile_matches(attendee.id))
     return {"ok": True}
 
 
