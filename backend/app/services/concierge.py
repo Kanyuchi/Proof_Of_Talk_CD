@@ -321,6 +321,24 @@ def _brief_attendee_line(a: Attendee) -> str:
     return "\n".join(lines)
 
 
+# Hard cap on how many attendee brief-lines get embedded in the final concierge
+# prompt. The full pool (~830 rows × ~180 tokens) overflowed GPT-4o's 128k
+# window (observed 147k tokens → 400 context_length_exceeded → 500 to the user).
+# 80 relevant rows is plenty for a 2-3 person recommendation and leaves ample
+# headroom for the system prompt, chat history, and the response.
+MAX_PROMPT_ATTENDEES = 80
+
+
+def _select_context_attendees(
+    attendees: list[Attendee], filtered: list[Attendee]
+) -> list[Attendee]:
+    """Pick the attendees to embed in the final prompt, capped to
+    MAX_PROMPT_ATTENDEES. Prefer the agent-filtered (relevant) subset; fall back
+    to a capped slice of the full list when the filter produced nothing."""
+    chosen = filtered if filtered else attendees
+    return chosen[:MAX_PROMPT_ATTENDEES]
+
+
 def _build_attendee_context(attendees: list[Attendee]) -> str:
     return "\n\n".join(_brief_attendee_line(a) for a in attendees)
 
@@ -412,19 +430,23 @@ async def concierge_chat(
 ) -> str:
     """Run one turn of concierge conversation with optional agentic orchestration."""
     attendees = await _list_attendees(db)
-    attendee_context = _build_attendee_context(attendees)
 
     if settings.AI_AGENT_ENABLED:
         plan = await _agent_plan(message, history, attendees)
         filtered = _apply_tool_filters(attendees, plan)
+        # The filtered subset IS the relevant context — embedding it once (capped)
+        # avoids the old double-inclusion (filtered lines here + the full ~830-row
+        # dump below) that blew past GPT-4o's 128k window.
+        context_attendees = _select_context_attendees(attendees, filtered)
         tool_context = (
             "Agent Plan:\n"
-            f"{json.dumps(plan, ensure_ascii=True)}\n\n"
-            "Tool Result (filtered attendees):\n"
-            + "\n\n".join(_brief_attendee_line(a) for a in filtered)
+            f"{json.dumps(plan, ensure_ascii=True)}"
         )
     else:
+        context_attendees = _select_context_attendees(attendees, [])
         tool_context = "Agentic controller disabled."
+
+    attendee_context = _build_attendee_context(context_attendees)
 
     system_prompt = f"""You are the AI Concierge for Proof of Talk 2026 — a friendly, knowledgeable assistant helping attendees navigate an exclusive Web3 conference at the Louvre Palace, Paris (June 2–3, 2026). 2,500 decision-makers, $18 trillion in assets.
 
