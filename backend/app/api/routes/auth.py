@@ -253,7 +253,7 @@ async def update_profile(
         raise HTTPException(status_code=404, detail="Attendee profile not found")
 
     allowed = {
-        "name", "company", "title", "goals", "interests",
+        "name", "company", "title", "goals", "interests", "target_companies",
         "seeking", "not_looking_for", "preferred_geographies", "deal_stage",
         "linkedin_url", "twitter_handle", "company_website", "photo_url",
         "privacy_mode",
