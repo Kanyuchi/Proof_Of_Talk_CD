@@ -313,6 +313,10 @@ async def update_profile(
     await db.commit()
     await db.refresh(attendee)
 
+    # Save triggers an immediate re-embed + match refresh (the "enrich your
+    # profile to unlock better matches" loop) instead of waiting for the cron.
+    asyncio.create_task(refresh_profile_matches(attendee.id))
+
     from app.schemas.attendee import AttendeeResponse
     return {
         "user": UserResponse.model_validate(user),

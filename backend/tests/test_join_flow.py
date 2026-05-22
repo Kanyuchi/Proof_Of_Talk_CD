@@ -143,6 +143,26 @@ async def test_join_rejects_existing_user():
 
 
 @pytest.mark.asyncio
+async def test_profile_save_dispatches_refresh():
+    import uuid
+    aid = uuid.uuid4()
+    attendee = SimpleNamespace(id=aid, embedding=[1.0], name="X")
+    user = SimpleNamespace(attendee_id=aid, full_name="X")
+    db = AsyncMock()
+    db.get = AsyncMock(return_value=attendee)
+    ct = _fake_ct()
+    with patch.object(auth, "refresh_profile_matches", AsyncMock()) as refresh, \
+         patch("asyncio.create_task", ct), \
+         patch.object(auth, "UserResponse") as UR, \
+         patch("app.schemas.attendee.AttendeeResponse") as AR:
+        UR.model_validate.return_value = {}
+        AR.model_validate.return_value = {}
+        await auth.update_profile({"goals": "new goals"}, user, db)
+    refresh.assert_called_once_with(aid)
+    ct.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_join_merges_existing_attendee_and_tags_sponsor():
     existing = SimpleNamespace(
         email="sam@sponsor.com", name="Old", company="Old Co", title="",
