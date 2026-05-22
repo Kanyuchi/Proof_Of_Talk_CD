@@ -1229,3 +1229,13 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - staff_filter change committed for deploy (isolation airtight on prod before the next 02:45 UTC refresh).
 
 ## 2026-05-22 — [auth] (continued) Login-recovery support notes (Melana / Franka): Melana = CLAIMED account, reset email was allowlist-gated → fixed (force reset). Franka Graz = UNCLAIMED (no `users` row) → "reset" doesn't apply; he kept getting the Welcome/claim email (5 delivered) but needed to SET a password via `/m/{token}?unlock=1`, not reset. Sent operator a copy-paste guide + his unlock link. **Known latent bug still open:** `forgot_password`/`login` email lookups are case-sensitive ([auth.py:61,228,328]) — auto-capitalised emails silently fail; one-line `.strip().lower()` fix offered, not yet applied.
+
+## 2026-05-22 — [sponsor-invite-link] Sponsor self-service signup link + universal save-trigger
+
+- **`POST /auth/join`** — new endpoint gated by `SPONSOR_INVITE_CODE` env var (blank = OFF); validates submitted code via constant-time comparison; creates a full login account tagged `ticket_type=SPONSOR`, bypassing the Rhuna/Extasy ticket gate. Wrong code → 403.
+- **Universal save-trigger** — every profile save (Profile page `PUT /auth/profile`, magic-link enrichment card `PATCH /matches/m/{token}/profile`, AI Concierge field save, and `register`) now fires `app/services/profile_pipeline.refresh_profile_matches(attendee_id)` (light re-embed + rematch, `notify=False`) so matches refresh in seconds rather than waiting for the 02:45 UTC cron. Closes the "enrich your profile to unlock better matches" loop immediately.
+- **`app/services/profile_pipeline.py`** — new module housing `run_full_enrichment(attendee_id)` (Grid + website enrichment → re-embed + match generation, runs detached on join) and `refresh_profile_matches(attendee_id)` (light re-embed + rematch, used on every save).
+- **Frontend** — `/join/:code` route + `SponsorJoin.tsx` page; `joinViaInvite` API client function; `AuthContext` method wires the token through.
+- **Tests** — 142/142 passed (full backend suite) including new sponsor-invite tests.
+- **Live smoke (2026-05-22)** — created Precious Zuze (`zuzvaida@gmail.com`) via the prod endpoint → SPONSOR row + magic token + login + embedding + AI summary + 15 matches generated; wrong code → 403 confirmed.
+- Spec: `docs/superpowers/specs/2026-05-22-sponsor-invite-link-design.md`. Plan: `docs/superpowers/plans/2026-05-22-sponsor-invite-link.md`.
