@@ -140,6 +140,47 @@ async def register(
     return Token(access_token=token)
 
 
+@router.post("/join", response_model=Token, status_code=201)
+@limiter.limit("5/minute")
+async def join(
+    request: Request,
+    data: JoinRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Self-service sponsor signup via the shared invite link. The invite code
+    is the gate, so this bypasses REQUIRE_TICKET_TO_REGISTER and forces
+    ticket_type=SPONSOR. On success, runs the full cold-start enrichment +
+    matching pipeline in the background and returns a JWT (auto-login)."""
+    expected = get_settings().SPONSOR_INVITE_CODE
+    if not expected or not secrets.compare_digest(data.invite_code, expected):
+        raise HTTPException(status_code=403, detail="This invite link is invalid or expired.")
+
+    if (await db.execute(select(User).where(User.email == data.email))).scalars().first():
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered — please log in instead.",
+        )
+
+    attendee = await _upsert_attendee_from_payload(
+        db, data, force_ticket_type="SPONSOR", enforce_ticket_gate=False,
+    )
+    await db.flush()
+
+    user = User(
+        email=data.email,
+        hashed_password=get_password_hash(data.password),
+        full_name=data.name,
+        attendee_id=attendee.id,
+    )
+    db.add(user)
+    await db.commit()
+
+    asyncio.create_task(run_full_enrichment(attendee.id))
+
+    token = create_access_token({"sub": str(user.id)})
+    return Token(access_token=token)
+
+
 @router.post("/claim-account", response_model=Token, status_code=201)
 @limiter.limit("5/minute")
 async def claim_account(
