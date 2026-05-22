@@ -18,6 +18,7 @@ import ResetPassword from "./pages/ResetPassword";
 import MagicMatches from "./pages/MagicMatches";
 import Briefing from "./pages/Briefing";
 import Threads from "./pages/Threads";
+import SponsorJoin from "./pages/SponsorJoin";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/join/:code" element={<SponsorJoin />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/m/:token" element={<MagicMatches />} />
