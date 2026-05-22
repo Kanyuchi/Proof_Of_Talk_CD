@@ -1239,3 +1239,10 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - **Tests** — 142/142 passed (full backend suite) including new sponsor-invite tests.
 - **Live smoke (2026-05-22)** — created Precious Zuze (`zuzvaida@gmail.com`) via the prod endpoint → SPONSOR row + magic token + login + embedding + AI summary + 15 matches generated; wrong code → 403 confirmed.
 - Spec: `docs/superpowers/specs/2026-05-22-sponsor-invite-link-design.md`. Plan: `docs/superpowers/plans/2026-05-22-sponsor-invite-link.md`.
+
+## 2026-05-22 — [content] Matchmaker walkthrough screen-recording (as Marcus)
+
+- **Recorded** a 1080×1350 portrait walkthrough of the **prod** app (`meet.proofoftalk.io`) signed in as the **Marcus** demo persona (`marcus@demo.proofoftalk.io` / `ProofDemo2026!`), hitting beats: Entry → My Matches → "Why this meeting matters" → Concierge (demo-safe canned prompt) → Priya mutual+free-slots. ~43.7s.
+- **Method:** native macOS `screencapture -v` of the full display while a headed Playwright Chromium drove the beats; the driver measured the window's on-screen rect in-page, then ffmpeg cropped to just the app column (`crop=1080:1350:444:280`) + trimmed to the driven window. Reproducible scripts in `/tmp/marcus_walkthrough/` (`drive_marcus.mjs`, `record.sh`, `crop.py`).
+- **Delivered:** `matchmaker_content/raw/marcus-walkthrough-1080x1350.mp4` (3.0 MB). `matchmaker_content/` added to `.gitignore` as local-only raw content. Full-screen intermediate `.mov` deleted (it captured the whole desktop — privacy hygiene).
+- **Flagged (not recording bugs):** (1) AI Concierge replies render literal `[GOALS][INTENTS]` placeholder tokens — template leak in the concierge prompt/render, worth a separate fix; (2) ~5s "Loading your matches…" dwell on cold prod fetch after login.

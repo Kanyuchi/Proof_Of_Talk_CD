@@ -74,6 +74,7 @@ backend/exports/
 .claude/
 Logo/
 mobile-audit/
+matchmaker_content/
 launch/from_Z/
 launch/our_version.zip
 backend/scripts/diagnose_*.py
