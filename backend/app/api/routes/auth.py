@@ -374,7 +374,8 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Asy
         # Fire-and-forget. send_password_reset_email is a SYNC httpx call;
         # awaiting it inline blocks the event loop and was hanging the request
         # ~60s on prod. Run it in a thread, detached, so the response returns
-        # immediately (same rationale as _process_attendee_bg above).
+        # immediately (same detached-task rationale as the profile_pipeline
+        # triggers used at registration/join).
         # force=True: account recovery is transactional and must reach real
         # (non-team) attendees even while EMAIL_MODE=allowlist gates bulk
         # engagement mail. Without it, a CLAIMED non-team account (e.g.

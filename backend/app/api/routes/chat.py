@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
@@ -216,8 +217,11 @@ async def save_field(
 
     # photo_url doesn't affect embeddings or match quality, so skip the
     # background re-embed — saves an OpenAI call + match-gen round-trip.
+    # Dispatch detached (asyncio.create_task, not BackgroundTasks) per
+    # profile_pipeline's docstring: BackgroundTasks holds the request worker
+    # through the 10-20s pipeline and can 504 the edge.
     if data.field != "photo_url":
-        background_tasks.add_task(refresh_profile_matches, attendee.id)
+        asyncio.create_task(refresh_profile_matches(attendee.id))
     return {"ok": True}
 
 
