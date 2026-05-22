@@ -17,7 +17,7 @@ from app.schemas.attendee import (
     AttendeeResponse,
     redact_for_privacy,
 )
-from app.services.avatars import upload_avatar, AvatarError
+from app.services.avatars import upload_avatar, AvatarError, MAX_BYTES
 from app.services.matching import MatchingEngine
 from app.services.slots import mutual_free_slots, has_conflict
 from app.services.match_visibility import ViewerMatch, order_and_cap, tier_limit, next_tier_unlock
@@ -414,13 +414,16 @@ async def upload_photo_via_magic_link(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
+    """Upload a profile photo via magic link — no login required."""
+    if not token or len(token) < 16:
+        raise HTTPException(status_code=400, detail="Invalid link")
     result = await db.execute(
         select(Attendee).where(Attendee.magic_access_token == token)
     )
-    attendee = result.scalar_one_or_none()
+    attendee = result.scalars().first()
     if not attendee:
-        raise HTTPException(status_code=404, detail="Invalid link")
-    data = await file.read()
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    data = await file.read(MAX_BYTES + 1)
     try:
         url = await upload_avatar(str(attendee.id), data, file.content_type or "")
     except AvatarError as exc:

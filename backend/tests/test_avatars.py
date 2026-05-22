@@ -110,9 +110,13 @@ _photo_client = TestClient(app, raise_server_exceptions=False)
 
 
 def _override_db_returning(attendee):
-    class _Result:
-        def scalar_one_or_none(self):
+    class _Scalars:
+        def first(self):
             return attendee
+
+    class _Result:
+        def scalars(self):
+            return _Scalars()
 
     class _FakeDB:
         async def execute(self, *a, **k):
@@ -128,7 +132,7 @@ def _override_db_returning(attendee):
 
 
 def test_magic_photo_sets_url_for_token_attendee(monkeypatch):
-    attendee = SimpleNamespace(id="att-1", photo_url=None, magic_access_token="tok")
+    attendee = SimpleNamespace(id="att-1", photo_url=None, magic_access_token="tok-abcdef-123456")
 
     async def _fake_upload(aid, data, ct):
         return "https://example/public/avatars/x.jpg?v=1"
@@ -137,7 +141,7 @@ def test_magic_photo_sets_url_for_token_attendee(monkeypatch):
     app.dependency_overrides[get_db] = _override_db_returning(attendee)
     try:
         r = _photo_client.post(
-            "/api/v1/matches/m/tok/photo",
+            "/api/v1/matches/m/tok-abcdef-123456/photo",
             files={"file": ("a.jpg", b"abc", "image/jpeg")},
         )
     finally:
@@ -159,3 +163,31 @@ def test_magic_photo_404_on_bad_token():
         app.dependency_overrides.pop(get_db, None)
 
     assert r.status_code == 404, r.text
+
+
+def test_magic_photo_400_on_avatar_error(monkeypatch):
+    attendee = SimpleNamespace(id="att-1", photo_url=None, magic_access_token="tok-abcdef-123456")
+
+    async def _bad_upload(aid, data, ct):
+        raise avatars.AvatarError("Unsupported image type: 'application/pdf'")
+
+    monkeypatch.setattr("app.api.routes.matches.upload_avatar", _bad_upload)
+    app.dependency_overrides[get_db] = _override_db_returning(attendee)
+    try:
+        r = _photo_client.post(
+            "/api/v1/matches/m/tok-abcdef-123456/photo",
+            files={"file": ("a.pdf", b"abc", "application/pdf")},
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+    assert r.status_code == 400, r.text
+
+
+def test_magic_photo_400_on_short_token():
+    # The len<16 guard rejects before any DB access (no override needed).
+    r = _photo_client.post(
+        "/api/v1/matches/m/short/photo",
+        files={"file": ("a.jpg", b"abc", "image/jpeg")},
+    )
+    assert r.status_code == 400, r.text
