@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Save, Plus, X, Linkedin, Twitter, Globe, User } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { updateProfile, getAttendee } from "../api/client";
+import { updateProfile, getAttendee, uploadProfilePhoto } from "../api/client";
 import AttendeeAvatar from "../components/AttendeeAvatar";
+import PhotoUpload from "../components/PhotoUpload";
 import QRCard from "../components/QRCard";
 import type { Attendee } from "../types";
 
@@ -116,16 +117,26 @@ export default function Profile() {
     <div className="max-w-2xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-5 mb-8">
-        {attendee ? (
-          <AttendeeAvatar
-            attendee={attendee}
-            size="lg"
-          />
-        ) : (
-          <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#E76315] to-[#D35400] flex items-center justify-center text-black font-bold text-xl shrink-0">
-            {initials}
-          </div>
-        )}
+        <div className="flex flex-col items-center gap-2 shrink-0">
+          {attendee ? (
+            <AttendeeAvatar
+              attendee={attendee}
+              size="lg"
+            />
+          ) : (
+            <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-[#E76315] to-[#D35400] flex items-center justify-center text-black font-bold text-xl shrink-0">
+              {initials}
+            </div>
+          )}
+          {user?.attendee_id && (
+            <PhotoUpload
+              uploadFn={uploadProfilePhoto}
+              onUploaded={(url) =>
+                setAttendee((a) => (a ? { ...a, photo_url: url } : a))
+              }
+            />
+          )}
+        </div>
         <div>
           <h1 className="text-2xl font-bold">{user?.full_name}</h1>
           <p className="text-white/40 text-sm">{user?.email}</p>
