@@ -548,3 +548,23 @@ export async function postToThread(slug: string, content: string): Promise<Threa
   const { data } = await api.post(`/threads/${slug}`, { content });
   return data;
 }
+
+// ── Photo upload ──────────────────────────────────────────────────────
+// FormData posts: do NOT set Content-Type — axios/the browser set the
+// multipart boundary automatically. `api` already carries the JWT auth header.
+export async function uploadProfilePhoto(blob: Blob): Promise<{ photo_url: string }> {
+  const form = new FormData();
+  form.append("file", blob, "photo.jpg");
+  const { data } = await api.post("/auth/profile/photo", form);
+  return data;
+}
+
+export async function uploadPhotoViaMagicLink(
+  token: string,
+  blob: Blob
+): Promise<{ photo_url: string }> {
+  const form = new FormData();
+  form.append("file", blob, "photo.jpg");
+  const { data } = await api.post(`/matches/m/${token}/photo`, form);
+  return data;
+}
