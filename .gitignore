@@ -68,3 +68,19 @@ tools/whatsapp-mcp/**/*.db-journal
 # Backend operational exports + ledgers (local runtime, not source).
 # The 5 already-tracked files here stay tracked; this only blocks new junk.
 backend/exports/
+
+# Local-only / vendored content — triaged 2026-05-22, not part of source.
+# (Matchmaking_Feedback/ keeps its 12 tracked files; only its stray PDF is ignored.)
+.claude/
+Logo/
+mobile-audit/
+launch/from_Z/
+launch/our_version.zip
+backend/scripts/diagnose_*.py
+backend/scripts/investigate_*.py
+docs/superpowers/plans/2026-05-21-deeper-match-pool.md
+tools/whatsapp-mcp/LICENSE
+tools/whatsapp-mcp/.gitignore
+tools/whatsapp-mcp/example-use.png
+tools/whatsapp-mcp/whatsapp-bridge/whatsapp-client
+Matchmaking_Feedback/Proof of Talk 2026*.pdf
