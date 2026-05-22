@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Sparkles, Eye, EyeOff, LogIn } from "lucide-react";
+import { Sparkles, Eye, EyeOff, LogIn, Mail } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { forgotPassword } from "../api/client";
 
 export default function Login() {
   const { login } = useAuth();
@@ -11,6 +12,24 @@ export default function Login() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupSent, setSetupSent] = useState(false);
+
+  const sendSetupLink = async () => {
+    if (!email.trim()) {
+      setError("Enter your email above first, then tap to get a setup link.");
+      return;
+    }
+    setSetupLoading(true);
+    try {
+      await forgotPassword(email);
+    } catch {
+      // fall through — always show the generic confirmation (no enumeration)
+    } finally {
+      setSetupLoading(false);
+      setSetupSent(true);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +64,33 @@ export default function Login() {
           {error && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
               {error}
+            </div>
+          )}
+
+          {error && !setupSent && (
+            <div className="space-y-2">
+              <p className="text-xs text-white/50 text-center">
+                First time here, or haven't set a password yet?
+              </p>
+              <button
+                type="button"
+                onClick={sendSetupLink}
+                disabled={setupLoading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 bg-white/5 border border-white/10 text-white/80 text-sm font-medium rounded-xl hover:bg-white/10 hover:border-[#E76315]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {setupLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4 text-[#E76315]" />
+                )}
+                {setupLoading ? "Sending…" : "Email me a setup link"}
+              </button>
+            </div>
+          )}
+
+          {setupSent && (
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm">
+              If your email is in our system, we've sent a link to set your password. Check your inbox (and spam).
             </div>
           )}
 
