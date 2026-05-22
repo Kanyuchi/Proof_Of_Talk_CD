@@ -133,6 +133,7 @@ async def get_matches(
         responses = [await _build_match_response(db, m, attendee_id) for m in rows[:limit]]
         return MatchListResponse(
             matches=responses, attendee_id=attendee_id, tier=tier,
+            viewer=AttendeeResponse.model_validate(attendee),
             visible_count=len(responses), locked_count=0,
             next_tier_at=None, completeness_pct=pct,
         )
@@ -142,6 +143,7 @@ async def get_matches(
     responses = [await _build_match_response(db, vm.match, attendee_id) for vm in visible]
     return MatchListResponse(
         matches=responses, attendee_id=attendee_id, tier=tier,
+        viewer=AttendeeResponse.model_validate(attendee),
         visible_count=len(responses), locked_count=locked,
         next_tier_at=next_tier_unlock(tier), completeness_pct=pct,
     )
@@ -178,6 +180,7 @@ async def get_matches_by_magic_link(
     responses = [await _build_match_response(db, vm.match, attendee.id) for vm in visible]
     return MatchListResponse(
         matches=responses, attendee_id=attendee.id, tier=tier,
+        viewer=AttendeeResponse.model_validate(attendee),
         visible_count=len(responses), locked_count=locked,
         next_tier_at=next_tier_unlock(tier), completeness_pct=pct,
     )

@@ -5,7 +5,7 @@ import {
   Sparkles, Brain, Target, MessageSquare,
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
-import { getMatchesByMagicLink, getAttendee, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink } from "../api/client";
+import { getMatchesByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink } from "../api/client";
 import PhotoUpload from "../components/PhotoUpload";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import GridOrgCard from "../components/GridOrgCard";
@@ -40,12 +40,10 @@ export default function MagicMatches() {
     enabled: !!token,
   });
 
-  const attendeeId = data?.attendee_id;
-  const { data: attendee } = useQuery({
-    queryKey: ["attendee", attendeeId],
-    queryFn: () => getAttendee(attendeeId!),
-    enabled: !!attendeeId,
-  });
+  // The viewer's own profile rides along on the magic-link match response, so
+  // no-login users get it without the auth-gated GET /attendees/{id} (which
+  // 401s for them and left the enrichment card permanently hidden).
+  const attendee = data?.viewer;
 
   const enrichMutation = useMutation({
     mutationFn: () => updateProfileViaMagicLink(token!, {
@@ -56,7 +54,7 @@ export default function MagicMatches() {
     }),
     onSuccess: () => {
       setEnrichSaved(true);
-      queryClient.invalidateQueries({ queryKey: ["attendee", attendeeId] });
+      queryClient.invalidateQueries({ queryKey: ["magic-matches", token] });
       setTimeout(() => setEnrichSaved(false), 3000);
     },
   });
@@ -225,7 +223,7 @@ export default function MagicMatches() {
                 <PhotoUpload
                   uploadFn={(blob) => uploadPhotoViaMagicLink(token!, blob)}
                   onUploaded={() =>
-                    queryClient.invalidateQueries({ queryKey: ["attendee", attendeeId] })
+                    queryClient.invalidateQueries({ queryKey: ["magic-matches", token] })
                   }
                 />
               </div>

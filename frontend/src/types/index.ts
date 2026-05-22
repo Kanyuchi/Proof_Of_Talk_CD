@@ -144,6 +144,9 @@ export interface ConversationDetail {
 export interface MatchListResult {
   matches: Match[];
   attendee_id: string;
+  // The viewer's own profile. Lets the no-login magic-link page render its
+  // enrichment card + avatar without the auth-gated GET /attendees/{id}.
+  viewer?: Attendee | null;
   tier?: "SPARSE" | "PARTIAL" | "GOOD";
   visible_count?: number;
   locked_count?: number;
