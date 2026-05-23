@@ -78,16 +78,37 @@ def fetch_attendees(with_url_only: bool = True, missing_photo_only: bool = False
     return rows
 
 
-def patch_attendee(aid: str, payload: dict) -> bool:
+def patch_attendee(aid: str, payload: dict, retries: int = 3) -> bool:
+    """PATCH one attendee row, retrying on transient network/5xx failures.
+
+    A single Supabase timeout used to propagate out of the scrape loop and
+    kill the whole run mid-batch (2026-05-23: crashed at #62, lost #63–76).
+    Now we retry up to `retries` times with linear backoff, and on permanent
+    failure return False so the caller logs an error and continues to the
+    next attendee instead of the whole pass dying.
+    """
     url = f"{SUPABASE_URL}/rest/v1/attendees"
-    with httpx.Client(timeout=30) as client:
-        resp = client.patch(
-            url,
-            headers={**sb_headers(), "Prefer": "return=minimal"},
-            params={"id": f"eq.{aid}"},
-            content=json.dumps(payload),
-        )
-        return resp.status_code in (200, 204)
+    for attempt in range(1, retries + 1):
+        try:
+            with httpx.Client(timeout=30) as client:
+                resp = client.patch(
+                    url,
+                    headers={**sb_headers(), "Prefer": "return=minimal"},
+                    params={"id": f"eq.{aid}"},
+                    content=json.dumps(payload),
+                )
+            if resp.status_code in (200, 204):
+                return True
+            # 4xx (bad payload, auth) won't fix itself — don't burn retries.
+            if resp.status_code < 500:
+                print(f"    ⚠ patch returned {resp.status_code}: {resp.text[:120]}")
+                return False
+            print(f"    ⚠ patch {resp.status_code} (attempt {attempt}/{retries})")
+        except httpx.HTTPError as e:
+            print(f"    ⚠ patch network error (attempt {attempt}/{retries}): {e}")
+        if attempt < retries:
+            time.sleep(2 * attempt)  # 2s, 4s linear backoff
+    return False
 
 
 # ── Playwright scraper ────────────────────────────────────────────────────
@@ -120,6 +141,8 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                 'img.pv-top-card-profile-picture__image, '
                 'img[src*="profile-displayphoto"], '
                 'img[src*="profile-framedphoto"], '
+                'img[srcset*="profile-displayphoto"], '
+                'img[srcset*="profile-framedphoto"], '
                 'button[aria-label*="profile photo" i] img',
                 state="visible",
                 timeout=4000,
@@ -326,20 +349,52 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
             //   - 2026-05-18 wrong-photo-on-no-photo: if NO profile-displayphoto
             //     imgs exist on the page AND no preload link, photo stays
             //     NULL. Never fall back to a guessed/operator avatar.
+            // Extract the real photo URL from an <img>, tolerant of LinkedIn's
+            // lazy-loading: the rendered top-card avatar sometimes keeps a
+            // placeholder (or ghost) in .src while the actual photo URL lives
+            // in srcset or data-delayed-url (Patrick Azzopardi, 2026-05-23 —
+            // same gap as the older Sneha/Josiah cases). Prefer a real .src,
+            // then the largest srcset entry, then data-delayed-url.
+            const _photoUrlFromImg = (img) => {
+                if (!img) return null;
+                const isReal = (u) => !!u && u.startsWith('http') &&
+                    /profile-(displayphoto|framedphoto)/.test(u);
+                const src = img.src || '';
+                if (isReal(src)) return src;
+                const srcset = img.getAttribute('srcset') || '';
+                if (srcset) {
+                    const entries = srcset.split(',')
+                        .map(s => s.trim())
+                        .map(s => {
+                            const parts = s.split(/\\s+/);
+                            const w = parseInt((parts[1] || '').replace(/\\D/g, ''), 10) || 0;
+                            return { url: parts[0], w };
+                        })
+                        .filter(e => isReal(e.url))
+                        .sort((a, b) => b.w - a.w);  // largest first
+                    if (entries.length) return entries[0].url;
+                }
+                const delayed = img.getAttribute('data-delayed-url') || '';
+                if (isReal(delayed)) return delayed;
+                return null;
+            };
+
             // Reuse `ownerH1` from the headline-extraction block above.
             photoUrl = null;
             if (ownerH1) {
+                // Match profile-photo imgs by src OR srcset OR data-delayed-url.
+                // The src-only selector missed lazy-loaded avatars whose .src
+                // never resolved to the real URL (the Patrick gap).
                 const allPhotos = [...document.querySelectorAll(
-                    'img[src*="profile-displayphoto"], img[src*="profile-framedphoto"]'
-                )].filter(img => {
-                    const src = img.src || '';
-                    if (!src.startsWith('http')) return false;
-                    if (navAvatarSrcs.has(src)) return false;
-                    return true;
-                });
+                    'img[src*="profile-displayphoto"], img[src*="profile-framedphoto"], ' +
+                    'img[srcset*="profile-displayphoto"], img[srcset*="profile-framedphoto"], ' +
+                    'img[data-delayed-url*="profile-displayphoto"], img[data-delayed-url*="profile-framedphoto"]'
+                )].map(img => ({ img, url: _photoUrlFromImg(img) }))
+                  .filter(({ url }) => url && !navAvatarSrcs.has(url));
                 let bestPhoto = null;
+                let bestUrl = null;
                 let bestDepth = Infinity;
-                for (const img of allPhotos) {
+                for (const { img, url } of allPhotos) {
                     // Walk up from the img until we find an ancestor that
                     // also contains the h1. Depth = number of steps up.
                     let depth = 0;
@@ -352,9 +407,10 @@ async def scrape_linkedin_profile(page, linkedin_url: str) -> dict | None:
                     if (ancestor && depth < bestDepth) {
                         bestDepth = depth;
                         bestPhoto = img;
+                        bestUrl = url;
                     }
                 }
-                if (bestPhoto) photoUrl = bestPhoto.src;
+                if (bestPhoto) photoUrl = bestUrl;
             }
 
             // v4 fallback: preload-link signal. Only fires when the h1
