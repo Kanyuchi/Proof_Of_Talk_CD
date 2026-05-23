@@ -1246,3 +1246,11 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - **Method:** native macOS `screencapture -v` of the full display while a headed Playwright Chromium drove the beats; the driver measured the window's on-screen rect in-page, then ffmpeg cropped to just the app column (`crop=1080:1350:444:280`) + trimmed to the driven window. Reproducible scripts in `/tmp/marcus_walkthrough/` (`drive_marcus.mjs`, `record.sh`, `crop.py`).
 - **Delivered:** `matchmaker_content/raw/marcus-walkthrough-1080x1350.mp4` (3.0 MB). `matchmaker_content/` added to `.gitignore` as local-only raw content. Full-screen intermediate `.mov` deleted (it captured the whole desktop — privacy hygiene).
 - **Flagged (not recording bugs):** (1) AI Concierge replies render literal `[GOALS][INTENTS]` placeholder tokens — template leak in the concierge prompt/render, worth a separate fix; (2) ~5s "Loading your matches…" dwell on cold prod fetch after login.
+
+## 2026-05-23 — [welcome] Closed the no-token gap + sent one 63-attendee welcome wave
+
+- **Directory now 902 attendees** (was 737 on 2026-05-21 → ~165 new since the last backfill). Welcome ledger was 816 sent (411 on 05-21 + 405 on 05-22).
+- **Backfilled magic tokens** — `scripts/backfill_magic_tokens.py` filled 62 NULL tokens (the welcome link `/m/{token}` dead-ends at the login wall without one). no-token gap 58 → 0.
+- **Caught 7 demo personas in the eligible pool** — the token backfill made the 2026-05-22 `@demo.proofoftalk.io` video-demo personas (Amara/Marcus/Sofia/Daniel/Priya/Thomas/Lena) eligible. Mail to that domain would hard-bounce and dent sender reputation. Set `email_opt_out=true` on all 7 (the script's native exclusion; doesn't affect their concierge-demo isolation). Eligible 70 → **63 real deliverable**.
+- **Sent one wave of 63** real attendees (Paxos, Nexo, Ledger, Blockstream, Robinhood, Tether, SwissBorg, Bank Frick, GSR, etc.) from warm `team@xventures.de`: **sent=63 failed=0** (all Resend 200/201). Under the ~100/day ceiling; 0 had been sent earlier today.
+- **Ledger now 879.** Final status: 0 eligible, 7 opted-out (demos), 16 gated (await consent), 879 sent = 902 total. Welcome pool fully drained except gated speakers.
