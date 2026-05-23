@@ -1261,3 +1261,13 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - New rows: alix bouxaguet (Kraken), Magda Tarasińska (defiam.xyz), Jeff Marshall, cyber aventurier, Tatiana Pena (alphapromax), **Daniel Held (VIP Black)**, Riccardo Donega (Banca Sella, VIP), Henry Chin (VIP), Joseph Rotondi (unit.network), Stanislav Havryliuk (satsterminal).
 - **Charset wrinkle:** "Magda Tarasi?ska" stored with a `?` — `ingest_extasy.py` decodes the Extasy CSV as iso-8859-1, so the Polish `ń` (not in latin-1) becomes `?`. Fix via a one-row name PATCH or by widening the decoder to utf-8-with-latin1-fallback.
 - **Follow-on still pending for the 10 new rows:** the standalone script does NOT generate magic tokens, enrich, embed, or match. Left alone, the 03:00 UTC enrichment sweep embeds them tonight but matches lag to the *next* 02:45 refresh; they stay tokenless + not welcome-eligible until `backfill_magic_tokens.py` runs.
+
+## 2026-05-23 — [extasy] Follow-on: 10 new attendees fully onboarded + welcomed
+
+- Completed the follow-on for the 10 freshly-synced rows (steps 1–3) so they're live now instead of waiting on tonight's cron.
+- **Name fix:** PATCHed `mt@defiam.xyz` name `Magda Tarasi?ska` → **Magda Tarasińska** (before enrichment, so the AI summary + embedding use the correct name).
+- **Step 1 — tokens:** `backfill_magic_tokens.py` → 10 magic tokens (no-token gap 10 → 0).
+- **Step 2 — enrich+embed+match:** ran `profile_pipeline.run_full_enrichment(id)` per attendee (one-off `/tmp/enrich_new.py`) — deliberately per-attendee, NOT a full `generate_all_matches`, which would wipe the demo personas' curated video matches. All 10: LinkedIn private (no LI data, expected), but Grid + website + AI summary + intent + ICP + embedding ✓. Matches generated **16–18 each (164 total)** via `generate_matches_for_attendee` (`notify=False`, so no premature match-intro emails).
+- **Step 3 — welcome:** `send_welcome_batch.py --confirm` sent to exactly the 10 eligible (warm `team@xventures.de`): **sent=10 failed=0**. Welcome ledger **879 → 889**.
+- Final status: 912 total = 889 sent + 7 opted-out (demos) + 16 gated (await consent), **0 eligible remaining**. The 10 are matchable + welcomed end-to-end.
+- **NB the latin-1 charset bug in `ingest_extasy.py` is still unfixed at source** — next non-ASCII name (e.g. another `ń`/`ø`/`ü`) will re-mangle. One-line fix: decode the Extasy CSV utf-8-first with latin-1 fallback.
