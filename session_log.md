@@ -1254,3 +1254,10 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - **Caught 7 demo personas in the eligible pool** — the token backfill made the 2026-05-22 `@demo.proofoftalk.io` video-demo personas (Amara/Marcus/Sofia/Daniel/Priya/Thomas/Lena) eligible. Mail to that domain would hard-bounce and dent sender reputation. Set `email_opt_out=true` on all 7 (the script's native exclusion; doesn't affect their concierge-demo isolation). Eligible 70 → **63 real deliverable**.
 - **Sent one wave of 63** real attendees (Paxos, Nexo, Ledger, Blockstream, Robinhood, Tether, SwissBorg, Bank Frick, GSR, etc.) from warm `team@xventures.de`: **sent=63 failed=0** (all Resend 200/201). Under the ~100/day ceiling; 0 had been sent earlier today.
 - **Ledger now 879.** Final status: 0 eligible, 7 opted-out (demos), 16 gated (await consent), 879 sent = 902 total. Welcome pool fully drained except gated speakers.
+
+## 2026-05-23 — [extasy] Manual Rhuna/Extasy sync — 10 new attendees ingested
+
+- Ran `scripts/ingest_extasy.py` (dry-run first, then live). 840 valid PAID/REDEEMED orders → **10 inserted, 175 patched (Rhuna metadata only), 655 unchanged, 0 errors**. Directory **902 → 912**.
+- New rows: alix bouxaguet (Kraken), Magda Tarasińska (defiam.xyz), Jeff Marshall, cyber aventurier, Tatiana Pena (alphapromax), **Daniel Held (VIP Black)**, Riccardo Donega (Banca Sella, VIP), Henry Chin (VIP), Joseph Rotondi (unit.network), Stanislav Havryliuk (satsterminal).
+- **Charset wrinkle:** "Magda Tarasi?ska" stored with a `?` — `ingest_extasy.py` decodes the Extasy CSV as iso-8859-1, so the Polish `ń` (not in latin-1) becomes `?`. Fix via a one-row name PATCH or by widening the decoder to utf-8-with-latin1-fallback.
+- **Follow-on still pending for the 10 new rows:** the standalone script does NOT generate magic tokens, enrich, embed, or match. Left alone, the 03:00 UTC enrichment sweep embeds them tonight but matches lag to the *next* 02:45 refresh; they stay tokenless + not welcome-eligible until `backfill_magic_tokens.py` runs.
