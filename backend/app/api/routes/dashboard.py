@@ -927,3 +927,110 @@ async def list_recent_jobs(
     """List recent background jobs (for admin debugging)."""
     from app.services.jobs import list_recent
     return {"jobs": list_recent(limit=limit)}
+
+
+@router.get("/adoption")
+async def get_adoption(
+    db: AsyncSession = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Admin-only adoption + usage metrics. Account/signup numbers are
+    historical (correct immediately); usage numbers start at zero and grow
+    from tracking-start forward. See the adoption-usage-tracking design."""
+    from datetime import datetime as _dt
+    from app.models.usage_daily import UsageDaily
+    # Import the demo-suffix constant from usage_snapshot so the "real accounts"
+    # predicate here is IDENTICAL to the one used in the daily snapshot cron —
+    # the two can never diverge.
+    from app.services.usage_snapshot import _DEMO_SUFFIX as _DEMO
+
+    total = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    real = (
+        await db.execute(
+            select(func.count(User.id)).where(
+                User.is_admin.is_(False),
+                ~func.lower(User.email).like(f"%{_DEMO}"),
+            )
+        )
+    ).scalar() or 0
+    linked = (
+        await db.execute(
+            select(func.count(User.id)).where(User.attendee_id.isnot(None))
+        )
+    ).scalar() or 0
+    directory_size = (await db.execute(select(func.count(Attendee.id)))).scalar() or 0
+    pct_of_directory = round(real / directory_size * 100, 1) if directory_size else 0.0
+
+    # Signups by day — historical, from users.created_at.
+    signup_rows = (
+        await db.execute(
+            select(
+                func.date(User.created_at).label("day"),
+                func.count(User.id).label("n"),
+            )
+            .group_by(func.date(User.created_at))
+            .order_by(func.date(User.created_at))
+        )
+    ).all()
+    signups_by_day = [
+        {"day": r[0].isoformat() if hasattr(r[0], "isoformat") else str(r[0]), "n": r[1]}
+        for r in signup_rows
+    ]
+
+    # Live usage counts (correct even before the cron has run).
+    login_active = (
+        await db.execute(
+            select(func.count(User.id)).where(User.last_login_at.isnot(None))
+        )
+    ).scalar() or 0
+    magic_link_active = (
+        await db.execute(
+            select(func.count(Attendee.id)).where(Attendee.last_seen_at.isnot(None))
+        )
+    ).scalar() or 0
+
+    # Usage-by-day history from the snapshot table.
+    usage_rows = (
+        await db.execute(
+            select(
+                UsageDaily.day, UsageDaily.active_today, UsageDaily.cumulative_active
+            ).order_by(UsageDaily.day)
+        )
+    ).all()
+    usage_by_day = [
+        {
+            "day": r[0].isoformat() if hasattr(r[0], "isoformat") else str(r[0]),
+            "active_today": r[1],
+            "cumulative_active": r[2],
+        }
+        for r in usage_rows
+    ]
+
+    if usage_by_day:
+        tracking_started_at = usage_by_day[0]["day"]
+        latest = usage_by_day[-1]
+        cumulative_active = latest["cumulative_active"]
+        active_last_7d = sum(d["active_today"] for d in usage_by_day[-7:])
+    else:
+        tracking_started_at = _dt.utcnow().date().isoformat()
+        cumulative_active = 0
+        active_last_7d = 0
+
+    return {
+        "tracking_started_at": tracking_started_at,
+        "accounts": {
+            "total": total,
+            "real": real,
+            "linked_to_attendee": linked,
+            "pct_of_directory": pct_of_directory,
+            "directory_size": directory_size,
+        },
+        "signups_by_day": signups_by_day,
+        "usage": {
+            "cumulative_active": cumulative_active,
+            "active_last_7d": active_last_7d,
+            "magic_link_active": magic_link_active,
+            "login_active": login_active,
+        },
+        "usage_by_day": usage_by_day,
+    }
