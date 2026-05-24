@@ -24,6 +24,41 @@ settings = get_settings()
 NOMINAL_PAID_THRESHOLD = 1.0  # euros; amount > threshold → real paid ticket
 
 
+def _linkedin_pending(attendee) -> bool:
+    """True iff this attendee is genuine, actionable LinkedIn-scrape backlog.
+
+    Drives the dashboard's "N attendees pending LinkedIn enrichment" banner.
+    The naive "has URL and no headline" definition over-counts ~45x: on
+    2026-05-24 it read 90 while only ~2 rows were truly worth scraping. We
+    exclude three non-actionable buckets so the banner means "scrape these":
+
+      - already enriched ...... truthy `enriched_profile.linkedin.headline`
+      - flagged dead .......... `linkedin_unscrapable` set (repeated 403s)
+      - already attempted ..... `linkedin_enriched_at` set but headline empty —
+                                an empty-stub scrape (private/login-walled);
+                                re-scraping returns nothing, so not actionable
+      - demo persona .......... `@demo.proofoftalk.io` (seeded video personas
+                                with fake `-demo` URLs; excluded from matching
+                                already, must not inflate ops counts)
+
+    Malformed-URL rows (e.g. "N/A", missing scheme) ARE still counted: they
+    have a URL string we've never attempted. Cleaning those is a separate,
+    deferred data-hygiene pass.
+    """
+    if not attendee.linkedin_url:
+        return False
+    ep = attendee.enriched_profile or {}
+    if (ep.get("linkedin") or {}).get("headline"):
+        return False
+    if ep.get("linkedin_unscrapable"):
+        return False
+    if ep.get("linkedin_enriched_at"):
+        return False
+    if (attendee.email or "").endswith("@demo.proofoftalk.io"):
+        return False
+    return True
+
+
 def _summarise_revenue(valid_orders: list[dict]) -> dict:
     """Aggregate revenue / paid / comp from already-filtered valid orders.
 
@@ -695,17 +730,13 @@ async def revenue_stats(
     with_goals = sum(1 for a in attendees if a.goals)
     with_linkedin = sum(1 for a in attendees if a.linkedin_url)
     # `with_linkedin_data`: actually have a scraped headline. `pending_linkedin_enrichment`:
-    # have a URL but the Playwright script hasn't been run on them yet. Surfaces the
-    # silent-fail mode that bit us 2026-04-29 → 2026-05-01.
+    # genuine actionable scrape backlog only — see `_linkedin_pending` (excludes dead,
+    # already-attempted empty stubs, and demo personas that previously inflated this 90 → ~2).
     with_linkedin_data = sum(
         1 for a in attendees
         if ((a.enriched_profile or {}).get("linkedin") or {}).get("headline")
     )
-    pending_linkedin_enrichment = sum(
-        1 for a in attendees
-        if a.linkedin_url
-        and not ((a.enriched_profile or {}).get("linkedin") or {}).get("headline")
-    )
+    pending_linkedin_enrichment = sum(1 for a in attendees if _linkedin_pending(a))
     with_twitter = sum(1 for a in attendees if a.twitter_handle)
     with_website = sum(1 for a in attendees if a.company_website)
     with_grid = sum(1 for a in attendees if (a.enriched_profile or {}).get("grid", {}).get("grid_name"))
