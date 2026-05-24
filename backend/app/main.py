@@ -129,6 +129,14 @@ async def _daily_match_refresh():
             return await refresh_matches_for_new_attendees(db)
     await _run_with_heartbeat("daily_match_refresh", _go)
 
+async def _daily_usage_snapshot():
+    from app.core.database import async_session
+    from app.services.usage_snapshot import compute_and_upsert_usage_daily
+    async def _go():
+        async with async_session() as db:
+            return await compute_and_upsert_usage_daily(db)
+    await _run_with_heartbeat("daily_usage_snapshot", _go)
+
 # coalesce + max_instances + misfire_grace_time are the APScheduler-level
 # protections that catch the OTHER half of the May 5-6 failure: container
 # restarts that miss the cron window, or jobs that stack up after a bad
@@ -153,11 +161,14 @@ scheduler.add_job(_daily_enrichment_sweep,  CronTrigger(hour=3, minute=0,  timez
 # Match refresh moved to 03:30 UTC so it runs AFTER the enrichment
 # sweep finishes (was 02:45, before enrichment existed in the cron).
 scheduler.add_job(_daily_match_refresh,     CronTrigger(hour=3, minute=30, timezone="UTC"), **_JOB_DEFAULTS)
+# Usage snapshot at 03:45 UTC — runs AFTER match refresh so it captures a
+# full day of login/magic-link activity into usage_daily (one row/day).
+scheduler.add_job(_daily_usage_snapshot,    CronTrigger(hour=3, minute=45, timezone="UTC"), **_JOB_DEFAULTS)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
-    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, match refresh 02:45 (UTC)")
+    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, enrichment 03:00, match refresh 03:30, usage snapshot 03:45 (UTC)")
     yield
     scheduler.shutdown(wait=False)
     logger.info("scheduler: stopped")
