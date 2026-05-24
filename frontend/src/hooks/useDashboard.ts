@@ -6,6 +6,7 @@ import {
   getAttendeesBySector,
   triggerProcessing,
   triggerMatching,
+  getAdoption,
 } from "../api/client";
 
 export function useDashboardStats() {
@@ -49,4 +50,13 @@ export function useTriggerProcessing() {
 
 export function useTriggerMatching() {
   return useMutation({ mutationFn: triggerMatching });
+}
+
+export function useAdoption() {
+  return useQuery({
+    queryKey: ["adoption"],
+    queryFn: getAdoption,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 }

@@ -78,6 +78,25 @@ export interface MatchQuality {
   acceptance_rate: number;
 }
 
+export interface Adoption {
+  tracking_started_at: string;
+  accounts: {
+    total: number;
+    real: number;
+    linked_to_attendee: number;
+    pct_of_directory: number;
+    directory_size: number;
+  };
+  signups_by_day: { day: string; n: number }[];
+  usage: {
+    cumulative_active: number;
+    active_last_7d: number;
+    magic_link_active: number;
+    login_active: number;
+  };
+  usage_by_day: { day: string; active_today: number; cumulative_active: number }[];
+}
+
 // ── Auth ────────────────────────────────────────────────────────────────
 
 export interface User {
