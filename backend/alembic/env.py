@@ -14,6 +14,7 @@ from app.models.attendee import Attendee, Match  # noqa: F401 - ensure models ar
 from app.models.user import User  # noqa: F401
 from app.models.message import Conversation, Message  # noqa: F401
 from app.models.grid_audit_run import GridAuditRun  # noqa: F401
+from app.models.usage_daily import UsageDaily  # noqa: F401
 
 settings = get_settings()
 config = context.config

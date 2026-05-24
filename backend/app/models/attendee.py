@@ -83,6 +83,10 @@ class Attendee(Base):
     # Transactional emails (password reset, meeting confirmation) ignore this.
     email_opt_out: Mapped[bool] = mapped_column(Boolean, server_default="false", nullable=False)
 
+    # Adoption tracking — set (throttled, best-effort) on magic-link match view.
+    # This is the hook that captures the magic-link majority (no-account users).
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
 
 class Match(Base):
     __tablename__ = "matches"
