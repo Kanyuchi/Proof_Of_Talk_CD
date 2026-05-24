@@ -80,6 +80,10 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 - Email template design — match intro email needs design polish before re-enabling
 - Rotate Supabase DB password (exposed in CLI session 2026-04-14)
 
+## Now (adoption-tracking — built, awaiting deploy)
+
+- **[adoption-tracking] ✅ ALL 8 TASKS BUILT + REVIEWED on branch `feat/adoption-usage-tracking`** (backend 171 tests pass, frontend build clean, final review APPROVED_WITH_NITS, nits fixed). **PENDING:** (1) **merge the PR**; (2) **`alembic upgrade head` against prod Supabase** to create `users.last_login_at` + `attendees.last_seen_at` + `usage_daily` (migration `c3d4e5f6a7b8`) — without this the new endpoint/cron error; (3) Railway+Netlify auto-deploy on merge; (4) verify `/dashboard/adoption` returns + the card renders; usage numbers start at 0 on deploy day and grow. **OPEN DECISION:** exclude admin/staff + demo personas from `active_today`/`cumulative_active` too (today only `real_accounts` excludes them) so early active numbers aren't inflated by operator logins + the 7 demo personas — recommended quick follow-up. Spec/plan in `docs/superpowers/`.
+
 ## Now (newly discovered)
 
 - **[sponsor-invite-link] Set production `SPONSOR_INVITE_CODE` in Railway + share `/join/<code>` with sponsors; then run a LinkedIn scrape pass to pick up joiners.**

@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   Attendee,
+  Adoption,
   Match,
   MatchListResult,
   DashboardStats,
@@ -234,6 +235,11 @@ export async function getRevenueStats(): Promise<{
   sync_health: { job_name: string; last_run_at: string | null; age_seconds: number | null; last_status: string; stats: Record<string, unknown> }[];
 }> {
   const { data } = await api.get("/dashboard/revenue");
+  return data;
+}
+
+export async function getAdoption(): Promise<Adoption> {
+  const { data } = await api.get("/dashboard/adoption");
   return data;
 }
 

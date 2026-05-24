@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import secrets
 from uuid import UUID
 from datetime import datetime
@@ -27,6 +28,8 @@ from app.services.concierge import profile_data_quality, compute_completeness_pc
 from app.core.deps import require_auth, require_admin
 from app.core.limiter import limiter
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
@@ -166,6 +169,17 @@ async def get_matches_by_magic_link(
     attendee = result.scalars().first()
     if not attendee:
         raise HTTPException(status_code=404, detail="Invalid or expired link")
+
+    # Adoption tracking — stamp last_seen_at (the magic-link majority path),
+    # throttled to once/hour and best-effort so it never breaks the match view.
+    try:
+        from datetime import timedelta
+        now = datetime.utcnow()
+        if attendee.last_seen_at is None or (now - attendee.last_seen_at) > timedelta(hours=1):
+            attendee.last_seen_at = now
+            await db.commit()
+    except Exception as exc:
+        logger.warning("magic-link last_seen_at write failed: %s", exc)  # best-effort; response takes priority
 
     match_result = await db.execute(
         select(Match).where(

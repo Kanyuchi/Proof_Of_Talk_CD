@@ -267,6 +267,18 @@ async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends
     user = (await db.execute(select(User).where(User.email == data.email))).scalars().first()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
+
+    # Adoption tracking — stamp last_login_at, throttled to once/hour and
+    # best-effort so a write failure never blocks the login response.
+    try:
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        if user.last_login_at is None or (now - user.last_login_at) > timedelta(hours=1):
+            user.last_login_at = now
+            await db.commit()
+    except Exception as exc:  # noqa: BLE001 — never let tracking break auth
+        logger.warning("login: last_login_at write failed: %s", exc)
+
     token = create_access_token({"sub": str(user.id)})
     return Token(access_token=token)
 

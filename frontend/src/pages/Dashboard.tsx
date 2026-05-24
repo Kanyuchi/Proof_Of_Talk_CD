@@ -2,12 +2,13 @@ import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
   Users, Handshake, Check, TrendingUp, BarChart3, Brain,
-  Lightbulb, DollarSign, Activity, Zap, RefreshCw, X, Sparkles, Download,
+  Lightbulb, DollarSign, Activity, Zap, RefreshCw, X, Sparkles, Download, UserPlus,
 } from "lucide-react";
 import type { Attendee, Match } from "../types";
 import {
   useDashboardStats, useMatchQuality, useMatchesByType,
   useAttendeesBySector, useTriggerProcessing, useTriggerMatching,
+  useAdoption,
 } from "../hooks/useDashboard";
 import { useAuth } from "../hooks/useAuth";
 import { enrichAll, syncExtasy, syncSpeakers, getInvestorHeatmap, getRevenueStats, getSponsors, generateSponsorReport, reEnrichGrid } from "../api/client";
@@ -73,6 +74,7 @@ export default function Dashboard() {
   const { isAdmin, isAuthenticated, isLoading: authLoading } = useAuth();
   const { data: stats } = useDashboardStats();
   const { data: quality } = useMatchQuality();
+  const { data: adoption } = useAdoption();
   const [drillType, setDrillType] = useState<string | null>(null);
   const [drillSector, setDrillSector] = useState<string | null>(null);
   const [enrichingAll, setEnrichingAll] = useState(false);
@@ -503,7 +505,124 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+        </>
+      )}
 
+      {/* Adoption & Usage — accounts created + signup trend (historical),
+          plus real usage (logins + magic-link opens) anchored to the
+          tracking-start date. Usage numbers start at 0 and grow forward;
+          they are NOT a 30-day window (we have no pre-launch history).
+          Rendered independently of revenueData so a revenue-endpoint failure
+          or delay does not suppress adoption metrics. */}
+      {adoption && (
+            <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center gap-2 mb-4">
+                <UserPlus className="w-5 h-5 text-[#E76315]" />
+                <h2 className="text-lg font-semibold">Adoption &amp; Usage</h2>
+                <span className="text-[10px] text-white/30">admin only</span>
+              </div>
+
+              {/* Accounts top line */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-2xl font-bold">{adoption.accounts.total}</div>
+                  <div className="text-[10px] text-white/40 uppercase">Accounts</div>
+                </div>
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-2xl font-bold">{adoption.accounts.real}</div>
+                  <div className="text-[10px] text-white/40 uppercase">Real (excl. admin/demo)</div>
+                </div>
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-2xl font-bold">{adoption.accounts.pct_of_directory}%</div>
+                  <div className="text-[10px] text-white/40 uppercase">of {adoption.accounts.directory_size} directory</div>
+                </div>
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-2xl font-bold">{adoption.accounts.linked_to_attendee}</div>
+                  <div className="text-[10px] text-white/40 uppercase">Linked to profile</div>
+                </div>
+              </div>
+
+              {/* Signup trend — historical, shows the welcome-email spike. */}
+              {adoption.signups_by_day.length > 0 && (
+                <div className="mb-5">
+                  <div className="text-xs font-semibold text-white/60 mb-2">Signups by day</div>
+                  <div className="space-y-1.5">
+                    {adoption.signups_by_day.map(({ day, n }) => {
+                      const maxN = Math.max(...adoption.signups_by_day.map((d) => d.n), 1);
+                      const label = (() => {
+                        try {
+                          return new Date(day).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+                        } catch { return day; }
+                      })();
+                      return (
+                        <div key={day} className="flex items-center gap-2">
+                          <span className="w-14 text-[10px] text-white/40 text-right shrink-0">{label}</span>
+                          <div className="flex-1 h-5 bg-white/5 rounded overflow-hidden relative">
+                            <div className="h-full bg-[#E76315] rounded transition-all" style={{ width: `${(n / maxN) * 100}%` }} />
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/70">{n}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Usage block — anchored to tracking start. */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-2xl font-bold">{adoption.usage.cumulative_active}</div>
+                  <div className="text-[10px] text-white/40 uppercase">Active (since tracking began {adoption.tracking_started_at})</div>
+                </div>
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-2xl font-bold">{adoption.usage.active_last_7d}</div>
+                  <div className="text-[10px] text-white/40 uppercase">Active last 7d (since tracking began {adoption.tracking_started_at})</div>
+                </div>
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-2xl font-bold">{adoption.usage.login_active}</div>
+                  <div className="text-[10px] text-white/40 uppercase">Logged in</div>
+                </div>
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-2xl font-bold">{adoption.usage.magic_link_active}</div>
+                  <div className="text-[10px] text-white/40 uppercase">Magic-link opens</div>
+                </div>
+              </div>
+
+              {/* Day-by-day usage trend, once usage_daily has rows; else explainer. */}
+              {adoption.usage_by_day.length > 0 ? (
+                <div className="mt-5">
+                  <div className="text-xs font-semibold text-white/60 mb-2">Daily active</div>
+                  <div className="space-y-1.5">
+                    {adoption.usage_by_day.map(({ day, active_today }) => {
+                      const maxA = Math.max(...adoption.usage_by_day.map((d) => d.active_today), 1);
+                      const label = (() => {
+                        try {
+                          return new Date(day).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+                        } catch { return day; }
+                      })();
+                      return (
+                        <div key={day} className="flex items-center gap-2">
+                          <span className="w-14 text-[10px] text-white/40 text-right shrink-0">{label}</span>
+                          <div className="flex-1 h-5 bg-white/5 rounded overflow-hidden relative">
+                            <div className="h-full bg-emerald-500 rounded transition-all" style={{ width: `${(active_today / maxA) * 100}%` }} />
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/70">{active_today}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 p-3 rounded-lg bg-white/[0.02] border border-white/5 text-xs text-white/40">
+                  Usage tracking started {adoption.tracking_started_at} — numbers build from here. The daily snapshot fills this in from day one.
+                </div>
+              )}
+            </div>
+      )}
+
+      {/* Revenue & Registration — gated on revenueData independently of adoption. */}
+      {revenueData && (
+        <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard icon={DollarSign} label="Total Revenue" value={`€${revenueData.revenue.total.toLocaleString()}`} color="bg-emerald-500" />
             <StatCard icon={Users} label="Valid Tickets (orders)" value={revenueData.funnel.valid} color="bg-blue-500" subtitle="Extasy orders — deduped attendees shown on Attendees page" />

@@ -19,3 +19,6 @@ class User(Base):
 
     # Optional link to attendee profile (set when user registers as attendee)
     attendee_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+    # Adoption tracking — set (throttled, best-effort) on successful password login
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
