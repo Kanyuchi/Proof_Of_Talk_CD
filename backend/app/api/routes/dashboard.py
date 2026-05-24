@@ -18,6 +18,62 @@ from app.models.user import User
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 settings = get_settings()
 
+# Tickets sold at exactly €1 are nominal "complimentary" entries (Speaker Pass
+# + General Pass comp batches).  They count toward total_revenue (they were
+# sold) but must NOT inflate paid_count or the average paid-ticket value.
+NOMINAL_PAID_THRESHOLD = 1.0  # euros; amount > threshold → real paid ticket
+
+
+def _summarise_revenue(valid_orders: list[dict]) -> dict:
+    """Aggregate revenue / paid / comp from already-filtered valid orders.
+
+    Tickets at or below NOMINAL_PAID_THRESHOLD are treated as complimentary:
+    they are included in total_revenue (they were sold) but NOT in paid_count
+    or paid_revenue, and therefore do not affect avg_ticket.
+
+    Returns a dict with keys:
+        total_revenue, paid_revenue, paid_count, comp_count,
+        avg_ticket, by_type (list of {type, count, revenue})
+    """
+    total_revenue = 0.0
+    paid_revenue = 0.0
+    paid_count = 0
+    comp_count = 0
+    revenue_by_type: dict = defaultdict(lambda: {"count": 0, "revenue": 0.0})
+
+    for o in valid_orders:
+        ticket_name = (o.get("ticketNames") or "").split(",")[0].strip()
+        try:
+            amount = float(o.get("paymentsAmount") or o.get("fullPrice") or "0")
+        except (ValueError, TypeError):
+            amount = 0.0
+
+        total_revenue += amount
+        revenue_by_type[ticket_name]["count"] += 1
+        revenue_by_type[ticket_name]["revenue"] += amount
+
+        if amount > NOMINAL_PAID_THRESHOLD:
+            paid_count += 1
+            paid_revenue += amount
+        else:
+            comp_count += 1
+
+    avg_ticket = (paid_revenue / paid_count) if paid_count else 0.0
+
+    by_type = [
+        {"type": k, "count": v["count"], "revenue": round(v["revenue"], 2)}
+        for k, v in sorted(revenue_by_type.items(), key=lambda x: -x[1]["revenue"])
+    ]
+
+    return {
+        "total_revenue": total_revenue,
+        "paid_revenue": paid_revenue,
+        "paid_count": paid_count,
+        "comp_count": comp_count,
+        "avg_ticket": avg_ticket,
+        "by_type": by_type,
+    }
+
 
 def _compute_kpi_rates(
     matches_generated: int,
@@ -601,33 +657,18 @@ async def revenue_stats(
     # Revenue should match Rhuna's "Total Sales" figure exactly.
     valid_orders = [o for o in orders if o.get("status") in {"PAID", "REDEEMED"}]
 
-    total_revenue = 0.0
-    revenue_by_type = defaultdict(lambda: {"count": 0, "revenue": 0.0})
-    paid_count = 0
-    comp_count = 0
-
-    for o in valid_orders:
-        ticket_name = (o.get("ticketNames") or "").split(",")[0].strip()
-        if ticket_name.lower() in TEST_TICKET_NAMES:
-            continue
-
-        amount = 0.0
-        try:
-            amount = float(o.get("paymentsAmount") or o.get("fullPrice") or "0")
-        except (ValueError, TypeError):
-            pass
-
-        total_revenue += amount
-        revenue_by_type[ticket_name]["count"] += 1
-        revenue_by_type[ticket_name]["revenue"] += amount
-
-        if amount > 0:
-            paid_count += 1
-        else:
-            comp_count += 1
-
-    real_valid = sum(t["count"] for t in revenue_by_type.values())
-    avg_ticket = total_revenue / paid_count if paid_count else 0
+    # Filter out test ticket names before passing to the pure helper.
+    non_test_valid_orders = [
+        o for o in valid_orders
+        if (o.get("ticketNames") or "").split(",")[0].strip().lower()
+        not in TEST_TICKET_NAMES
+    ]
+    rev = _summarise_revenue(non_test_valid_orders)
+    total_revenue = rev["total_revenue"]
+    paid_count = rev["paid_count"]
+    comp_count = rev["comp_count"]
+    avg_ticket = rev["avg_ticket"]
+    real_valid = sum(r["count"] for r in rev["by_type"])
 
     # ── Growth over time (weekly buckets) ─────────────────────────────────
     from datetime import datetime
@@ -754,10 +795,7 @@ async def revenue_stats(
             "avg_ticket_price": round(avg_ticket, 2),
             "paid_tickets": paid_count,
             "comp_tickets": comp_count,
-            "by_type": [
-                {"type": k, "count": v["count"], "revenue": round(v["revenue"], 2)}
-                for k, v in sorted(revenue_by_type.items(), key=lambda x: -x[1]["revenue"])
-            ],
+            "by_type": rev["by_type"],
         },
         "growth": growth,
         "source_breakdown": {
