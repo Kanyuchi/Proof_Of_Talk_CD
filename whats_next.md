@@ -80,6 +80,10 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 - Email template design — match intro email needs design polish before re-enabling
 - Rotate Supabase DB password (exposed in CLI session 2026-04-14)
 
+## Now (adoption-tracking plan — active)
+
+- **[adoption-tracking] Task 3 next: throttled `last_login_at` write in `POST /auth/login`** — Tasks 1 (migration) and 2 (ORM models) committed on branch `feat/adoption-usage-tracking`. Task 3: modify `backend/app/api/routes/auth.py` login handler + write `backend/tests/test_login_last_login.py` (5 tests). Full steps in plan file `docs/superpowers/plans/2026-05-24-adoption-usage-tracking.md`.
+
 ## Now (newly discovered)
 
 - **[sponsor-invite-link] Set production `SPONSOR_INVITE_CODE` in Railway + share `/join/<code>` with sponsors; then run a LinkedIn scrape pass to pick up joiners.**

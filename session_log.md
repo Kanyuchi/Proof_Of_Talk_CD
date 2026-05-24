@@ -1288,6 +1288,16 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - **Fix (b) — photo extraction reads `srcset` (largest) + `data-delayed-url`, not just `img.src`.** Patrick scraped with `photo_url=NULL` despite having a LinkedIn photo: LinkedIn lazy-loads the top-card avatar, so the real URL sits in `srcset`/`data-delayed-url` while `.src` is a placeholder, and the old `img[src*="profile-displayphoto"]` selector didn't even match it. Added a `_photoUrlFromImg()` helper (real `.src` → largest `srcset` entry → `data-delayed-url`), broadened the selector + the best-effort wait to include `srcset`/`data-delayed-url`, kept the closest-common-ancestor ranking and nav-blacklist intact. Additive + regression-safe: the 94 working `.src` profiles return the identical URL. **Verified** in a real browser engine (Playwright) against a synthetic DOM — 5 cases: normal `.src` unchanged, lazy `srcset`→largest, `data-delayed-url`→captured, no-photo→NULL (no-photo-means-no-photo preserved), nav+sidebar→top-card only.
 - **Still pending (needs operator — manual LinkedIn login):** run `python scripts/linkedin_scrape.py` (picks up the unenriched 14: #63–76) AND `python scripts/linkedin_scrape.py --missing-photos-only` (re-scrapes photo-NULL rows incl. Patrick — he's "enriched" now so default mode skips him). Then re-embed/rematch the newly-enriched via `refresh_profile_matches` per-attendee (`/tmp/reembed_scraped.py`). If Patrick's photo still comes back NULL, run `scripts/diagnose_photo_dom.py "<patrick-url>"` to confirm the exact DOM variant.
 
+## 2026-05-24 — [adoption-tracking] Task 2: ORM models — UsageDaily + last_login_at/last_seen_at columns
+
+- Implemented Task 2 of the adoption & usage tracking plan (plan at `docs/superpowers/plans/2026-05-24-adoption-usage-tracking.md`).
+- **Created `backend/app/models/usage_daily.py`** — `UsageDaily` ORM model, `__tablename__ = "usage_daily"`, columns: `day` (Date PK), `total_accounts`, `real_accounts`, `active_today`, `cumulative_active` (all Integer, server_default=0). Matches the `c3d4e5f6a7b8` migration exactly.
+- **Modified `backend/app/models/user.py`** — added `last_login_at: Mapped[datetime | None]` (nullable DateTime) after `attendee_id`. Uses existing `datetime`/`DateTime` imports.
+- **Modified `backend/app/models/attendee.py`** — added `last_seen_at: Mapped[datetime | None]` (nullable DateTime) after `email_opt_out`. Uses existing `datetime`/`DateTime` imports.
+- **Modified `backend/alembic/env.py`** — added `from app.models.usage_daily import UsageDaily  # noqa: F401` import after the `GridAuditRun` import, so `Base.metadata` registers the table (deferred import from Task 1 Step 3).
+- **Created `backend/tests/test_usage_models.py`** — 4 structural tests (TDD order: wrote test first, confirmed FAIL, then implemented). All 4 pass: column presence, nullable checks, column set + PK, instantiation with datetime assignment.
+- Commit: `19c7e79` — `feat: add UsageDaily model + last_login_at/last_seen_at columns`.
+
 ## 2026-05-23 — [linkedin] Resumed crashed pass with the hardening fixes — 8 enriched, Patrick's photo recovered, no crash
 
 - Ran the two fixes from earlier today (commit a48616f) against the real queue. Operator logged in manually (Playwright headed Chrome).
