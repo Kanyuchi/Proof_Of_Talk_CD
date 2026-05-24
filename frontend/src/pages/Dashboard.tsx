@@ -18,12 +18,14 @@ function StatCard({
   label,
   value,
   color,
+  subtitle,
   onClick,
 }: {
   icon: React.ElementType;
   label: string;
   value: string | number;
   color: string;
+  subtitle?: string;
   onClick?: () => void;
 }) {
   return (
@@ -38,6 +40,7 @@ function StatCard({
         <span className="text-sm text-white/40">{label}</span>
       </div>
       <div className="text-3xl font-bold">{value}</div>
+      {subtitle && <div className="mt-1 text-[11px] text-white/30">{subtitle}</div>}
     </div>
   );
 }
@@ -503,7 +506,7 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard icon={DollarSign} label="Total Revenue" value={`€${revenueData.revenue.total.toLocaleString()}`} color="bg-emerald-500" />
-            <StatCard icon={Users} label="Valid Tickets" value={revenueData.funnel.valid} color="bg-blue-500" />
+            <StatCard icon={Users} label="Valid Tickets (orders)" value={revenueData.funnel.valid} color="bg-blue-500" subtitle="Extasy orders — deduped attendees shown on Attendees page" />
             <StatCard icon={TrendingUp} label="Conversion Rate" value={`${(revenueData.funnel.conversion_rate * 100).toFixed(1)}%`} color="bg-purple-500" />
             <StatCard icon={DollarSign} label={`Avg Paid Ticket (${revenueData.revenue.paid_tickets} paying)`} value={`€${revenueData.revenue.avg_ticket_price.toFixed(0)}`} color="bg-[#D35400]" />
           </div>
