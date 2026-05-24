@@ -22,6 +22,36 @@ logger = logging.getLogger(__name__)
 _DEMO_SUFFIX = "@demo.proofoftalk.io"
 
 
+def _active_user_filter():
+    """WHERE clauses dropping admin + demo accounts from 'active' user counts.
+
+    Mirrors the `real_accounts` predicate so active metrics can't be inflated
+    by operator/admin logins or the 7 seeded demo personas. Returned as a tuple
+    so callers splat it into `.where(..., *_active_user_filter())`.
+    """
+    return (
+        User.is_admin.is_(False),
+        ~func.lower(func.coalesce(User.email, "")).like(f"%{_DEMO_SUFFIX}"),
+    )
+
+
+def _active_attendee_filter():
+    """WHERE clauses dropping demo + admin-linked attendees from magic-link
+    'active' counts. Demo personas are matched by email suffix; an admin's own
+    attendee row is matched via the same admin subquery pattern used in
+    dashboard `/stats`.
+    """
+    admin_attendee_subq = (
+        select(User.attendee_id)
+        .where(User.is_admin.is_(True), User.attendee_id.isnot(None))
+        .scalar_subquery()
+    )
+    return (
+        ~func.lower(func.coalesce(Attendee.email, "")).like(f"%{_DEMO_SUFFIX}"),
+        ~Attendee.id.in_(admin_attendee_subq),
+    )
+
+
 async def compute_and_upsert_usage_daily(db: AsyncSession) -> dict:
     """Compute today's usage_daily row and upsert it (idempotent on `day`).
     Returns a stats dict for the cron heartbeat."""
@@ -40,18 +70,21 @@ async def compute_and_upsert_usage_daily(db: AsyncSession) -> dict:
     ).scalar() or 0
 
     # Ever-active users: (attendee_id, last_login_at). attendee_id may be None.
+    # Admin + demo accounts excluded so they never inflate active metrics.
     user_rows = (
         await db.execute(
             select(User.attendee_id, User.last_login_at).where(
-                User.last_login_at.isnot(None)
+                User.last_login_at.isnot(None),
+                *_active_user_filter(),
             )
         )
     ).all()
-    # Ever-active attendees: (id, last_seen_at).
+    # Ever-active attendees: (id, last_seen_at). Demo + admin-linked excluded.
     att_rows = (
         await db.execute(
             select(Attendee.id, Attendee.last_seen_at).where(
-                Attendee.last_seen_at.isnot(None)
+                Attendee.last_seen_at.isnot(None),
+                *_active_attendee_filter(),
             )
         )
     ).all()

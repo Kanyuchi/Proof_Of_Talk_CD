@@ -939,10 +939,14 @@ async def get_adoption(
     from tracking-start forward. See the adoption-usage-tracking design."""
     from datetime import datetime as _dt
     from app.models.usage_daily import UsageDaily
-    # Import the demo-suffix constant from usage_snapshot so the "real accounts"
-    # predicate here is IDENTICAL to the one used in the daily snapshot cron —
-    # the two can never diverge.
-    from app.services.usage_snapshot import _DEMO_SUFFIX as _DEMO
+    # Import the demo-suffix constant + active filters from usage_snapshot so the
+    # "real accounts" and "active" predicates here are IDENTICAL to the daily
+    # snapshot cron — the two can never diverge.
+    from app.services.usage_snapshot import (
+        _DEMO_SUFFIX as _DEMO,
+        _active_user_filter,
+        _active_attendee_filter,
+    )
 
     total = (await db.execute(select(func.count(User.id)))).scalar() or 0
     real = (
@@ -977,15 +981,20 @@ async def get_adoption(
         for r in signup_rows
     ]
 
-    # Live usage counts (correct even before the cron has run).
+    # Live usage counts (correct even before the cron has run). Admin + demo
+    # accounts excluded to match real_accounts + the snapshot's active metrics.
     login_active = (
         await db.execute(
-            select(func.count(User.id)).where(User.last_login_at.isnot(None))
+            select(func.count(User.id)).where(
+                User.last_login_at.isnot(None), *_active_user_filter()
+            )
         )
     ).scalar() or 0
     magic_link_active = (
         await db.execute(
-            select(func.count(Attendee.id)).where(Attendee.last_seen_at.isnot(None))
+            select(func.count(Attendee.id)).where(
+                Attendee.last_seen_at.isnot(None), *_active_attendee_filter()
+            )
         )
     ).scalar() or 0
 
