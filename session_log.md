@@ -1305,3 +1305,14 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - Tests: new `test_revenue_summary.py` (11 tests incl. €1-not-in-paid-count); full backend suite 160 pass; frontend build clean.
 - **Residual (separate, known issue):** our 123 vs CEO's 130 paid = the pre-existing test-row filter asymmetry between the two apps (matchmaker filters by ticket/buyer-name, CEO by buyer email/name lists) — tracked under the CEO-Dash↔Matchmaker reconciliation item, NOT fixed here.
 - **1004 valid tickets vs 918 attendees** = different metrics by design (valid Extasy orders vs email-deduped unique attendees), now labeled; not a bug.
+
+## 2026-05-24 — [dashboard-fix] PR #8 deployed + verified live; CEO-Dash reconciliation diagnosed
+
+- **PR #8 merged (085c6ba) + deployed + verified live.** Matchmaker dashboard now shows Avg Paid Ticket (123 paying) **€1507**, Total Revenue €185,571.01, "Valid Tickets (orders) 1004". Deploy confirmed via the new frontend label in the live bundle + backend 401 (up). (The earlier "numbers didn't change" was because the PR hadn't been merged yet.)
+- **CEO-Dash vs matchmaker reconciliation (investigated `/Users/kanyuchi/Developer/CEO-Dash`).** Both pull the SAME live Rhuna/Extasy feed; numbers diverge on **3 rules**, reconciled to the cent:
+  1. **Qty multiplier (the big one):** CEO counts `numberOfTickets` per order; matchmaker counts 1 per order → **+33 tickets** CEO-side (24 multi-ticket orders). CEO `index.ts:1103,1119,1147,1156`; matchmaker never reads qty (`dashboard.py:609-627`).
+  2. **Test-row filter:** CEO `isTestRow` = email+name+ticket-name (drops Wello "Test" laura@/laura+NN@, jessica@, sveat@extasy.com) `index.ts:259-269`; matchmaker = ticket-name only `dashboard.py:532` → CEO drops 13 more.
+  3. **Paid threshold:** CEO `>=€50` (COMP_PRICE_FLOOR `index.ts:437`) vs matchmaker `>€1` — only differ on 3× Adrian @wello €1.20 REDEEMED rows.
+  - Reconciles: total 1004+33−13=1024 ✓; paid 123−3+10(qty)=130 ✓; revenue €189 gap = €178 (€1 comps in MM grand total) + €10.60 (small redeemed) ✓; avg CEO €1426=€185,382/130 vs MM €1507=paid_revenue/123 — **difference is the qty denominator (130 vs 123), NOT a numerator bug** (MM already uses paid_revenue/paid_count, confirmed by live €1507).
+  - **CEO is more correct on counts** (counts real tickets via qty; matchmaker undercounts multi-seat orders by 33) and on test filtering.
+- **DECISION (Shaun): capture diagnosis now, implement alignment in a fresh session** (controller context exhausted at 186%). Queued in whats_next.
