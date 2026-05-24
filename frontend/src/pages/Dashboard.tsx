@@ -505,12 +505,16 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+        </>
+      )}
 
-          {/* Adoption & Usage — accounts created + signup trend (historical),
-              plus real usage (logins + magic-link opens) anchored to the
-              tracking-start date. Usage numbers start at 0 and grow forward;
-              they are NOT a 30-day window (we have no pre-launch history). */}
-          {adoption && (
+      {/* Adoption & Usage — accounts created + signup trend (historical),
+          plus real usage (logins + magic-link opens) anchored to the
+          tracking-start date. Usage numbers start at 0 and grow forward;
+          they are NOT a 30-day window (we have no pre-launch history).
+          Rendered independently of revenueData so a revenue-endpoint failure
+          or delay does not suppress adoption metrics. */}
+      {adoption && (
             <div className="p-6 rounded-2xl bg-white/[0.03] border border-white/10">
               <div className="flex items-center gap-2 mb-4">
                 <UserPlus className="w-5 h-5 text-[#E76315]" />
@@ -614,8 +618,11 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-          )}
+      )}
 
+      {/* Revenue & Registration — gated on revenueData independently of adoption. */}
+      {revenueData && (
+        <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <StatCard icon={DollarSign} label="Total Revenue" value={`€${revenueData.revenue.total.toLocaleString()}`} color="bg-emerald-500" />
             <StatCard icon={Users} label="Valid Tickets (orders)" value={revenueData.funnel.valid} color="bg-blue-500" subtitle="Extasy orders — deduped attendees shown on Attendees page" />
