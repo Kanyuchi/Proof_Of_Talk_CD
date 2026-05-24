@@ -80,9 +80,9 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 - Email template design — match intro email needs design polish before re-enabling
 - Rotate Supabase DB password (exposed in CLI session 2026-04-14)
 
-## Now (adoption-tracking — built, awaiting deploy)
+## Now (adoption-tracking — ✅ SHIPPED & LIVE 2026-05-24)
 
-- **[adoption-tracking] ✅ ALL 8 TASKS BUILT + REVIEWED on branch `feat/adoption-usage-tracking`** (backend 171 tests pass, frontend build clean, final review APPROVED_WITH_NITS, nits fixed). **PENDING:** (1) **merge the PR**; (2) **`alembic upgrade head` against prod Supabase** to create `users.last_login_at` + `attendees.last_seen_at` + `usage_daily` (migration `c3d4e5f6a7b8`) — without this the new endpoint/cron error; (3) Railway+Netlify auto-deploy on merge; (4) verify `/dashboard/adoption` returns + the card renders; usage numbers start at 0 on deploy day and grow. **OPEN DECISION:** exclude admin/staff + demo personas from `active_today`/`cumulative_active` too (today only `real_accounts` excludes them) so early active numbers aren't inflated by operator logins + the 7 demo personas — recommended quick follow-up. Spec/plan in `docs/superpowers/`.
+- **[adoption-tracking] ✅ FULLY SHIPPED, DEPLOYED, VERIFIED LIVE (2026-05-24).** PR #7 rebased onto main (2 doc commits auto-dropped as already-upstream; only session_log conflicted), prod migration `c3d4e5f6a7b8` applied **before** merge (no deploy error window), squash-merged (`349c4e7`), Railway+Netlify deployed. **End-to-end prod smoke (4 paths green):** `/dashboard/adoption` 200 w/ real data (169 accounts / 161 real), magic-link hook stamps `last_seen_at`, login hook stamps `last_login_at`, snapshot writes `usage_daily`. Frontend card live (bundle `index-DYZZjjrl.js`). **OPEN DECISION → RESOLVED:** the recommended admin/demo exclusion from `active_today`/`cumulative_active`/live counts is **implemented + deployed** (`9e38c96`, shared `_active_user_filter`/`_active_attendee_filter`, TDD `test_usage_active_exclusion.py`, 193 tests) — verified live (Marcus demo dropped: `login_active` 1→0, `magic_active` 2→1). Today's `usage_daily` row seeded so the card shows data immediately. **No open items.** Spec/plan in `docs/superpowers/`.
 
 ## Now (newly discovered)
 
