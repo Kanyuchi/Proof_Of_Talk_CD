@@ -1376,3 +1376,10 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - Verified against real code before writing: magic-defer endpoint pattern (matches.py:232), `_compute_overall_status`, send_welcome_batch.py structure, `_render_email`/`send_welcome_email`, attendee model, TS Match type (status_a/status_b, no viewer_status — frontend derives from viewer.id), test patterns (test_match_defer SimpleNamespace + test_magic_last_seen fake-DB).
 - Fast-follow explicitly OUT of this plan: recurring ~1-2h cron + un-gating mutual-completion email (both require off-request-path sends).
 - No code yet — plan committed, awaiting execution-mode choice.
+
+## 2026-05-25 06:55 — [reciprocity-loop] Built + reviewed + PR #9 (awaiting rollout)
+
+- Executed the plan via subagent-driven development on isolated worktree branch `reciprocity-loop` (6 feature commits df8b2e7..7437c90). Per-task TDD + spec/quality review, final cross-task seam review: all green. **206 backend tests pass; frontend tsc + build clean.**
+- Shipped: migration `d4e5f6a7b8c9` (`attendees.last_interest_notified_at`); `PATCH /m/{token}/status` tokenless accept-back (security-reviewed: caller can only set own side, 404 on non-owned, "met" rejected); `send_interest_notification` email; `notify_pending_interest.py` backlog script (live `--status` preview: **131 eligible** — validates the ~135 dormant-accept estimate); `acceptMatchByMagicLink` client fn; Requests surface + accept/decline + `?tab=requests` deep-link on MagicMatches/MyMatches.
+- **PR #9** opened against main: https://github.com/Kanyuchi/Proof_Of_Talk_CD/pull/9 . NOT merged. Rollout gates (each needs a deliberate go): apply prod migration before merge → merge → deploy → Task 7 E2E smoke → first backlog wave `--limit 100 --confirm` (real email to ~100). Worktree preserved at `../Proof_Of_Talk_CD-reciprocity` for PR iteration.
+- Fast-follow (separate PR): recurring ~1–2h cron + un-gating mutual-completion email off the request path.
