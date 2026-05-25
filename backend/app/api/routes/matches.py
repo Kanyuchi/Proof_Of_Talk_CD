@@ -609,26 +609,11 @@ async def update_match_status(
     await db.commit()
     await db.refresh(match)
 
-    # Fire-and-forget: notify both parties when a mutual match is newly confirmed
-    if match.status == "accepted" and prev_status != "accepted":
-        try:
-            from app.services.email import send_mutual_match_email
-            attendee_a = await db.get(Attendee, match.attendee_a_id)
-            attendee_b = await db.get(Attendee, match.attendee_b_id)
-            if attendee_a and attendee_b:
-                for recipient, partner in [(attendee_a, attendee_b), (attendee_b, attendee_a)]:
-                    if recipient.email and not getattr(recipient, "email_opt_out", False):
-                        send_mutual_match_email(
-                            to_email=recipient.email,
-                            attendee_name=recipient.name,
-                            other_name=partner.name,
-                            other_title=partner.title or "",
-                            other_company=partner.company or "",
-                            magic_token=recipient.magic_access_token,
-                        )
-        except Exception as exc:  # noqa: BLE001
-            import logging
-            logging.getLogger(__name__).warning("Mutual match email failed: %s", exc)
+    # NOTE: mutual-match confirmation emails are no longer sent from this
+    # request path. The reciprocity_notify cron (run_mutual_notifications,
+    # every 2h) picks up status='accepted' + mutual_notified_at IS NULL and
+    # sends to both parties with force=True. This removes the race condition
+    # between the inline send and dedup, and keeps the request path clean.
 
     return MatchResponse.model_validate(match)
 

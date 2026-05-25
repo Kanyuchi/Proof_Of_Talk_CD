@@ -93,6 +93,13 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
 
+    # Reciprocity-notify kill-switch. Default OFF so the cron is dormant
+    # until explicitly enabled via Railway env var. Set to true to activate
+    # forward-interest + mutual-completion emails every 2h. EMAIL_MODE alone
+    # cannot stop this job because the cron force-sends; this flag is the
+    # real off-switch.
+    RECIPROCITY_NOTIFY_ENABLED: bool = False
+
     # Integration (Runa / third-party)
     INTEGRATION_API_KEY: str = ""
     INTEGRATION_API_KEY_SECONDARY: str = ""  # For key rotation
