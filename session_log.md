@@ -1454,3 +1454,6 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - Reworked `launch/POT Matchmaker — Onboarding Video Script.md` per Shaun's inline notes (left in voiceover_script_v2.md): dropped the marketing re-sell (Introducing/2,500/$18T/93
 ## 2026-05-25 — [content] Onboarding video script revised to 60s per Zohair-thread edits
 - Reworked `launch/POT Matchmaker — Onboarding Video Script.md` per Shaun's inline notes (left in voiceover_script_v2.md): dropped the marketing re-sell (Introducing / 2,500 / $18T / 93% — the launch film covers it); linear journey ticket → redeem → magic link → SET PASSWORD → ENRICH PROFILE TO UNLOCK MORE → matches → MUTUAL UNLOCKS MESSAGES → message + book → THREADS (start conversations without a match). Retimed to exactly 60.0s (10 scenes). Hook kept: "Somewhere in this room is the conversation that changes your year."
+
+## 2026-05-25 — [content] Onboarding voiceover track (pairs with 60s script)
+- Wrote `launch/POT Matchmaker — Onboarding Voiceover.md`: one VO line per scene, timed table (#/start_s/scene/phrase) matching voiceover_script_v2.md format. ~145 words / 60s (~2.4 w/s). Includes per-line fit check + trim variants. Key line 6 carries the mutual-match-unlocks-messages beat; line 8 covers Threads.
