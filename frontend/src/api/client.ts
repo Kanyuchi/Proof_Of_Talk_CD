@@ -156,6 +156,20 @@ export async function deferMatchByMagicLink(
   return data;
 }
 
+export async function acceptMatchByMagicLink(
+  token: string,
+  matchId: string,
+  status: "accepted" | "declined",
+  decline_reason?: string
+): Promise<Match> {
+  const { data } = await api.patch(`/matches/m/${token}/status`, {
+    match_id: matchId,
+    status,
+    decline_reason,
+  });
+  return data;
+}
+
 export async function scheduleMeeting(
   matchId: string,
   meeting_time: string,

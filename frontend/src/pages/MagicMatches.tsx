@@ -5,7 +5,7 @@ import {
   Sparkles, Brain, Target, MessageSquare,
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
-import { getMatchesByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink } from "../api/client";
+import { getMatchesByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink, acceptMatchByMagicLink } from "../api/client";
 import PhotoUpload from "../components/PhotoUpload";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import GridOrgCard from "../components/GridOrgCard";
@@ -65,6 +65,31 @@ export default function MagicMatches() {
       queryClient.invalidateQueries({ queryKey: ["magic-matches", token] });
     },
   });
+
+  const acceptMutation = useMutation({
+    mutationFn: ({ matchId, status }: { matchId: string; status: "accepted" | "declined" }) =>
+      acceptMatchByMagicLink(token!, matchId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["magic-matches", token] });
+    },
+  });
+
+  // Incoming reciprocity requests: the other party accepted, this viewer has
+  // not responded. Mirrors MyMatches.tsx. `attendee` is the viewer profile.
+  const requestMatches = (data?.matches ?? []).filter((m) => {
+    if (!attendee) return false;
+    const iAmA = m.attendee_a_id === attendee.id;
+    const myStatus = iAmA ? m.status_a : m.status_b;
+    const otherStatus = iAmA ? m.status_b : m.status_a;
+    return otherStatus === "accepted" && myStatus === "pending";
+  });
+
+  const requestsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (searchParams.get("tab") === "requests") {
+      requestsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [searchParams, data]);
 
   // Claim a full account from this magic link. The token authenticates the
   // request server-side, so it bypasses the registration ticket gate — this
@@ -323,6 +348,59 @@ export default function MagicMatches() {
         <Sparkles className="w-5 h-5 text-[#E76315]" />
         <h2 className="text-xl font-bold">Recommended Connections</h2>
         <span className="text-white/30 text-sm">({matches.length})</span>
+      </div>
+
+      {/* Requests banner — "N people want to meet you" */}
+      <div ref={requestsRef}>
+        {requestMatches.length > 0 && (
+          <div className="mb-6 rounded-xl border border-[#E76315]/40 bg-[#E76315]/10 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#E76315] opacity-60"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#E76315]"></span>
+              </span>
+              <h3 className="text-base font-semibold text-white">
+                {requestMatches.length} {requestMatches.length === 1 ? "person wants" : "people want"} to meet you
+              </h3>
+            </div>
+            <p className="text-sm text-white/60 mb-4">Accept to lock in the match, then book a time.</p>
+            <div className="space-y-3">
+              {requestMatches.map((m) => (
+                <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg bg-black/20 p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {m.matched_attendee && (
+                      <AttendeeAvatar attendee={m.matched_attendee} size="sm" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-white truncate">
+                        {m.matched_attendee?.name ?? "A fellow attendee"}
+                      </div>
+                      <div className="text-xs text-white/50 truncate">
+                        {[m.matched_attendee?.title, m.matched_attendee?.company].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => acceptMutation.mutate({ matchId: m.id, status: "accepted" })}
+                      disabled={acceptMutation.isPending}
+                      className="rounded-lg bg-[#E76315] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => acceptMutation.mutate({ matchId: m.id, status: "declined" })}
+                      disabled={acceptMutation.isPending}
+                      className="rounded-lg border border-white/15 px-3 py-2 text-xs font-medium text-white/70 disabled:opacity-50"
+                    >
+                      Not now
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Match cards */}

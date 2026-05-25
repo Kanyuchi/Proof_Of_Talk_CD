@@ -527,6 +527,54 @@ def send_welcome_email(
     return _send_email(to_email, subject, body_html, body_text, force=force)
 
 
+def send_interest_notification(
+    to_email: str,
+    attendee_name: str,
+    count: int,
+    magic_token: str | None = None,
+    app_url: str | None = None,
+    force: bool = False,
+) -> bool:
+    """"N people want to meet you" pull-back email. The CTA lands on the
+    magic-link Requests tab so a no-login attendee can accept back in one tap.
+
+    `force=True` is for the operator backlog batch (notify_pending_interest.py)
+    and the future recurring cron — both off the request path. Never call with
+    force=True from a request handler (see _send_email docstring).
+    """
+    settings = get_settings()
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
+    first_name = attendee_name.split()[0] if attendee_name else attendee_name
+    requests_url = (
+        f"{app_url}/m/{magic_token}?tab=requests" if magic_token else f"{app_url}/matches"
+    )
+    noun = "person wants" if count == 1 else "people want"
+    subject = f"{count} {noun} to meet you at Proof of Talk"
+    body_html = _render_email(
+        preheader=f"{count} {noun} to meet you. Accept to lock in the meeting.",
+        eyebrow="Mutual interest",
+        heading=f"{count} {noun} to meet you",
+        body_html=(
+            f"<tr><td style=\"padding:0 0 14px;\">Hi {first_name}, {count} {noun} to meet you at "
+            f"Proof of Talk 2026. They have already said yes. Accept them back and you can book a "
+            f"meeting in one tap, no login needed.</td></tr>"
+        ),
+        cta_label="See who wants to meet you",
+        cta_url=requests_url,
+        cta_color="#E76315",
+        unsubscribe=True,
+        unsubscribe_token=magic_token,
+    )
+    body_text = (
+        f"{count} {noun} to meet you at Proof of Talk 2026, {first_name}.\n\n"
+        f"They have already said yes. Accept them back and book a meeting in one tap:\n"
+        f"{requests_url}\n\n"
+        f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
+    )
+    return _send_email(to_email, subject, body_html, body_text, force=force)
+
+
 # ── Post-event emails (Phase 6) ─────────────────────────────────────
 
 

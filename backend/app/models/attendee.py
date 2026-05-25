@@ -87,6 +87,11 @@ class Attendee(Base):
     # This is the hook that captures the magic-link majority (no-account users).
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # When we last emailed this attendee "N people want to meet you" (reciprocity
+    # pull-back throttle). NULL = never notified. Set by notify_pending_interest.py
+    # and the future recurring cron; lets the cron skip people the backlog covered.
+    last_interest_notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
 
 class Match(Base):
     __tablename__ = "matches"

@@ -1,4 +1,4 @@
-import { Navigate, Link, useNavigate } from "react-router-dom";
+import { Navigate, Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Check, X, Brain, Target, MessageSquare, Sparkles,
   Copy, CheckCheck, Calendar, Clock, Download, Heart, ChevronDown, ChevronUp, Send,
@@ -21,6 +21,7 @@ import GridOrgCard from "../components/GridOrgCard";
 
 export default function MyMatches() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const attendeeId = user?.attendee_id ?? undefined;
 
@@ -46,7 +47,9 @@ export default function MyMatches() {
       return new Set();
     }
   });
-  const [activeTab, setActiveTab] = useState<"all" | "requests" | "saved">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "requests" | "saved">(
+    searchParams.get("tab") === "requests" ? "requests" : "all"
+  );
 
   const matches = matchData?.matches ?? [];
   const isAdmin = user?.is_admin ?? false;
