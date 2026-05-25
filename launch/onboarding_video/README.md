@@ -11,9 +11,13 @@ prod Supabase DB), driven through the real onboarding flow by a demo account.
 
 ## Deliverables
 
+- `pot_onboarding_realapp_4k_vo.mp4` — **TRUE 4K + VOICEOVER** 3840×2160, 30fps,
+  ~64s, H.264 (CRF 18) + AAC. **NO on-screen captions** — an ElevenLabs MALE
+  voiceover (Brian, beat-synced) carries the narration, with the music bed
+  sidechain-ducked underneath. The crisp cut to ship. (See "Voiceover cut" below.)
 - `pot_onboarding_realapp_4k.mp4` — **TRUE 4K** 3840×2160, 30fps, ~64s, H.264
-  (CRF 18) + AAC music bed. The crisp cut — built from high-DPI screenshot
-  frames (see "4K pipeline" below). **This is the one to ship.**
+  (CRF 18) + AAC music bed. The original captioned cut — built from high-DPI
+  screenshot frames (see "4K pipeline" below). Kept in place.
 - `pot_onboarding_realapp_1080p.mp4` — 1920×1080, 30fps, ~62.7s, H.264 + AAC.
   The original cut; left in place. It was captured at 1280×720 (Playwright
   `recordVideo`) then upscaled, so its UI text is soft.
@@ -99,16 +103,61 @@ bash launch/onboarding_video/assemble_realapp.sh
 
 ## Verification frames (gitignored)
 
-- `4k_frame_{1..3}_*.png` — extracted from the FINAL **4K** mp4 at set-password,
-  messages/mutual, and threads. Each is 3840×2160 with visibly sharp UI text and
-  shows ONLY demo personas (Alex Rivera / Thomas Weber / Sofia Reyes / Priya Nair).
+- `4k_vo_frame_threads.png` — extracted from the FINAL **VO** mp4 at the threads
+  beat (~58s). Confirms NO captions are burned in (only the real app UI is on
+  screen) — the VO cut's caption-free check.
+- `4k_frame_{1..3}_*.png` — extracted from the FINAL captioned **4K** mp4 at
+  set-password, messages/mutual, and threads. Each is 3840×2160 with visibly
+  sharp UI text and shows ONLY demo personas (Alex Rivera / Thomas Weber /
+  Sofia Reyes / Priya Nair).
 - `realapp_frame_{1..5}_*.png` — same idea from the older 1080p cut.
 
-## Audio — music only (VO is a follow-up)
+## Voiceover cut (4K, no captions — the one to ship)
 
-No voiceover (ElevenLabs out of scope). `assemble_realapp.sh` muxes
-`../our_version/music.mp3` only. TODO in that script shows the two-input amix to
-restore VO once `voiceover.mp3` exists.
+A caption-free 4K cut with an ElevenLabs MALE voiceover synced to the recording's
+real beat offsets, music ducked under the VO. Reuses the same `frames4k/` frames
++ `beats.json` as the captioned 4K cut — **no re-recording needed**, just
+regenerate the VO and re-assemble (fast).
+
+- `generate_vo_4k.sh` — generates the VO. One narration line per beat (+ a closing
+  CTA), each line mapped to what is ACTUALLY on screen at its beat and sized to
+  fit the beat's duration when spoken (~2.5 w/s). Voice: **Brian — Deep,
+  Resonant, Comforting** (ElevenLabs premade `nPczCjzI2devNBz1zQrb`, the same
+  male voice as `launch/our_version`), model `eleven_multilingual_v2`, mp3.
+  Reads `ELEVENLABS_API_KEY` from `backend/.env` (never printed). Each line is a
+  separate mp3 in `frames4k/vo/`, then stitched onto one ~64s track
+  (`4k_vo_track.mp3`) by delaying each clip to its beat's start offset (`adelay`)
+  and mixing (`amix`) — mirrors how the launch film stitched per-phrase clips.
+- `assemble_realapp_4k_vo.sh` — same real-time concat → 3840×2160 H.264, **NO
+  drawtext captions**. Audio: VO at full (1.0) + `../our_version/music.mp3` as a
+  quiet bed sidechain-compressed (`sidechaincompress`) keyed off the VO, so the
+  music dips while Brian speaks and lifts in the gaps; short fade in/out. Output:
+  `pot_onboarding_realapp_4k_vo.mp4`.
+
+```bash
+# frames4k/ already exists (from record_realapp_4k.mjs) → just:
+bash launch/onboarding_video/generate_vo_4k.sh        # → 4k_vo_track.mp3
+bash launch/onboarding_video/assemble_realapp_4k_vo.sh # → pot_onboarding_realapp_4k_vo.mp4
+# verify: ffprobe must report 3840×2160, ~64s, h264 + an aac AUDIO stream
+```
+
+### Narration lines + beat offsets (auditable)
+
+| Beat | offset | line |
+|------|--------|------|
+| 1 · set-password   | 0.4s  | You're in. Tap your magic link, set a password, and your account is ready. |
+| 2 · profile        | 8.0s  | Sharpen your profile. Add your goals, and let the AI draft your write-up — the more it knows, the more of the room it opens. |
+| 3 · matches/accept | 21.9s | Here are your matches — ranked, scored, and explained, with a reason for every meeting. |
+| 4 · messages/mutual| 30.0s | Accept the people you want. The moment they accept back, it's a mutual match, and your messages unlock. |
+| 5 · booking        | 42.1s | Now book a time you're both free — locked in, right there at the Louvre. |
+| 6 · threads        | 51.5s | Don't want to wait for a yes? Jump into Threads and start the conversation today. |
+| CTA (threads tail) | 61.3s | Open your matches. They're already in the room. |
+
+## Audio — captioned cut uses music only
+
+The captioned cuts (`assemble_realapp.sh`, `assemble_realapp_4k.sh`) mux
+`../our_version/music.mp3` only (no VO — the burned-in captions carry the steps).
+The VO lives in the caption-free cut above.
 
 ## Demo data left in place (clean up when done with the video)
 
