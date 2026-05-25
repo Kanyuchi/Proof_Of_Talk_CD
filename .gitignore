@@ -52,6 +52,14 @@ launch/our_version/.DS_Store
 launch/our_version/pot_matchmaker_*.mp4
 launch/our_version/.render_frames/
 
+# Onboarding video binaries + exports (source JS/HTML committed; binaries are heavy/copied)
+launch/onboarding_video/*.mp3
+launch/onboarding_video/*.mp4
+launch/onboarding_video/*.png
+launch/onboarding_video/figures/
+launch/onboarding_video/.DS_Store
+launch/onboarding_video/.render_frames/
+
 # WhatsApp Zohair bridge — never commit credentials or message data
 tools/whatsapp-mcp/whatsapp-bridge/store/
 tools/whatsapp-mcp/.env
