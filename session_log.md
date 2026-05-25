@@ -1457,3 +1457,7 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 
 ## 2026-05-25 — [content] Onboarding voiceover track (pairs with 60s script)
 - Wrote `launch/POT Matchmaker — Onboarding Voiceover.md`: one VO line per scene, timed table (#/start_s/scene/phrase) matching voiceover_script_v2.md format. ~145 words / 60s (~2.4 w/s). Includes per-line fit check + trim variants. Key line 6 carries the mutual-match-unlocks-messages beat; line 8 covers Threads.
+
+## 2026-05-25 — [content] Onboarding video production package (shot list + plan)
+- Confirmed the videos are NOT code (production plan = screen-record + AI cinematic + ElevenLabs VO + DaVinci edit; no Remotion/codebase). So "start" = production deliverables, not a build.
+- Wrote `launch/onboarding-video-shotlist-and-production.md`: asset checklist, per-scene screen-recording shot list grounded in real app routes (/m magic link, claim/set-password, /profile write-up+Regenerate, /matches accept, /messages mutual+composer, /threads, booking), assembly notes, acceptance criteria, next actions. Distribution = welcome email + magic-link landing + in-app "How it works" + support replies (retention, not acquisition). Uses demo personas (no real data on screen).
