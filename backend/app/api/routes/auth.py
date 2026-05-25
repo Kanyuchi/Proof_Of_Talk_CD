@@ -303,6 +303,22 @@ async def update_profile(
     if not attendee:
         raise HTTPException(status_code=404, detail="Attendee profile not found")
 
+    # User-editable AI write-up: pins on non-empty, un-pins on empty (= reset to
+    # AI). Handled before the generic loop because it needs special pin logic.
+    from datetime import datetime
+    if "ai_summary" in data:
+        raw = (data.get("ai_summary") or "").strip()
+        if len(raw) > 2000:
+            raise HTTPException(status_code=400, detail="Write-up must be 2000 characters or fewer.")
+        if raw:
+            attendee.ai_summary = raw
+            attendee.ai_summary_pinned = True
+            attendee.ai_summary_edited_at = datetime.utcnow()
+        else:
+            # Empty = "reset to AI": un-pin and let the refresh below regenerate.
+            attendee.ai_summary_pinned = False
+        data = {k: v for k, v in data.items() if k != "ai_summary"}
+
     allowed = {
         "name", "company", "title", "goals", "interests", "target_companies",
         "seeking", "not_looking_for", "preferred_geographies", "deal_stage",
