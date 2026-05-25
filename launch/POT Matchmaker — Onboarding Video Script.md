@@ -2,38 +2,36 @@
 
 Onboarding Video Script — On-Screen Text & Animation Reference
 
-~82 seconds · 13 scenes · 4 acts · 4K 60fps
+60 seconds · 10 scenes · 4K 60fps
 
-**Purpose:** Walk a brand-new attendee end-to-end — from buying/redeeming a ticket OR
-receiving the welcome email with the magic link, through setting up, to booking meetings.
-The spine of the film is the **mutual-match consent model**, told deliberately so the
-"I accepted but can't see them in Messages / can't message them" confusion never happens.
-This is the companion to the launch film (`POT Matchmaker — Video Script.md`) and reuses
-its visual system.
+**Purpose:** Walk a brand-new attendee through the *flow of use* — from buying & redeeming a
+ticket and getting the welcome email with the magic link, to setting a password, enriching
+their profile, and understanding how matching, messages and threads work. The spine is the
+**mutual-match consent model**, told deliberately so the "I accepted but can't see them in
+Messages / can't send a message" confusion never happens.
+
+**Deliberately NOT included** (per Zohair feedback — the launch film already does this):
+the "Introducing", 2,500-attendee, $18T / 93%-C-suite event-stats sell. This film is purely
+*how to use your account*.
+
+Companion to `POT Matchmaker — Video Script.md`; reuses its visual system.
 
 ---
 
 ## How to read this document
 
-Each section = one scene, in playback order.
+Each section = one scene, in playback order. ON-SCREEN TEXT = every word on screen, in order.
+ANIMATIONS = timing/motion; times are seconds from the start of that scene.
 
-ON-SCREEN TEXT — every word that appears on screen, in order.
-
-ANIMATIONS — timing and motion for each element. Times are seconds from the start of that
-scene (local, not global).
-
-### Persistent Watermark (all scenes except 01 and 13)
-
-POT logo — white, 28px, top-left (60px from left, 50px from top). Inverted to black on
-light scenes. Fades in over 1s at start, out over 1s at end.
+**Watermark:** POT logo top-left (white; inverted on light scenes) on all scenes except 01 & 10.
 
 ---
 
-## ━━ ACT 1 — YOU'RE IN ━━
+## ━━ ACT 1 — INTO THE ROOM ━━
 
-### Scene 01 · Title
+### Scene 01 · Title + hook
 
-**Time:** 0:00 – 0:04 (4.0s)
+**Time:** 0:00 – 0:05 (5.0s)
 
 **Background:** Pure white
 
@@ -41,103 +39,31 @@ light scenes. Fades in over 1s at start, out over 1s at end.
 
 > **YOU'RE IN.** *Large heading, black*
 >
-> **[Proof of Talk logo]** *POT wordmark, inverted to black*
+> **Matchmaker** *Giant italic orange — 180px Poppins*
 >
-> **Matchmaker** *Giant italic orange — 200px Poppins*
->
-> **From ticket to your first meeting — in minutes.** *Subtitle — small grey*
+> **Somewhere in this room is the conversation that changes your year.** *Subtitle — grey, italic*
 
 **ANIMATIONS**
 
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
 | YOU'RE IN | 0.05s | 0.5s | easeOutCubic | Fade + slide up 8px, word by word |
-| POT Logo | 0.5s | 0.5s | easeOutCubic | Fade + slide up 12px |
-| Matchmaker | 0.85s | per word 0.07s | easeOutCubic | Word-by-word reveal, slide up 20px |
-| Subtitle | 1.6s | per word 0.022s | easeOutCubic | Word-by-word reveal |
+| Matchmaker | 0.5s | per word 0.07s | easeOutCubic | Word-by-word reveal, slide up 20px |
+| Subtitle | 1.4s | per word 0.03s | easeOutCubic | Word-by-word reveal |
 
 ---
 
-### Scene 02 · Two ways in
+### Scene 02 · Ticket → redeemed → the email
 
-**Time:** 0:04 – 0:09 (5.0s)
-
-**Background:** Pitch black
-
-**ON-SCREEN TEXT**
-
-> **Two ways into the room.** *Centered headline — 80px italic Poppins, white*
->
-> **1 · You bought or redeemed a ticket** *Left card — white, mono label "TICKET"*
->
-> **2 · You got the welcome email** *Right card — orange accent, mono label "MAGIC LINK"*
->
-> **Either way — same destination: your matches.** *Subtitle, grey, beneath both cards*
-
-**ANIMATIONS**
-
-| Element | Delay | Duration | Easing | Animation |
-|---|---|---|---|---|
-| Headline | 0.2s | 0.6s | easeOutCubic | Fade + slide up 16px |
-| Left card | 0.8s | 0.5s | easeOutBack | Scale pop 0.85→1.0 |
-| Right card | 1.0s | 0.5s | easeOutBack | Scale pop 0.85→1.0 |
-| Converging lines | 1.6s | 0.6s | easeInOutCubic | Two lines draw down from cards to a single point |
-| Subtitle | 2.2s | 0.5s | easeOutCubic | Fade + slide up 10px |
-
----
-
-### Scene 03 · Path 1 — Ticket → account
-
-**Time:** 0:09 – 0:15 (6.0s)
+**Time:** 0:05 – 0:12 (7.0s)
 
 **Background:** Pitch black (split layout)
 
 **ON-SCREEN TEXT**
 
-> **Bought a ticket?** *LEFT PANEL — italic, 86px, white*
+> **You bought your pass. You redeemed it.** *LEFT PANEL — italic, 80px, white*
 >
-> **Create your account with the email you bought it with.** *LEFT PANEL — subtitle, grey*
->
-> **meet.proofoftalk.io** *RIGHT PANEL — browser bar, mono*
->
-> **Register** *Form card heading*
->
-> **Email — you@company.com** *Field 1 — with helper "the email on your ticket"*
->
-> **Password — ••••••••** *Field 2*
->
-> **[ Create account → ]** *Orange CTA*
->
-> **✓ Ticket found — you're verified** *Green confirmation chip*
-
-**ANIMATIONS**
-
-| Element | Delay | Duration | Easing | Animation |
-|---|---|---|---|---|
-| Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
-| Register card | 0.6s | 0.5s | easeOutCubic | Fade + slide up 16px |
-| Email field | 1.1s | 0.4s | easeOutCubic | Field fills, typewriter |
-| Password field | 1.7s | 0.4s | easeOutCubic | Field fills with dots |
-| Cursor taps CTA | 2.4s | 0.25s | easeInOutCubic | Cursor scale-down + ripple |
-| Green verified chip | 2.9s | 0.5s | easeOutBack | Scale pop + glow |
-
-**NOTE (not on screen):** reinforces the real rule — register with the *ticket* email so the
-gate finds you. If someone buys mid-day, their ticket syncs shortly; the welcome-email path
-(Scene 04) is the instant alternative.
-
----
-
-### Scene 04 · Path 2 — Welcome email → magic link
-
-**Time:** 0:15 – 0:21 (6.0s)
-
-**Background:** Pitch black (split layout)
-
-**ON-SCREEN TEXT**
-
-> **Got the email?** *LEFT PANEL — italic, 86px, white*
->
-> **One tap. No password. Straight to your matches.** *LEFT PANEL — subtitle, grey*
+> **Then this lands in your inbox.** *LEFT PANEL — subtitle, grey*
 >
 > **[POT Logo]** *Email card header*
 >
@@ -145,73 +71,95 @@ gate finds you. If someone buys mid-day, their ticket syncs shortly; the welcome
 >
 > **Your introductions are ready.** *Email subject — 44px*
 >
-> **[ Open my matches → ]** *Single orange CTA*
+> **[ Open my matches → ]** *Single orange CTA — the magic link*
 >
-> *— cursor taps, email slides out, app drops in —*
->
-> **Welcome to Proof of Talk** *Landing heading — real app copy*
->
-> **Set a password to save your spot (optional)** *Small grey line under heading*
+> **No app. No password yet. Just tap.** *Caption under button, grey*
 
 **ANIMATIONS**
 
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
 | Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
-| Email card | 0.2s | 0.5s | easeOutCubic | Fade + slide up 16px |
-| CTA button | 0.7s | 0.4s | easeOutBack | Scale pop + glow |
-| Cursor taps CTA | 1.3s | 0.25s | easeInOutCubic | Cursor scale-down + ripple |
-| Email exit | 1.4s | 0.4s | easeInCubic | Slide up + fade out |
-| Landing heading | 1.8s | 0.5s | easeOutCubic | Fade + slide up 16px |
-| Password line | 2.4s | 0.4s | easeOutCubic | Fade in |
+| Email card | 0.4s | 0.5s | easeOutCubic | Fade + slide up 16px |
+| CTA (magic link) | 1.0s | 0.4s | easeOutBack | Scale pop + glow |
+| Caption | 1.5s | 0.4s | easeOutCubic | Fade in |
+| Cursor taps CTA | 2.2s | 0.25s | easeInOutCubic | Cursor scale-down + ripple |
 
 ---
 
-## ━━ ACT 2 — SET UP IN 30 SECONDS ━━
+### Scene 03 · Tap in → make it yours (password)
 
-### Scene 05 · Make your matches sharper
-
-**Time:** 0:21 – 0:27 (6.0s)
+**Time:** 0:12 – 0:18 (6.0s)
 
 **Background:** Pitch black (split layout)
 
 **ON-SCREEN TEXT**
 
-> **Tell it what you want.** *LEFT PANEL — italic, 86px*
+> **One tap and you're in.** *LEFT PANEL — italic, 86px*
 >
-> **A few lines now = far better matches.** *LEFT PANEL — subtitle, grey*
+> **Set a password to make the account yours.** *LEFT PANEL — subtitle, grey*
 >
-> **Your goals at POT 2026** *RIGHT PANEL — field label*
+> **Welcome to Proof of Talk** *RIGHT PANEL — landing heading, real app copy*
 >
-> **Raising a seed round · seeking infra VCs and custody partners** *Field text, typewriter*
+> **Create a password** *Field label*
 >
-> **Your write-up** *Second field label*
+> **••••••••** *Password field, fills*
 >
-> **This is how you're introduced to your matches — edit it anytime.** *Helper line, grey*
+> **[ Save & continue → ]** *Orange CTA*
 >
-> **[ Regenerate with AI ]** *Small pill, orange outline*
->
-> **✓ Saved. Matches refreshing.** *Green confirmation banner*
+> **✓ Account secured** *Green chip*
 
 **ANIMATIONS**
 
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
 | Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
-| Goals field | 0.7s | 0.5s | easeOutCubic | Field fills, typewriter |
-| Write-up field | 1.8s | 0.5s | easeOutCubic | Field fills, typewriter |
-| Regenerate pill | 2.6s | 0.4s | easeOutBack | Scale pop |
-| Green banner | 3.2s | 0.5s | easeOutCubic | Fade + slide up 10px |
-
-**NOTE:** showcases the new self-service write-up edit + regenerate (shipped 2026-05-25).
+| Landing → password card | 0.5s | 0.5s | easeOutCubic | Fade + slide up 16px |
+| Password field | 1.1s | 0.4s | easeOutCubic | Fills with dots |
+| Cursor taps CTA | 1.8s | 0.25s | easeInOutCubic | Cursor + ripple |
+| Green chip | 2.3s | 0.45s | easeOutBack | Scale pop + glow |
 
 ---
 
-## ━━ ACT 3 — HOW MATCHING WORKS (THE IMPORTANT BIT) ━━
+## ━━ ACT 2 — SET YOURSELF UP ━━
 
-### Scene 06 · Your matches, ranked
+### Scene 04 · Enrich your profile → unlock more
 
-**Time:** 0:27 – 0:32 (5.0s)
+**Time:** 0:18 – 0:25 (7.0s)
+
+**Background:** Pitch black (split layout)
+
+**ON-SCREEN TEXT**
+
+> **The more it knows, the more it opens up.** *LEFT PANEL — italic, 78px*
+>
+> **Add your goals and a short write-up — unlock sharper matches and more of the room.** *LEFT PANEL — subtitle, grey*
+>
+> **Your goals at POT 2026** *RIGHT PANEL — field label*
+>
+> **Raising a seed round · seeking infra VCs and custody partners** *Field text, typewriter*
+>
+> **Your write-up** *Second field — editable, with [ Regenerate with AI ] pill*
+>
+> **Profile 95% — matches refreshing ✓** *Green progress banner*
+
+**ANIMATIONS**
+
+| Element | Delay | Duration | Easing | Animation |
+|---|---|---|---|---|
+| Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
+| Goals field | 0.7s | 0.5s | easeOutCubic | Fills, typewriter |
+| Write-up field + pill | 1.7s | 0.5s | easeOutCubic | Fills; Regenerate pill scale-pops |
+| Progress bar fills | 2.6s | 0.7s | easeOutCubic | Bar grows toward 95% |
+| Green banner | 3.4s | 0.5s | easeOutCubic | Fade + slide up 10px |
+
+---
+
+## ━━ ACT 3 — HOW MATCHING WORKS ━━
+
+### Scene 05 · Your matches, ranked
+
+**Time:** 0:25 – 0:30 (5.0s)
 
 **Background:** Pitch black (split layout)
 
@@ -219,155 +167,81 @@ gate finds you. If someone buys mid-day, their ticket syncs shortly; the welcome
 
 > **Your matches.** *LEFT PANEL — italic, 86px*
 >
-> **Ranked. With a reason for every one.** *LEFT PANEL — subtitle*
+> **Ranked — with a reason for every one.** *LEFT PANEL — subtitle*
 >
-> **#1 Complementary · Good match** *Card header*
+> **#1 Complementary · 82%** *Card header, score green*
 >
 > **[Photo] Mira Chen / GP · Vega Ventures** *Name + role*
 >
-> **COMPATIBILITY: 82%** *Score, green*
->
 > **Why this meeting matters — She raises from the LPs you need.** *Orange insight box*
 >
-> **[ Accept ]   [ Decline ]** *Two action buttons under the card*
+> **[ Accept ]   [ Decline ]** *Action buttons*
 
 **ANIMATIONS**
 
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
 | Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
-| Match card | 0.9s | 0.6s | easeOutCubic | Slide in from right 40px |
-| Shimmer | 1.6s | 0.65s | easeInOutCubic | White shine sweeps |
-| Action buttons | 2.2s | 0.45s | easeOutBack | Pills scale-pop in together |
+| Match card | 0.8s | 0.6s | easeOutCubic | Slide in from right 40px |
+| Shimmer | 1.5s | 0.65s | easeInOutCubic | White shine sweeps |
+| Action buttons | 2.1s | 0.45s | easeOutBack | Pills scale-pop together |
 
 ---
 
-### Scene 07 · Accepting sends a request
+### Scene 06 · Accept → both say yes → messages unlock (the key beat)
 
-**Time:** 0:32 – 0:38 (6.0s)
-
-**Background:** Pitch black (split layout)
-
-**ON-SCREEN TEXT**
-
-> **Accepting is step one.** *LEFT PANEL — italic, 80px*
->
-> **It sends them a request — it doesn't open a chat yet.** *LEFT PANEL — subtitle, grey*
->
-> *— cursor taps [ Accept ] on Mira's card —*
->
-> **You accepted Mira** *Status pill on card*
->
-> **Awaiting their acceptance** *Amber badge — REAL app copy*
->
-> **They've been notified. You'll know the moment they say yes.** *Reassurance line, grey*
-
-**ANIMATIONS**
-
-| Element | Delay | Duration | Easing | Animation |
-|---|---|---|---|---|
-| Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
-| Cursor taps Accept | 0.8s | 0.25s | easeInOutCubic | Cursor scale-down + pill ripple |
-| Card flips to "accepted" | 1.1s | 0.45s | easeOutCubic | Button row morphs to status pill |
-| Amber "awaiting" badge | 1.6s | 0.45s | easeOutBack | Scale pop |
-| Reassurance line | 2.2s | 0.5s | easeOutCubic | Fade + slide up 10px |
-
-**NOTE:** this scene exists specifically to set the expectation. "Awaiting their acceptance"
-is the real string from the app (Messages thread header).
-
----
-
-### Scene 08 · Chat unlocks when BOTH say yes (the key scene)
-
-**Time:** 0:38 – 0:45 (7.0s)
+**Time:** 0:30 – 0:39 (9.0s)
 
 **Background:** Pitch black
 
 **ON-SCREEN TEXT**
 
-> **Chat opens when you both accept.** *Centered headline — 84px italic Poppins, 'both' in orange*
+> **Accept the people you want.** *Headline line 1 — 80px italic, white*
 >
-> *— a simple two-step diagram animates left → right —*
+> **Chat opens when you both accept.** *Headline line 2 — 'both' in orange*
 >
-> **You ✓** *Left node — your avatar, green check*
+> *— cursor taps [ Accept ]; an amber badge appears —*
 >
-> **Mira …** *Middle node — Mira's avatar, pulsing "pending"*
+> **You accepted · Awaiting their acceptance** *Amber badge — REAL app copy*
 >
-> *— then Mira's node flips to a green check, an orange line connects them —*
->
-> **Mira ✓** *Middle node resolves to green check*
+> *— two avatars: You ✓ … then Mira flips to ✓, an orange line connects them —*
 >
 > **Mutual match — both accepted!** *Green banner — REAL app copy*
 >
-> **Now it's in your Messages. Now you can write.** *Sub-line, grey*
+> **Now it's in your Messages.** *Sub-line, grey*
 
 **ANIMATIONS**
 
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
-| Headline | 0.2s | 0.6s | easeOutCubic | Fade + slide up 16px |
-| 'You ✓' node | 1.0s | 0.5s | easeOutBack | Scale pop, green check draws |
-| 'Mira …' node (pending) | 1.3s | 0.5s | easeOutBack | Scale pop, dots pulse |
-| Mira flips to ✓ | 2.6s | 0.5s | easeOutBack | Pending dots → green check |
-| Orange connector | 3.0s | 0.5s | easeInOutCubic | ScaleX grows left→right |
-| Green mutual banner | 3.6s | 0.55s | easeOutCubic | Fade + slide up 12px |
-| Sub-line | 4.3s | 0.5s | easeOutCubic | Fade + slide up 10px |
+| Headline (2 lines) | 0.2s | 0.6s | easeOutCubic | Fade + slide up 16px, line by line |
+| Cursor taps Accept | 1.3s | 0.25s | easeInOutCubic | Cursor + ripple |
+| Amber "awaiting" badge | 1.7s | 0.45s | easeOutBack | Scale pop |
+| You ✓ / Mira … nodes | 2.6s | 0.5s | easeOutBack | Scale pop; Mira's dots pulse |
+| Mira flips to ✓ + connector | 3.8s | 0.6s | easeInOutCubic | Pending → green check; orange line grows |
+| Green mutual banner | 4.6s | 0.55s | easeOutCubic | Fade + slide up 12px |
+| Sub-line | 5.3s | 0.5s | easeOutCubic | Fade + slide up 10px |
 
-**NOTE:** the heart of the film — directly answers "why can't I see my accepted match in
-Messages / why can't I message them." Mirrors the real empty-state copy: *"Chat opens when
-both attendees accept the same match."*
+**NOTE:** the heart of the film — directly answers "why isn't my accepted match in Messages /
+why can't I message yet." Mirrors real copy: *"Chat opens when both attendees accept."*
 
 ---
 
-### Scene 09 · Now you can message
+### Scene 07 · Message + book
 
-**Time:** 0:45 – 0:51 (6.0s)
+**Time:** 0:39 – 0:45 (6.0s)
 
 **Background:** Pitch black (split layout)
 
 **ON-SCREEN TEXT**
 
-> **Messages.** *LEFT PANEL — italic, 86px*
->
-> **Unlocked. Write whatever you like.** *LEFT PANEL — subtitle*
+> **Now you can write — and book.** *LEFT PANEL — italic, 80px*
 >
 > **Mira Chen — Mutual match** *RIGHT PANEL — thread header, green dot*
 >
-> **YOU** *Chat label, mono*
+> **Hi Mira — free to talk LPs on Day 1?** *Custom message bubble, typewriter*
 >
-> **Hi Mira — loved your last fund's thesis. Free to talk LPs on Day 1?** *Custom message bubble, right aligned, typewriter*
->
-> **[ Type a message… ]** *Active input field — enabled, not greyed*
-
-**ANIMATIONS**
-
-| Element | Delay | Duration | Easing | Animation |
-|---|---|---|---|---|
-| Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
-| Thread header | 0.7s | 0.45s | easeOutCubic | Fade + slide up 12px |
-| Input field enables | 1.1s | 0.4s | easeOutCubic | Greyed → solid, subtle glow |
-| Custom message bubble | 1.6s | 0.6s | easeOutCubic | Fade + slide up 14px, typewriter |
-
-**NOTE:** explicitly shows the composer ENABLED and a free-text custom message — the second
-half of the user's feedback ("it doesn't allow me to send a custom message").
-
----
-
-### Scene 10 · Lock in the meeting
-
-**Time:** 0:51 – 0:56 (5.0s)
-
-**Background:** Pitch black (split layout)
-
-**ON-SCREEN TEXT**
-
-> **Then book it.** *LEFT PANEL — italic, 86px*
->
-> **Shared free slots. One tap.** *LEFT PANEL — subtitle*
->
-> **Both free at — tap to book** *RIGHT PANEL — card header, REAL app copy*
->
-> **Wed 11:30** *Slot pill — HIGHLIGHTED orange*
+> **Both free at — tap to book → Wed 11:30** *Slot row, REAL app copy; Wed 11:30 highlighted*
 >
 > **● CONFIRMED — Wed · 11:30** *Confirmation card*
 
@@ -376,56 +250,61 @@ half of the user's feedback ("it doesn't allow me to send a custom message").
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
 | Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
-| Slot pills (5, staggered) | 0.9s | per pill 0.1s | easeOutBack | Scale pop |
-| Cursor taps Wed 11:30 | 1.7s | 0.25s | easeInOutCubic | Cursor + orange highlight |
-| Confirmed card | 2.2s | 0.55s | easeOutCubic | Fade + slide up 16px |
+| Thread header | 0.6s | 0.45s | easeOutCubic | Fade + slide up 12px |
+| Custom message bubble | 1.1s | 0.6s | easeOutCubic | Fade up + typewriter (input shown ENABLED) |
+| Slot pills | 1.9s | per pill 0.1s | easeOutBack | Scale pop; Wed 11:30 orange |
+| Confirmed card | 2.7s | 0.55s | easeOutCubic | Fade + slide up 16px |
 
 ---
 
-## ━━ ACT 4 — KEEP COMING BACK ━━
+### Scene 08 · Don't wait — Threads
 
-### Scene 11 · Why it's worth checking back
+**Time:** 0:45 – 0:52 (7.0s)
 
-**Time:** 0:56 – 1:03 (7.0s)
-
-**Background:** Pitch black
+**Background:** Pitch black (split layout)
 
 **ON-SCREEN TEXT**
 
-> **It keeps working while you don't.** *Headline — 80px italic, white*
+> **Don't want to wait for a yes?** *LEFT PANEL — italic, 76px*
 >
-> **New matches as people join** *Stat row 1 — orange tick*
+> **Jump into Threads and start the conversation now.** *LEFT PANEL — subtitle, grey*
 >
-> **Connection requests waiting for your yes** *Stat row 2 — orange tick*
+> **Threads** *RIGHT PANEL — section heading*
 >
-> **Replies from your mutual matches** *Stat row 3 — orange tick*
+> **# Tokenisation of finance** *Topic thread — 14 in this discussion*
 >
-> **Check back. Your room keeps growing.** *Closing sub-line, grey*
+> **# Stablecoins & settlement** *Topic thread — 9 in this discussion*
+>
+> **# Compliance & RWA** *Topic thread*
+>
+> **[ Post a reply… ]** *Open input — anyone can join, no match needed*
 
 **ANIMATIONS**
 
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
-| Headline | 0.2s | 0.6s | easeOutCubic | Fade + slide up 16px |
-| Stat row 1 | 1.0s | 0.45s | easeOutCubic | Fade + slide up 10px |
-| Stat row 2 | 1.4s | 0.45s | easeOutCubic | Fade + slide up 10px |
-| Stat row 3 | 1.8s | 0.45s | easeOutCubic | Fade + slide up 10px |
-| Sub-line | 2.5s | 0.5s | easeOutCubic | Fade + slide up 10px |
+| Left panel | 0s | 1.4s | useFeatureTransition | Opacity crossfade |
+| Thread 1 | 0.8s | 0.45s | easeOutCubic | Fade + slide up 12px |
+| Thread 2 | 1.1s | 0.45s | easeOutCubic | Fade + slide up 12px |
+| Thread 3 | 1.4s | 0.45s | easeOutCubic | Fade + slide up 12px |
+| Reply input | 2.0s | 0.4s | easeOutBack | Input scale-pop (enabled) |
 
-**NOTE:** "Connection requests" is the real MyMatches tab where one-sided accepts from
-others wait — turning the consent model into a reason to return rather than a dead end.
+**NOTE:** Threads are open pre-event topic discussions — a way to start conversations WITHOUT
+a mutual match. The deliberate counterweight to the consent gate, and a reason to come back.
 
 ---
 
-### Scene 12 · One line to remember
+## ━━ ACT 4 — THE INVITATION ━━
 
-**Time:** 1:03 – 1:08 (5.0s)
+### Scene 09 · One line to remember
+
+**Time:** 0:52 – 0:56 (4.0s)
 
 **Background:** Cream / light
 
 **ON-SCREEN TEXT**
 
-> **Accept the people you want.** *Line 1 — 52px Fraunces serif, dark*
+> **Accept who you want.** *Line 1 — 52px Fraunces serif, dark*
 >
 > **When they accept back, the conversation opens.** *Line 2 — 52px Fraunces serif, orange italic*
 
@@ -433,24 +312,24 @@ others wait — turning the consent model into a reason to return rather than a 
 
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
-| Line 1 | 0.2s | 0.55s | easeOutBack | Spring pop — translateY 30px→0 + fade |
-| Line 2 | 1.2s | 0.55s | easeOutBack | Spring pop — translateY 30px→0 + fade |
+| Line 1 | 0.2s | 0.5s | easeOutBack | Spring pop — translateY 28px→0 + fade |
+| Line 2 | 1.0s | 0.5s | easeOutBack | Spring pop — translateY 28px→0 + fade |
 
 ---
 
-### Scene 13 · CTA
+### Scene 10 · CTA
 
-**Time:** 1:08 – 1:13 (5.0s)
+**Time:** 0:56 – 1:00 (4.0s)
 
 **Background:** Pitch black
 
 **ON-SCREEN TEXT**
 
-> **[Proof of Talk logo]** *POT wordmark — white, 200px*
+> **[Proof of Talk logo]** *POT wordmark — white, 180px*
 >
 > **LOUVRE PALACE · PARIS · JUNE 2–3, 2026** *Date line — mono caps, grey*
 >
-> **Open your matches. They're already in the room.** *Tagline — 28px, grey*
+> **Open your matches. They're already in the room.** *Tagline — 26px, grey*
 >
 > **[ meet.proofoftalk.io → ]** *Orange pill button*
 
@@ -458,43 +337,57 @@ others wait — turning the consent model into a reason to return rather than a 
 
 | Element | Delay | Duration | Easing | Animation |
 |---|---|---|---|---|
-| POT Logo | 0s | 0.7s | easeOutCubic | Fade + slide up 22px |
-| Date line | 0.6s | 0.55s | easeOutCubic | Fade + slide up 12px |
-| Tagline | 0.85s | 0.55s | easeOutCubic | Fade + slide up 12px |
-| CTA button | 1.35s | 0.55s | easeOutBack | Scale pop + glow |
+| POT Logo | 0s | 0.6s | easeOutCubic | Fade + slide up 20px |
+| Date line | 0.5s | 0.5s | easeOutCubic | Fade + slide up 12px |
+| Tagline | 0.75s | 0.5s | easeOutCubic | Fade + slide up 12px |
+| CTA button | 1.2s | 0.5s | easeOutBack | Scale pop + glow |
+
+---
+
+## Appendix — Timing summary (60.0s)
+
+| Scene | Beat | Duration |
+|---|---|---|
+| 01 | Title + hook | 5.0s |
+| 02 | Ticket → redeemed → the email (magic link) | 7.0s |
+| 03 | Tap in → set a password | 6.0s |
+| 04 | Enrich profile → unlock more | 7.0s |
+| 05 | Matches, ranked | 5.0s |
+| 06 | Accept → mutual → messages unlock | 9.0s |
+| 07 | Message + book | 6.0s |
+| 08 | Threads — start conversations now | 7.0s |
+| 09 | One line to remember | 4.0s |
+| 10 | CTA | 4.0s |
+| **Total** | | **60.0s** |
 
 ---
 
 ## Appendix — Global Constants (shared with the launch film)
 
-**Canvas:** 1920 × 1080 (renders 4K via 2× scale) · **FPS:** 60 · **Duration:** ~82s
+**Canvas:** 1920 × 1080 (4K via 2× scale) · **FPS:** 60 · **Duration:** 60.0s
 
-**Fonts:** Poppins (display) · Inter (body) · JetBrains Mono (mono) · Fraunces (serif chapter)
+**Fonts:** Poppins (display) · Inter (body) · JetBrains Mono (mono) · Fraunces (serif)
 
 **Orange:** #F76A0C · **Dark bg:** rgb(8,8,8) + 0.9% crosshatch · **Light bg:** rgb(250,248,245)
 · **Green (match):** rgb(34,197,94) · **Amber (pending):** rgb(245,158,11)
 
-**Easing:** easeOutCubic (reveals) · easeInOutCubic (transitions) · easeOutBack (spring pops)
-· easeInCubic (exits) · useFeatureTransition (split-layout left fade / right vertical slide)
+**Easing:** easeOutCubic · easeInOutCubic · easeOutBack · easeInCubic · useFeatureTransition
 
 ---
 
 ## Appendix — Source-of-truth for on-screen strings
 
-On-screen copy is matched to the real app / real flows so the film teaches the actual product:
-
-- **Register requires the ticket email** (gate) — [backend/app/api/routes/auth.py:66-75](../backend/app/api/routes/auth.py#L66-L75)
 - **Magic-link welcome email + landing** — [backend/app/services/email.py](../backend/app/services/email.py), [frontend/src/pages/MagicMatches.tsx:94](../frontend/src/pages/MagicMatches.tsx#L94)
-- **Editable write-up + "Regenerate with AI"** (Scene 05) — [frontend/src/pages/Profile.tsx](../frontend/src/pages/Profile.tsx)
-- **Match card: type, "Why this meeting matters", Compatibility** — [frontend/src/pages/MyMatches.tsx](../frontend/src/pages/MyMatches.tsx)
+- **Claim account / set password** — [backend/app/api/routes/auth.py:184-260](../backend/app/api/routes/auth.py#L184-L260)
+- **Editable write-up + "Regenerate with AI"** (Scene 04) — [frontend/src/pages/Profile.tsx](../frontend/src/pages/Profile.tsx)
+- **Match card: type / "Why this meeting matters" / Compatibility** — [frontend/src/pages/MyMatches.tsx](../frontend/src/pages/MyMatches.tsx)
 - **One-sided accept → status_a/status_b; overall stays pending** — [backend/app/api/routes/matches.py:575-610](../backend/app/api/routes/matches.py#L575-L610)
-- **"Awaiting their acceptance"** badge (Scene 07) — [frontend/src/pages/Messages.tsx:188-192](../frontend/src/pages/Messages.tsx#L188-L192)
-- **"Chat opens when both attendees accept the same match"** (Scene 08) — [frontend/src/pages/Messages.tsx:89](../frontend/src/pages/Messages.tsx#L89)
+- **"Awaiting their acceptance"** badge (Scene 06) — [frontend/src/pages/Messages.tsx:188-192](../frontend/src/pages/Messages.tsx#L188-L192)
+- **"Chat opens when both attendees accept the same match"** — [frontend/src/pages/Messages.tsx:89](../frontend/src/pages/Messages.tsx#L89)
 - **"Mutual match — both accepted!"** banner — [frontend/src/pages/MyMatches.tsx:649-651](../frontend/src/pages/MyMatches.tsx#L649-L651)
-- **Composer enabled only on mutual** (Scene 09 inverse) — [frontend/src/pages/Messages.tsx:235-239](../frontend/src/pages/Messages.tsx#L235-L239)
-- **Messages list shows mutual (or already-messaged) matches** — [backend/app/api/routes/messages.py:96-99](../backend/app/api/routes/messages.py#L96-L99)
+- **Composer enabled only on mutual** (Scene 07) — [frontend/src/pages/Messages.tsx:235-239](../frontend/src/pages/Messages.tsx#L235-L239)
 - **"Both free at — tap to book"** chip — [frontend/src/pages/MyMatches.tsx:690-691](../frontend/src/pages/MyMatches.tsx#L690-L691)
-- **"Connection Requests" tab** (Scene 11) — [frontend/src/pages/MyMatches.tsx:66-73](../frontend/src/pages/MyMatches.tsx#L66-L73)
+- **Threads — pre-event vertical discussion threads** (Scene 08) — [frontend/src/pages/Threads.tsx](../frontend/src/pages/Threads.tsx), [backend/app/api/routes/threads.py](../backend/app/api/routes/threads.py)
 
 Advertising placeholders (not literal app data): attendee names (Mira Chen / Vega Ventures),
-venue/room names, illustrative meeting copy.
+thread counts, venue/room names, illustrative meeting copy.

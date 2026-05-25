@@ -1449,3 +1449,8 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 
 ## 2026-05-25 — [content] Onboarding/"getting started" video script
 - Drafted `launch/POT Matchmaker — Onboarding Video Script.md` (same format as the launch film): end-to-end journey (buy/redeem ticket OR welcome-email magic link → setup → matching → booking), spine = the mutual-match consent model to preempt the "accepted match not in Messages / can't send custom message" confusion. On-screen strings grounded in real app code (Awaiting their acceptance / Chat opens when both accept / Connection Requests tab).
+
+## 2026-05-25 — [content] Onboarding video script revised to 60s per Zohair-thread edits
+- Reworked `launch/POT Matchmaker — Onboarding Video Script.md` per Shaun's inline notes (left in voiceover_script_v2.md): dropped the marketing re-sell (Introducing/2,500/$18T/93
+## 2026-05-25 — [content] Onboarding video script revised to 60s per Zohair-thread edits
+- Reworked `launch/POT Matchmaker — Onboarding Video Script.md` per Shaun's inline notes (left in voiceover_script_v2.md): dropped the marketing re-sell (Introducing / 2,500 / $18T / 93% — the launch film covers it); linear journey ticket → redeem → magic link → SET PASSWORD → ENRICH PROFILE TO UNLOCK MORE → matches → MUTUAL UNLOCKS MESSAGES → message + book → THREADS (start conversations without a match). Retimed to exactly 60.0s (10 scenes). Hook kept: "Somewhere in this room is the conversation that changes your year."
