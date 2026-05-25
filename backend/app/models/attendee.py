@@ -60,6 +60,11 @@ class Attendee(Base):
 
     # AI-generated fields
     ai_summary: Mapped[str] = mapped_column(Text, nullable=True)  # AI-generated profile summary
+    # User-editable write-up: when pinned, the AI never auto-regenerates ai_summary
+    ai_summary_pinned: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+    ai_summary_edited_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     embedding: Mapped[list] = mapped_column(Vector(1536), nullable=True)  # OpenAI embedding
     intent_tags: Mapped[list] = mapped_column(ARRAY(String), default=list)  # AI-classified intents
     vertical_tags: Mapped[list] = mapped_column(ARRAY(String), default=list)  # 1000minds sector verticals
