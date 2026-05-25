@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Save, Plus, X, Linkedin, Twitter, Globe, User } from "lucide-react";
+import { Save, Plus, X, Linkedin, Twitter, Globe, User, RefreshCw } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import { updateProfile, getAttendee, uploadProfilePhoto } from "../api/client";
+import { updateProfile, getAttendee, uploadProfilePhoto, regenerateSummary } from "../api/client";
 import AttendeeAvatar from "../components/AttendeeAvatar";
 import PhotoUpload from "../components/PhotoUpload";
 import QRCard from "../components/QRCard";
@@ -35,9 +35,11 @@ export default function Profile() {
     company_website: "",
     interests: [] as string[],
     privacy_mode: "full",
+    ai_summary: "",
   });
 
   const [interestInput, setInterestInput] = useState("");
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     if (!user?.attendee_id) {
@@ -58,6 +60,7 @@ export default function Profile() {
           company_website: a.company_website ?? "",
           interests: a.interests ?? [],
           privacy_mode: a.privacy_mode ?? "full",
+          ai_summary: a.ai_summary ?? "",
         });
       })
       .catch(() => setError("Could not load your profile."))
@@ -77,6 +80,18 @@ export default function Profile() {
 
   const removeInterest = (tag: string) =>
     setForm((f) => ({ ...f, interests: f.interests.filter((i) => i !== tag) }));
+
+  const handleRegenerate = async () => {
+    setRegenerating(true);
+    try {
+      const { ai_summary } = await regenerateSummary();
+      setForm((f) => ({ ...f, ai_summary }));
+    } catch {
+      setError("Could not regenerate the write-up.");
+    } finally {
+      setRegenerating(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,14 +320,24 @@ export default function Profile() {
           </div>
         </section>
 
-        {/* AI context */}
-        {attendee?.ai_summary && (
-          <section className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-2">
-            <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">AI Summary</h2>
-            <p className="text-sm text-white/50 leading-relaxed">{attendee.ai_summary}</p>
-            <p className="text-[11px] text-white/20">Auto-generated · updates after each enrichment run</p>
-          </section>
-        )}
+        {/* Your write-up — editable, pins on save so the AI won't overwrite it */}
+        <section className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">Your write-up</h2>
+            <button type="button" onClick={handleRegenerate} disabled={regenerating}
+              className="flex items-center gap-1 text-xs text-white/60 hover:text-white">
+              <RefreshCw className={`w-3 h-3 ${regenerating ? "animate-spin" : ""}`} />
+              {regenerating ? "Drafting…" : "Regenerate with AI"}
+            </button>
+          </div>
+          <textarea value={form.ai_summary} onChange={set("ai_summary")} rows={5} maxLength={2000}
+            placeholder="How you're introduced to your matches…"
+            className="w-full bg-white/5 rounded-lg p-3 text-sm" />
+          <div className="flex justify-between text-xs text-white/40">
+            <span>This is how you're introduced to your matches — edit it anytime. Your version is kept; the AI won't overwrite it.</span>
+            <span>{form.ai_summary.length}/2000</span>
+          </div>
+        </section>
 
         {/* Privacy mode toggle */}
         <section className="rounded-xl border border-white/10 bg-white/[0.03] p-6 space-y-3">

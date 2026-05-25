@@ -458,8 +458,14 @@ export async function updateProfile(body: {
   twitter_handle?: string;
   company_website?: string;
   photo_url?: string;
+  ai_summary?: string;
 }): Promise<{ user: User; attendee: Attendee }> {
   const { data } = await api.put("/auth/profile", body);
+  return data;
+}
+
+export async function regenerateSummary(): Promise<{ ai_summary: string }> {
+  const { data } = await api.post("/auth/profile/regenerate-summary");
   return data;
 }
 
