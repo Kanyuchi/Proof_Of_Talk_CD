@@ -1010,7 +1010,56 @@ async def get_adoption(
         )
     ).scalar() or 0
 
-    # Usage-by-day history from the snapshot table.
+    # ── Live cumulative_active + active_last_7d ──────────────────────────
+    # Previously read from usage_daily (up to 24 h stale). Now computed live
+    # from users.last_login_at / attendees.last_seen_at so the "Active" cards
+    # on the dashboard are always current.  Same person-dedup + admin/demo
+    # exclusion logic as compute_and_upsert_usage_daily() in usage_snapshot.py.
+    _seven_days_ago = _dt.utcnow() - __import__("datetime").timedelta(days=7)
+
+    _user_rows = (
+        await db.execute(
+            select(User.attendee_id, User.last_login_at).where(
+                User.last_login_at.isnot(None),
+                *_active_user_filter(),
+            )
+        )
+    ).all()
+    _att_rows = (
+        await db.execute(
+            select(Attendee.id, Attendee.last_seen_at).where(
+                Attendee.last_seen_at.isnot(None),
+                *_active_attendee_filter(),
+            )
+        )
+    ).all()
+
+    # Build per-person (attendee_id → latest_ts) map, then count.
+    # Users with no attendee link use an anonymous sentinel keyed on their row.
+    _login_attendee_ids = {r[0] for r in _user_rows if r[0] is not None}
+
+    # Start with every logged-in user (attendee_id or synthetic sentinel).
+    _person_latest: dict = {}
+    for i, (aid, ts) in enumerate(_user_rows):
+        key = aid if aid is not None else ("_user_anon", i)
+        _person_latest[key] = ts
+
+    # Merge attendee rows; if the attendee is already represented by a login,
+    # take the max timestamp rather than adding a second entry.
+    for (aid, seen) in _att_rows:
+        if aid in _login_attendee_ids:
+            if seen and (_person_latest.get(aid) is None or seen > _person_latest[aid]):
+                _person_latest[aid] = seen
+        else:
+            _person_latest[aid] = seen
+
+    cumulative_active = len(_person_latest)
+    active_last_7d = sum(
+        1 for ts in _person_latest.values()
+        if ts is not None and ts >= _seven_days_ago
+    )
+
+    # Usage-by-day history from the snapshot table (trend chart — unchanged).
     usage_rows = (
         await db.execute(
             select(
@@ -1029,13 +1078,8 @@ async def get_adoption(
 
     if usage_by_day:
         tracking_started_at = usage_by_day[0]["day"]
-        latest = usage_by_day[-1]
-        cumulative_active = latest["cumulative_active"]
-        active_last_7d = sum(d["active_today"] for d in usage_by_day[-7:])
     else:
         tracking_started_at = _dt.utcnow().date().isoformat()
-        cumulative_active = 0
-        active_last_7d = 0
 
     return {
         "tracking_started_at": tracking_started_at,

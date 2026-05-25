@@ -29,8 +29,14 @@ def _make_db():
       5. signups_by_day group-by           -> .all()  [(date, n)]
       6. count(distinct login_active)      -> .scalar()
       7. count(distinct magic_active)      -> .scalar()
-      8. usage_by_day select from usage_daily -> .all() [(day, active_today, cumulative_active)]
+      8. live user rows (attendee_id, last_login_at) -> .all()  [LIVE cumulative/7d]
+      9. live attendee rows (id, last_seen_at)       -> .all()  [LIVE cumulative/7d]
+     10. usage_by_day select from usage_daily        -> .all() [(day, active_today, cumulative_active)]
     """
+    import uuid as _uuid
+    from datetime import datetime as _dt, timedelta as _td
+    _aid = _uuid.uuid4()
+    _recent = _dt.utcnow() - _td(days=1)
     db = AsyncMock()
     db.execute.side_effect = [
         _Scalar(162),                                   # total
@@ -40,6 +46,8 @@ def _make_db():
         _Rows([(date(2026, 5, 21), 46), (date(2026, 5, 22), 50)]),  # signups
         _Scalar(3),                                     # login_active
         _Scalar(7),                                     # magic_link_active
+        _Rows([(_aid, _recent)]),                       # live user rows
+        _Rows([]),                                      # live attendee rows
         _Rows([                                         # usage_by_day
             (date(2026, 5, 24), 4, 9),
         ]),
@@ -65,9 +73,12 @@ async def test_adoption_shape_and_pct_math():
 
     assert out["usage"]["login_active"] == 3
     assert out["usage"]["magic_link_active"] == 7
-    # cumulative_active / active_last_7d derived from usage_by_day (latest row)
-    assert out["usage"]["cumulative_active"] == 9
+    # cumulative_active / active_last_7d are now computed LIVE from user/attendee
+    # rows, not from usage_daily. _make_db feeds 1 live user row → 1 person.
+    assert out["usage"]["cumulative_active"] == 1
+    assert out["usage"]["active_last_7d"] == 1  # the seeded user was recent
 
+    # usage_by_day trend chart still comes from usage_daily (unchanged)
     assert out["usage_by_day"] == [
         {"day": "2026-05-24", "active_today": 4, "cumulative_active": 9},
     ]
@@ -80,7 +91,9 @@ async def test_adoption_empty_usage_falls_back_to_today():
     db.execute.side_effect = [
         _Scalar(0), _Scalar(0), _Scalar(0), _Scalar(0),  # accounts + directory
         _Rows([]),                                         # signups
-        _Scalar(0), _Scalar(0),                            # usage live
+        _Scalar(0), _Scalar(0),                            # login_active / magic_link_active
+        _Rows([]),                                         # live user rows (empty)
+        _Rows([]),                                         # live attendee rows (empty)
         _Rows([]),                                         # usage_by_day EMPTY
     ]
     out = await dash.get_adoption(db=db, _admin=SimpleNamespace(is_admin=True))
@@ -88,6 +101,7 @@ async def test_adoption_empty_usage_falls_back_to_today():
     assert out["accounts"]["pct_of_directory"] == 0.0   # no div-by-zero
     assert out["tracking_started_at"] == datetime.utcnow().date().isoformat()
     assert out["usage"]["cumulative_active"] == 0
+    assert out["usage"]["active_last_7d"] == 0
 
 
 def test_adoption_requires_admin_dependency():
