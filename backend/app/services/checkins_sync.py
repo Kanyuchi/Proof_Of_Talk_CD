@@ -22,6 +22,7 @@ Called from POST /api/v1/dashboard/sync-checkins (admin) and the 02:05 UTC cron.
 
 import asyncio
 import logging
+import secrets
 import uuid
 from collections import Counter
 from datetime import datetime, timezone
@@ -206,6 +207,7 @@ async def _process_checkin_chunk(
                         goals=None,
                         company_website=company_website or None,
                         enriched_profile=enriched_profile,
+                        magic_access_token=secrets.token_urlsafe(32),
                     )
                     if country_iso3:
                         attendee.country_iso3 = country_iso3

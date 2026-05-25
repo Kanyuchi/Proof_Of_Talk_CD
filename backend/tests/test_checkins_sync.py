@@ -109,6 +109,19 @@ async def test_new_checkin_inserts_with_pass_company_title():
 
 
 @pytest.mark.asyncio
+async def test_new_checkin_gets_magic_token():
+    """New people must get a magic_access_token on insert so the welcome email's
+    link works immediately (else they sit in the welcome 'no token' bucket until
+    a separate backfill runs)."""
+    op, os_ = checkins_sync._build_order_maps([_order("O1", "General Pass", "qA")])
+    db = _fake_db(existing=None)
+    await checkins_sync._process_checkin_chunk(
+        db, [_checkin("tok@corp.io", "O1", "qA")], op, os_, set(), [], Counter())
+    (a,) = db.added
+    assert a.magic_access_token and len(a.magic_access_token) >= 20
+
+
+@pytest.mark.asyncio
 async def test_new_checkin_unknown_order_defaults_delegate():
     op, os_ = checkins_sync._build_order_maps([_order("O1", "VIP Pass", "qA")])
     db = _fake_db(existing=None)

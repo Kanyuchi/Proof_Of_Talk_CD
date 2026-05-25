@@ -105,8 +105,11 @@ checkin_block = {
 - **New email (~44):** INSERT a new `Attendee` with the real `name`, `email`,
   `company`, `title`, `ticket_type`, `country_iso3`, `ticket_bought_at`, and
   `enriched_profile = {"source": "checkin", "checkin": checkin_block}`. Track
-  the new id. (No `magic_access_token` on insert — it stays NULL and is minted
-  on demand, exactly as extasy-sourced rows behave.)
+  the new id. Mints a `magic_access_token` on insert (`secrets.token_urlsafe(32)`)
+  so the welcome email's link works immediately — without it, new people land in
+  the welcome sender's "no token" skip bucket until a separate backfill runs.
+  (Revised 2026-05-25 after the first backfill left 79 new arrivals tokenless;
+  extasy_sync has the same gap and should follow suit.)
 
 ### Make new people matchable immediately
 After the batch, for each newly-inserted attendee id, fire
