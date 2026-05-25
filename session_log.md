@@ -1390,3 +1390,10 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - **Prod E2E smoke (reversible, demo personas):** marcus accept (200) → daniel accept-back via token endpoint (200) → match `f1a62ee5…` went MUTUAL (overall=accepted) → restored to pending. The no-login accept-back loop closes on production.
 - **HELD by operator choice:** the first backlog email wave (`notify_pending_interest.py --limit 100 --confirm`, 131 eligible) — not sent. Awaiting Shaun's go.
 - Fast-follow (separate PR): recurring ~1–2h cron + un-gate mutual-completion email off the request path. project_state.md top-line update deferred (concurrent sessions) — capture on next touch.
+
+## 2026-05-25 07:16 — [reciprocity-loop] Wave 2 sent + fast-follow PR #10
+
+- **Second wave sent: 32/32, 0 failed.** Reciprocity ledger now 132 — entire dormant one-sided-accept backlog notified (wave 1: 100, wave 2: 32). All wave-1 spot-checks showed Resend `delivered` from warm team@xventures.de.
+- **Fast-follow built (branch `reciprocity-cron`, PR #10)** via subagent TDD + review (SPEC/CORRECTNESS/SAFETY ✅, 229 tests, +24): `app/services/interest_cron.py` with `run_interest_notifications` (2-hourly forward-notify, 20h throttle, opt-out/demo/no-token excluded) + `run_mutual_notifications` (mutual-completion email to both parties, deduped by new `matches.mutual_notified_at`); inline mutual-email send REMOVED from `update_match_status` (cron owns it now); registered `IntervalTrigger(hours=2)` in main.py with `sync_status` heartbeat `reciprocity_notify`; migration `a6dda3ac7276`.
+- **PR #10 NOT merged.** ⚠️ Merging+deploying turns ON autonomous 2-hourly attendee email. Rollout gates held for Shaun: apply migration before merge → merge → watch heartbeat + deliverability after first fire.
+- Worktrees preserved: `../Proof_Of_Talk_CD-reciprocity` (#9, merged) and `../Proof_Of_Talk_CD-cron` (#10). Clean up after #10 merges.
