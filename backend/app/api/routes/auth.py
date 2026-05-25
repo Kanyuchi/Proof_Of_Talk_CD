@@ -15,6 +15,7 @@ from app.models.user import User
 from app.models.attendee import Attendee
 from app.schemas.auth import RegisterRequest, LoginRequest, Token, UserResponse, ForgotPasswordRequest, ResetPasswordRequest, ClaimAccountRequest, JoinRequest
 from app.services.profile_pipeline import refresh_profile_matches, run_full_enrichment
+from app.services.embeddings import generate_ai_summary
 from app.services.email import send_password_reset_email, send_welcome_email
 from app.services.avatars import upload_avatar, AvatarError, MAX_BYTES
 
@@ -350,6 +351,25 @@ async def update_profile(
         "user": UserResponse.model_validate(user),
         "attendee": AttendeeResponse.model_validate(attendee),
     }
+
+
+@router.post("/profile/regenerate-summary")
+@limiter.limit("10/minute")
+async def regenerate_summary(
+    request: Request,
+    user: User = Depends(require_auth),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return a fresh AI-drafted write-up from the current profile. Does NOT
+    save and does NOT change the pin state — the client fills the textarea with
+    this draft; saving it (PUT /auth/profile) is what pins it."""
+    if not user.attendee_id:
+        raise HTTPException(status_code=404, detail="No attendee profile linked")
+    attendee = await db.get(Attendee, user.attendee_id)
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Attendee profile not found")
+    draft = await generate_ai_summary(attendee)
+    return {"ai_summary": draft}
 
 
 @router.post("/profile/photo")
