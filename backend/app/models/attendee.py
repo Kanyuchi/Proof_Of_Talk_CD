@@ -135,3 +135,9 @@ class Match(Base):
     # Per-viewer "Maybe later" soft-defer timestamps (mirrors status_a/status_b)
     deferred_a_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deferred_b_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Reciprocity-loop dedup guard — set by run_mutual_notifications after both
+    # parties receive their "mutual match confirmed" email. NULL = not yet sent.
+    # Prevents the cron from re-sending on every run; also decouples the email
+    # from the request path (the inline send in update_match_status was removed).
+    mutual_notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
