@@ -107,6 +107,10 @@ async def _daily_extasy_sync():
     from app.services.extasy_sync import sync_and_enrich
     await _run_with_heartbeat("daily_extasy_sync", sync_and_enrich)
 
+async def _daily_checkins_sync():
+    from app.services.checkins_sync import sync_checkins_to_db
+    await _run_with_heartbeat("daily_checkins_sync", sync_checkins_to_db)
+
 async def _daily_speakers_sync():
     from app.services.speakers_sheet_sync import sync_speakers_sheet
     await _run_with_heartbeat("daily_speakers_sync", lambda: sync_speakers_sheet(fetch=True))
@@ -196,6 +200,10 @@ _JOB_DEFAULTS = {
 
 scheduler = AsyncIOScheduler()
 scheduler.add_job(_daily_extasy_sync,       CronTrigger(hour=2, minute=0,  timezone="UTC"), **_JOB_DEFAULTS)
+# Check-ins sync at 02:05 UTC — right after extasy_sync so the orders feed used
+# for the pass-type join reflects the same morning's data. Recovers per-attendee
+# claimed-pass people the buyer-keyed orders feed collapses/misses.
+scheduler.add_job(_daily_checkins_sync,     CronTrigger(hour=2, minute=5,  timezone="UTC"), **_JOB_DEFAULTS)
 scheduler.add_job(_daily_speakers_sync,     CronTrigger(hour=2, minute=15, timezone="UTC"), **_JOB_DEFAULTS)
 scheduler.add_job(_daily_grid_audit,        CronTrigger(hour=2, minute=30, timezone="UTC"), **_JOB_DEFAULTS)
 # Enrichment sweep at 03:00 UTC: re-scrapes any attendee with missing

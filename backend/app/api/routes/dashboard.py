@@ -461,6 +461,18 @@ async def sync_extasy(
     return {"status": "completed", **result}
 
 
+@router.post("/sync-checkins")
+async def sync_checkins(
+    _admin: User = Depends(require_admin),
+):
+    """Admin: pull the Extasy check-ins feed (per-attendee claimed passes),
+    insert recovered people + backfill existing, then enrich new attendees.
+    Recovers the people the buyer-keyed orders/tickets sync collapses or misses."""
+    from app.services.checkins_sync import sync_checkins_to_db
+    result = await sync_checkins_to_db()
+    return {"status": "completed", **result}
+
+
 @router.post("/sync-speakers")
 async def sync_speakers(
     db: AsyncSession = Depends(get_db),

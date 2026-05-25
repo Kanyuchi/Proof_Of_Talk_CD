@@ -24,7 +24,8 @@ backend/               Python FastAPI backend
 │   │   ├── embeddings.py          OpenAI embedding generation + vector ops
 │   │   ├── enrichment.py          Per-attendee enrichment orchestrator (Voyager LinkedIn fallback, website, etc.)
 │   │   ├── enrichment_sweep.py    Daily enrichment cron (03:00 UTC)
-│   │   ├── extasy_sync.py         Live Rhuna/Extasy ticket-holder sync
+│   │   ├── extasy_sync.py         Live Rhuna/Extasy ticket-holder sync (buyer-keyed orders/tickets feed)
+│   │   ├── checkins_sync.py       Per-attendee Extasy check-ins sync (recovers claimed-pass people the buyer feed collapses/misses; pass type via order#+QR join)
 │   │   ├── speakers_sheet_sync.py Master speaker sheet → attendees upsert
 │   │   ├── grid_enrichment.py     The Grid B2B GraphQL enrichment
 │   │   ├── grid_audit.py          Periodic Grid coverage audit
@@ -133,6 +134,7 @@ Enrichment runs as background jobs per attendee. Sources are layered:
 
 **Daily cron jobs (UTC):**
 - 02:00 — Extasy ticket-holder sync
+- 02:05 — Check-ins sync (recover per-attendee claimed passes; runs after Extasy so the orders feed for the pass join is fresh)
 - 02:15 — Speaker sheet sync
 - 02:30 — Grid audit
 - 02:45 — Match refresh
