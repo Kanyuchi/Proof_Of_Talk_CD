@@ -9,10 +9,16 @@ prod Supabase DB), driven through the real onboarding flow by a demo account.
 > mock UI, not the product. This pipeline records the real UI instead. The mock
 > files are left in place for reference but are NOT used to build the deliverable.
 
-## Deliverable
+## Deliverables
 
-`pot_onboarding_realapp_1080p.mp4` — 1920×1080, 30fps, ~62.7s, H.264 + AAC
-music bed (gitignored, regenerate with the scripts below).
+- `pot_onboarding_realapp_4k.mp4` — **TRUE 4K** 3840×2160, 30fps, ~64s, H.264
+  (CRF 18) + AAC music bed. The crisp cut — built from high-DPI screenshot
+  frames (see "4K pipeline" below). **This is the one to ship.**
+- `pot_onboarding_realapp_1080p.mp4` — 1920×1080, 30fps, ~62.7s, H.264 + AAC.
+  The original cut; left in place. It was captured at 1280×720 (Playwright
+  `recordVideo`) then upscaled, so its UI text is soft.
+
+Both are gitignored (heavy binaries) — regenerate with the scripts below.
 
 ## The flow recorded (real app, in order)
 
@@ -45,7 +51,26 @@ music bed (gitignored, regenerate with the scripts below).
   burns a 2s "Getting started" intro + per-beat step captions, muxes
   `../our_version/music.mp3` at vol 0.2 (fade in/out). Output is the deliverable.
 
-## Re-run end to end
+## 4K pipeline (the crisp cut — preferred)
+
+Playwright's `recordVideo` rasterizes at the `size` param and **ignores
+`deviceScaleFactor`**, so it can only capture 1280×720 → upscaling to 4K stays
+soft. The 4K pipeline instead captures **high-DPI screenshot frames**:
+
+> browser context `viewport: 1920×1080` + **`deviceScaleFactor: 2`** →
+> `page.screenshot()` yields **3840×2160** sharp PNG/JPEG frames (crisp text,
+> correct layout — a 3840 CSS viewport would shrink the UI; this keeps it
+> normal-sized at 2× pixel density).
+
+- `record_realapp_4k.mjs` — drives the SAME 6-beat flow + the SAME mid-run
+  re-stage as `record_realapp.mjs`, but a background loop snaps 4K JPEG frames
+  (q92, ~85ms each → ~10fps real) as fast as it can into `frames4k/`, recording
+  each frame's real-time offset + per-beat markers into `frames4k/beats.json`.
+- `assemble_realapp_4k.sh` — builds an ffmpeg **concat list** with per-frame
+  durations from `beats.json` (so playback is TRUE real time — deliberate pauses
+  stay pauses, typing stays smooth), re-times to a constant 30fps, scales the
+  burned-in captions ~2× for 4K, muxes `../our_version/music.mp3` (vol 0.2, fade
+  in/out). Output: `pot_onboarding_realapp_4k.mp4` (3840×2160, H.264 CRF 18).
 
 ```bash
 # 1. servers (prod DB via backend/.env DATABASE_URL)
@@ -53,6 +78,18 @@ cd backend && source .venv/bin/activate && uvicorn app.main:app --port 8000 --lo
 cd frontend && npm run dev &        # serves :5173, proxies /api → :8000
 # wait until: curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/v1/dashboard/adoption  → 401
 
+# 2. record 4K high-DPI frames (Playwright lives in repo-root node_modules)
+NODE_PATH="$PWD/node_modules" node launch/onboarding_video/record_realapp_4k.mjs
+
+# 3. assemble 4K
+bash launch/onboarding_video/assemble_realapp_4k.sh
+# verify: ffprobe must report 3840×2160, ~64s, h264
+```
+
+## 1080p pipeline (original, soft — kept for reference)
+
+```bash
+# servers as above, then:
 # 2. record (Playwright lives in repo-root node_modules)
 NODE_PATH="$PWD/node_modules" node launch/onboarding_video/record_realapp.mjs
 
@@ -62,9 +99,10 @@ bash launch/onboarding_video/assemble_realapp.sh
 
 ## Verification frames (gitignored)
 
-`realapp_frame_{1..5}_*.png` — extracted from the FINAL mp4 at the set-password,
-profile/regenerate, matches/accept, messages, and threads moments. All show the
-real app UI (not the JSX mock).
+- `4k_frame_{1..3}_*.png` — extracted from the FINAL **4K** mp4 at set-password,
+  messages/mutual, and threads. Each is 3840×2160 with visibly sharp UI text and
+  shows ONLY demo personas (Alex Rivera / Thomas Weber / Sofia Reyes / Priya Nair).
+- `realapp_frame_{1..5}_*.png` — same idea from the older 1080p cut.
 
 ## Audio — music only (VO is a follow-up)
 
