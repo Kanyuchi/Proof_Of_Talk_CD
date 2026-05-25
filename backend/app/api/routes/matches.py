@@ -206,6 +206,12 @@ class MagicDeferRequest(BaseModel):
     match_id: UUID
 
 
+class MagicStatusRequest(BaseModel):
+    match_id: UUID
+    status: str
+    decline_reason: str | None = None
+
+
 @router.patch("/{match_id}/defer", response_model=MatchResponse)
 async def defer_match(
     match_id: UUID,
@@ -250,6 +256,40 @@ async def defer_match_by_magic_link(
         match.deferred_a_at = now
     else:
         match.deferred_b_at = now
+    await db.commit()
+    await db.refresh(match)
+    return await _build_match_response(db, match, attendee.id)
+
+
+@router.patch("/m/{token}/status", response_model=MatchResponse)
+async def update_match_status_by_magic_link(
+    token: str,
+    data: MagicStatusRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Magic-link accept/decline — no login required. Sets ONLY the caller's own
+    side and recomputes the mutual state, so a no-login attendee can accept an
+    incoming request back in one tap. Sends no email inline: the request path
+    stays force-clean; mutual/pull-back notifications run off the request path
+    (notify_pending_interest.py + the future cron)."""
+    if not token or len(token) < 16:
+        raise HTTPException(status_code=400, detail="Invalid link")
+    if data.status not in ("accepted", "declined"):
+        raise HTTPException(status_code=400, detail="Status must be accepted or declined")
+    result = await db.execute(select(Attendee).where(Attendee.magic_access_token == token))
+    attendee = result.scalars().first()
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    match = await db.get(Match, data.match_id)
+    if not match or attendee.id not in (match.attendee_a_id, match.attendee_b_id):
+        raise HTTPException(status_code=404, detail="Match not found")
+    if match.attendee_a_id == attendee.id:
+        match.status_a = data.status
+    else:
+        match.status_b = data.status
+    match.status = _compute_overall_status(match.status_a, match.status_b)
+    if data.status == "declined":
+        match.decline_reason = data.decline_reason
     await db.commit()
     await db.refresh(match)
     return await _build_match_response(db, match, attendee.id)
