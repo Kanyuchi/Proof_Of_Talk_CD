@@ -369,7 +369,8 @@ def send_mutual_match_email(
     other_company: str,
     app_url: str | None = None,
     magic_token: str | None = None,
-) -> None:
+    force: bool = False,
+) -> bool:
     """Send a 'mutual match confirmed' notification email.
 
     Args:
@@ -380,6 +381,8 @@ def send_mutual_match_email(
         other_company: Company of the other party.
         app_url: Base URL of the app for the CTA link.
         magic_token: Recipient's magic_access_token for personalised unsubscribe link.
+        force: Bypass EMAIL_MODE gate (for the reciprocity_notify cron). Never
+            set from a request path — see _send_email docstring.
     """
 
     settings = get_settings()
@@ -411,7 +414,7 @@ def send_mutual_match_email(
         f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
     )
 
-    _send_email(to_email, subject, body_html, body_text)
+    return _send_email(to_email, subject, body_html, body_text, force=force)
 
 
 def send_meeting_confirmation_email(
