@@ -1,103 +1,89 @@
-# onboarding_video — POT Matchmaker "Getting Started" (60s)
+# onboarding_video — POT Matchmaker "Getting Started" (REAL APP screen recording)
 
-A browser-rendered-React + Playwright/ffmpeg onboarding film that walks a
-brand-new attendee through the *flow of use*: buy/redeem ticket → magic-link
-welcome email → set a password → enrich profile → matches → the mutual-match
-consent gate → message + book → Threads → CTA.
+A ~60s onboarding film that is a **real Playwright screen recording of the
+actual POT Matchmaker app** (React on :5173 + FastAPI on :8000, pointed at the
+prod Supabase DB), driven through the real onboarding flow by a demo account.
 
-Built on the same system as the launch film in [`../our_version/`](../our_version/).
-On-screen text + per-scene timings are implemented exactly per
-[`../POT Matchmaker — Onboarding Video Script.md`](../POT%20Matchmaker%20—%20Onboarding%20Video%20Script.md).
+> The earlier JSX-mock cut (`onboarding.jsx` / `app.jsx` / `animations.jsx` /
+> `render.mjs` + the `pot_onboarding_1080p.mp4`) was **rejected** — it animated a
+> mock UI, not the product. This pipeline records the real UI instead. The mock
+> files are left in place for reference but are NOT used to build the deliverable.
 
-## Scenes (10 · 60.0s)
+## Deliverable
 
-| # | Time | Beat |
-|---|---|---|
-| 01 | 0:00–0:05 | Title + hook — "YOU'RE IN. / Matchmaker" (white) |
-| 02 | 0:05–0:12 | Ticket → redeemed → the welcome email (magic link) |
-| 03 | 0:12–0:18 | Tap in → set a password |
-| 04 | 0:18–0:25 | Enrich profile (goals + write-up + Regenerate with AI) |
-| 05 | 0:25–0:30 | Matches, ranked (#1 Complementary · 82%) |
-| 06 | 0:30–0:39 | **Accept → both yes → messages unlock** (the key beat) |
-| 07 | 0:39–0:45 | Message + book (Wed 11:30 slot → CONFIRMED) |
-| 08 | 0:45–0:52 | Threads — start conversations now (no match needed) |
-| 09 | 0:52–0:56 | Pay-off line (cream serif) |
-| 10 | 0:56–1:00 | CTA — meet.proofoftalk.io |
+`pot_onboarding_realapp_1080p.mp4` — 1920×1080, 30fps, ~62.7s, H.264 + AAC
+music bed (gitignored, regenerate with the scripts below).
 
-Scene 06 is the heart of the film — it deliberately tells the
-mutual-consent model ("Chat opens when you **both** accept") so the
-"I accepted but can't message yet" confusion never happens.
+## The flow recorded (real app, in order)
 
-## Files
+| Beat | Screen | What happens |
+|------|--------|--------------|
+| 1 | `/m/{token}?unlock=1` | Magic-link claim — type a password → "Create my account" → lands logged in |
+| 2 | `/profile` | "Your write-up" → **Regenerate with AI** (real OpenAI call fills the textarea) → tweak a word → **Save** (green confirmation) |
+| 3 | `/matches` | AI matches load, ranked → **Accept** ("I'd like to meet") a pending match |
+| 4 | `/messages` | Open the pre-staged **mutual** thread (Thomas Weber) → type + send a message in the enabled composer |
+| 5 | `/matches` | Booking — click a "Both free at — tap to book" slot chip → confirmed meeting (Louvre) |
+| 6 | `/threads` | Open the demo "Tokenisation & RWA — Builders Circle" thread → type a reply |
 
-- `index.html` — boots React/Babel, exposes `window.__seek(t)` + `window.__renderReady`,
-  `?render=1` mode, Stage scene-switching by time. Loads `animations.jsx` then `onboarding.jsx`.
-- `onboarding.jsx` — the 10 scenes + mount. Self-contained: it inlines the theme
-  constants, the `Scene` crossfade wrapper, `useFeatureTransition`, and the UI-mock
-  components (match card, chat/message bubble, slot pills, email card, magic-link
-  landing, mutual-match banner, `Portrait`) adapted from `our_version`'s
-  `video.jsx`/`video2.jsx` so it does **not** depend on those modules.
-- `animations.jsx` — copied verbatim from `our_version` (Stage, Sprite, Easing, etc.).
-- `app.jsx` — copied from `our_version` for reference/isolation. **NOT loaded** by
-  `index.html` (it targets the launch film's modules + would double-mount React).
-- `render.mjs` — Playwright + ffmpeg renderer. `DUR = 60.0`, output `pot_onboarding_1080p.mp4`.
-- `smoke.mjs` — boots the page, asserts `__renderReady`, captures the 4 smoke screenshots.
+## Pieces (all committed)
 
-## Run locally
+- `backend/scripts/stage_onboarding_video_demo.py` — stages the demo identity
+  **Alex Rivera** (`alex.video@demo.proofoftalk.io`, DELEGATE, privacy=full) with
+  goals+interests, a magic token, a real embedding, hand-built **demo-only**
+  curated matches (one set MUTUAL → Thomas Weber), and a demo-only thread with
+  seed posts. Everything is `@demo.proofoftalk.io` → excluded from all adoption/
+  usage metrics + the concierge demo-scope keeps real attendees off camera.
+  - `python scripts/stage_onboarding_video_demo.py` — full stage
+  - `--matches-only` — rebuild just the demo matches (used mid-recording: the
+    real profile-save fires `refresh_profile_matches`, which would otherwise
+    replace the curated demo set with real-pool matches)
+  - `--reset` — delete Alex's `users` row only (re-arm the claim/set-password flow)
+- `record_realapp.mjs` — Playwright recorder. Re-stages, then drives all 6 beats
+  in ONE `recordVideo` context (1280×720) → `raw/<auto>.webm`. Deliberate
+  `waitForTimeout` pauses + `{delay}` typing so the viewer can read each screen.
+- `assemble_realapp.sh` — ffmpeg: speeds raw ~1.25× → ~63s, scales to 1080p,
+  burns a 2s "Getting started" intro + per-beat step captions, muxes
+  `../our_version/music.mp3` at vol 0.2 (fade in/out). Output is the deliverable.
 
-```bash
-cd launch/onboarding_video
-python3 -m http.server 8765
-# → http://localhost:8765/?render=1
-```
-
-The `?render=1` param disables autoplay and exposes `window.__seek(t)`.
-Example: `window.__seek(34)` lands inside the mutual-match beat (Scene 06).
-
-## Render to MP4
+## Re-run end to end
 
 ```bash
-# One-time setup (playwright is already installed at the repo root)
-npm install --no-save playwright
-npx playwright install chromium
-brew install ffmpeg
+# 1. servers (prod DB via backend/.env DATABASE_URL)
+cd backend && source .venv/bin/activate && uvicorn app.main:app --port 8000 --log-level warning &
+cd frontend && npm run dev &        # serves :5173, proxies /api → :8000
+# wait until: curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/api/v1/dashboard/adoption  → 401
 
-# Start the dev server, then render
-python3 -m http.server 8765 &
-node render.mjs                  # → pot_onboarding_1080p.mp4 (1920×1080 60fps)
-node render.mjs --4k             # → pot_onboarding_4k.mp4
-node render.mjs --fps=30         # faster preview
+# 2. record (Playwright lives in repo-root node_modules)
+NODE_PATH="$PWD/node_modules" node launch/onboarding_video/record_realapp.mjs
+
+# 3. assemble
+bash launch/onboarding_video/assemble_realapp.sh
 ```
 
-If `node render.mjs` can't resolve `playwright`, run with the repo-root modules:
-`NODE_PATH=../../node_modules node render.mjs`.
+## Verification frames (gitignored)
 
-Verified: `ffprobe pot_onboarding_1080p.mp4` → `Duration: 00:01:00.00`, 1920×1080, 60 fps.
+`realapp_frame_{1..5}_*.png` — extracted from the FINAL mp4 at the set-password,
+profile/regenerate, matches/accept, messages, and threads moments. All show the
+real app UI (not the JSX mock).
 
 ## Audio — music only (VO is a follow-up)
 
-This cut has **no voiceover yet**. A VO needs ElevenLabs generation, which is out
-of scope for this pass, so `render.mjs` muxes **`music.mp3` only** at a gentle
-bed level (vol 0.22, 2s fade-in / 3s fade-out).
+No voiceover (ElevenLabs out of scope). `assemble_realapp.sh` muxes
+`../our_version/music.mp3` only. TODO in that script shows the two-input amix to
+restore VO once `voiceover.mp3` exists.
 
-To add VO later: generate `voiceover.mp3`, then restore the two-input mix in
-`render.mjs` (the commented `voArgs` branch shows the exact filter) and add a
-`SyncedAudio` component in `onboarding.jsx` mirroring `our_version/app.jsx`.
-Both spots are marked with `// TODO: add voiceover.mp3 (ElevenLabs) and restore VO mux`.
+## Demo data left in place (clean up when done with the video)
 
-## Smoke screenshots
+- Attendee **Alex Rivera** `alex.video@demo.proofoftalk.io` (id printed by the
+  staging script) — DELEGATE, privacy=full, real embedding.
+- 4 matches Alex ↔ {Thomas Weber, Priya Nair, Amara Okafor, Sofia Reyes};
+  **Thomas Weber is set mutual** (`status/status_a/status_b = accepted`).
+- A demo-only thread `rwa_tokenisation_demo` ("Tokenisation & RWA — Builders
+  Circle") with 3 demo-persona posts. (An earlier run also left 3 demo posts in
+  the public `tokenisation_of_finance` thread — harmless demo content.)
+- After the recording, Alex has a real `users` row (the on-camera claim) +
+  whatever message/post/booking the run created, and his matches were rebuilt to
+  the demo set. To fully reset: delete the Alex attendee + its user/matches/
+  messages/posts rows (all keyed off `alex.video@demo.proofoftalk.io`).
 
-Captured via `window.__seek(t)` (regenerate with `node smoke.mjs` after starting the server):
-
-- `smoke_t02_title.png` (t≈2) — Scene 01 title/hook
-- `smoke_t34_mutual.png` (t≈34) — Scene 06 mutual-match beat
-- `smoke_t48_threads.png` (t≈48) — Scene 08 Threads
-- `smoke_t58_cta.png` (t≈58) — Scene 10 CTA
-
-> Note: the smoke PNGs and all heavy binaries (`*.mp4`, `*.mp3`, `pot-logo.png`,
-> `louvre.png`, `figures/`) are gitignored (`*.png` is blocked) — same policy as `our_version`.
-> Copy the binaries from `../our_version/` (or `../from_sithum/`) before rendering:
-> ```bash
-> cp ../our_version/music.mp3 ../our_version/pot-logo.png ../our_version/louvre.png .
-> cp -R ../our_version/figures .
-> ```
+All of the above is `@demo.proofoftalk.io` and excluded from every metric.

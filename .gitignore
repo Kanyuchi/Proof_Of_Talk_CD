@@ -59,6 +59,8 @@ launch/onboarding_video/*.png
 launch/onboarding_video/figures/
 launch/onboarding_video/.DS_Store
 launch/onboarding_video/.render_frames/
+launch/onboarding_video/raw/
+launch/onboarding_video/*.webm
 
 # WhatsApp Zohair bridge — never commit credentials or message data
 tools/whatsapp-mcp/whatsapp-bridge/store/
