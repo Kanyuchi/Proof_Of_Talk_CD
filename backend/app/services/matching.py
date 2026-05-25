@@ -169,7 +169,9 @@ class MatchingEngine:
     async def process_attendee(self, attendee: Attendee) -> Attendee:
         """Generate AI summary, intent tags, ICP, and embedding for an attendee."""
         # Generate AI summary
-        attendee.ai_summary = await generate_ai_summary(attendee)
+        # Respect a user-pinned write-up: never auto-overwrite it.
+        if not getattr(attendee, "ai_summary_pinned", False):
+            attendee.ai_summary = await generate_ai_summary(attendee)
 
         # Classify intents
         attendee.intent_tags = await classify_intents(attendee)
