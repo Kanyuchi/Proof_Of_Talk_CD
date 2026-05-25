@@ -1467,3 +1467,10 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - Scene 06 (mutual-match consent gate) is the spine: headline "Chat opens when you **both** accept" → amber "You accepted · Awaiting their acceptance" → You ✓ / Mira (pending dots → ✓) + orange connector → green "Mutual match — both accepted!" → "Now it's in your Messages."
 - Adapted `render.mjs`: DUR=60.0, output `pot_onboarding_1080p.mp4`, **music-only mux** (no VO yet — ElevenLabs is a follow-up; gentle 0.22 bed + fades; TODO comments mark where to restore VO). Rendered 3600 frames → ffprobe **Duration: 00:01:00.00**, 1920×1080 @ 60fps, AAC 195k, 6.7MB. Smoke: `__renderReady===true`, 0 console errors, 4 screenshots (t≈2/34/48/58) verified correct.
 - gitignore: added `launch/onboarding_video/*.mp3|*.mp4|*.png|figures/|.render_frames/` (binaries copied from our_version, not committed). Source (index.html, onboarding.jsx, animations.jsx, app.jsx, render.mjs, smoke.mjs, README.md) staged by name.
+
+## 2026-05-25 20:03 — [reciprocity-loop] Cron ACTIVATED in prod
+
+- Set `RECIPROCITY_NOTIFY_ENABLED=true` on Railway (project observant-achievement / production / Proof_Of_Talk_CD) via CLI; verified set. Triggered the standard var-change restart; backend confirmed healthy after.
+- Reciprocity notify cron is now LIVE: fires every 2h → forward-notify (new incoming, 20h throttle) + mutual-completion email (deduped via matches.mutual_notified_at). First fire within ~2h of the restart.
+- **Kill switch:** set `RECIPROCITY_NOTIFY_ENABLED=false` (or unset) on Railway to halt instantly — this flag, NOT EMAIL_MODE, is the off-switch (cron force-sends).
+- **Watch:** `sync_status.reciprocity_notify` heartbeat on /dashboard + Resend deliverability after first fire.
