@@ -129,3 +129,6 @@
 - Re-enable emails + attendee onboarding when platform is ready for attendees to sign in
 - Sponsor intelligence rollout — Victor pitching pilot reports
 - Align CEO dashboard with matchmaker dashboard revenue figures
+
+## 2026-05-25 — User-editable AI write-up (LIVE)
+- Attendees can edit their own AI write-up (`ai_summary`) on the Profile page and/or Regenerate it from AI. A user edit sets `attendees.ai_summary_pinned=true`; `MatchingEngine.process_attendee` skips `generate_ai_summary` when pinned, so the user's text survives every re-embed/cron and feeds their match embedding. Empty submission un-pins ("reset to AI"). 2000-char cap. On for all attendees. Magic-link self-fill card NOT covered (v1 scope).
