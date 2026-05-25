@@ -1383,3 +1383,10 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - Shipped: migration `d4e5f6a7b8c9` (`attendees.last_interest_notified_at`); `PATCH /m/{token}/status` tokenless accept-back (security-reviewed: caller can only set own side, 404 on non-owned, "met" rejected); `send_interest_notification` email; `notify_pending_interest.py` backlog script (live `--status` preview: **131 eligible** — validates the ~135 dormant-accept estimate); `acceptMatchByMagicLink` client fn; Requests surface + accept/decline + `?tab=requests` deep-link on MagicMatches/MyMatches.
 - **PR #9** opened against main: https://github.com/Kanyuchi/Proof_Of_Talk_CD/pull/9 . NOT merged. Rollout gates (each needs a deliberate go): apply prod migration before merge → merge → deploy → Task 7 E2E smoke → first backlog wave `--limit 100 --confirm` (real email to ~100). Worktree preserved at `../Proof_Of_Talk_CD-reciprocity` for PR iteration.
 - Fast-follow (separate PR): recurring ~1–2h cron + un-gating mutual-completion email off the request path.
+
+## 2026-05-25 06:58 — [reciprocity-loop] SHIPPED LIVE (gates 1–3); email wave held for go
+
+- PR #9 squash-merged to main (`702e026`). Prod migration `d4e5f6a7b8c9` applied live BEFORE merge (column verified). Railway backend + Netlify frontend deployed: new `PATCH /m/{token}/status` returns 400 on short token (route live); bundle `index-NYJPbn9M.js` carries the Requests UI.
+- **Prod E2E smoke (reversible, demo personas):** marcus accept (200) → daniel accept-back via token endpoint (200) → match `f1a62ee5…` went MUTUAL (overall=accepted) → restored to pending. The no-login accept-back loop closes on production.
+- **HELD by operator choice:** the first backlog email wave (`notify_pending_interest.py --limit 100 --confirm`, 131 eligible) — not sent. Awaiting Shaun's go.
+- Fast-follow (separate PR): recurring ~1–2h cron + un-gate mutual-completion email off the request path. project_state.md top-line update deferred (concurrent sessions) — capture on next touch.
