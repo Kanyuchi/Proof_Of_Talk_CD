@@ -7,6 +7,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.config import get_settings
 from app.core.limiter import limiter
@@ -137,6 +138,35 @@ async def _daily_usage_snapshot():
             return await compute_and_upsert_usage_daily(db)
     await _run_with_heartbeat("daily_usage_snapshot", _go)
 
+
+async def _reciprocity_notify():
+    """Every-2h job: forward-notify pending interests + mutual-completion emails.
+
+    Runs run_interest_notifications then run_mutual_notifications in a single
+    session. Both are best-effort; the heartbeat captures combined stats.
+    Mutual emails are fully decoupled from the request path (inline send was
+    removed from update_match_status in this PR).
+    """
+    from app.core.database import async_session
+    from app.services.interest_cron import run_interest_notifications, run_mutual_notifications
+
+    async def _go():
+        async with async_session() as db:
+            interest_stats = await run_interest_notifications(db)
+            mutual_stats = await run_mutual_notifications(db)
+            return {
+                "interest_sent":   interest_stats["sent"],
+                "interest_skipped": interest_stats["skipped"],
+                "interest_errors": interest_stats["errors"],
+                "mutual_sent":     mutual_stats["sent"],
+                "mutual_skipped":  mutual_stats["skipped"],
+                "mutual_errors":   mutual_stats["errors"],
+                "errors": interest_stats["errors"] + mutual_stats["errors"],
+            }
+
+    await _run_with_heartbeat("reciprocity_notify", _go)
+
+
 # coalesce + max_instances + misfire_grace_time are the APScheduler-level
 # protections that catch the OTHER half of the May 5-6 failure: container
 # restarts that miss the cron window, or jobs that stack up after a bad
@@ -164,11 +194,15 @@ scheduler.add_job(_daily_match_refresh,     CronTrigger(hour=3, minute=30, timez
 # Usage snapshot at 03:45 UTC — runs AFTER match refresh so it captures a
 # full day of login/magic-link activity into usage_daily (one row/day).
 scheduler.add_job(_daily_usage_snapshot,    CronTrigger(hour=3, minute=45, timezone="UTC"), **_JOB_DEFAULTS)
+# Reciprocity-notify every 2h: forward pending-interest pull-backs +
+# mutual-completion emails. IntervalTrigger fires immediately on startup
+# then every 2h. mutual_notified_at dedup prevents double-sends.
+scheduler.add_job(_reciprocity_notify,      IntervalTrigger(hours=2), **_JOB_DEFAULTS)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
-    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, enrichment 03:00, match refresh 03:30, usage snapshot 03:45 (UTC)")
+    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, enrichment 03:00, match refresh 03:30, usage snapshot 03:45 (UTC); reciprocity_notify every 2h")
     yield
     scheduler.shutdown(wait=False)
     logger.info("scheduler: stopped")
