@@ -42,6 +42,8 @@ async def test_reciprocity_notify_runs_through_heartbeat():
 @pytest.mark.asyncio
 async def test_reciprocity_notify_calls_both_sub_jobs():
     """The cron factory must call run_interest_notifications then run_mutual_notifications."""
+    from app.core.config import Settings
+
     interest_called = []
     mutual_called = []
 
@@ -53,7 +55,14 @@ async def test_reciprocity_notify_calls_both_sub_jobs():
         mutual_called.append(True)
         return {"sent": 2, "skipped": 0, "errors": 0}
 
-    with patch("app.services.interest_cron.run_interest_notifications", _fake_interest), \
+    enabled_settings = Settings(
+        DATABASE_URL="postgresql+asyncpg://x:x@localhost/x",
+        SECRET_KEY="test",
+        RECIPROCITY_NOTIFY_ENABLED=True,
+    )
+
+    with patch.object(main, "get_settings", return_value=enabled_settings), \
+         patch("app.services.interest_cron.run_interest_notifications", _fake_interest), \
          patch("app.services.interest_cron.run_mutual_notifications", _fake_mutual), \
          patch("app.core.database.async_session") as mock_session:
         # Simulate the async context manager that the cron opens

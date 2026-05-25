@@ -28,6 +28,12 @@ structlog.configure(
 )
 logger = structlog.get_logger(__name__)
 
+async def _async_return(value):
+    """Trivial async helper — returns a value as a coroutine so it can be used
+    as a coro_factory result inside _run_with_heartbeat."""
+    return value
+
+
 # ── Scheduler heartbeat wrapper ───────────────────────────────────────────────
 # Every cron job runs through _run_with_heartbeat so that the sync_status
 # table always records last_run_at + status + stats — even if the job
@@ -146,7 +152,16 @@ async def _reciprocity_notify():
     session. Both are best-effort; the heartbeat captures combined stats.
     Mutual emails are fully decoupled from the request path (inline send was
     removed from update_match_status in this PR).
+
+    Kill-switch: if RECIPROCITY_NOTIFY_ENABLED is False (the default), the
+    actual send functions are skipped entirely. The heartbeat still fires so
+    the job shows as alive-but-disabled on the dashboard. Flip the Railway env
+    var to true when ready to start sending — no redeploy required.
     """
+    if not get_settings().RECIPROCITY_NOTIFY_ENABLED:
+        await _run_with_heartbeat("reciprocity_notify", lambda: _async_return({"disabled": True}))
+        return
+
     from app.core.database import async_session
     from app.services.interest_cron import run_interest_notifications, run_mutual_notifications
 
