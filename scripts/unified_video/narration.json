@@ -1,0 +1,17 @@
+{
+  "voice_name": "Bella",
+  "voice_id": "hpp4J3VqNfWAUOO0d1Us",
+  "voice_settings": {"stability": 0.55, "similarity_boost": 0.78, "style": 0.25, "use_speaker_boost": true},
+  "model_id": "eleven_multilingual_v2",
+  "total_words": 122,
+  "beats": [
+    {"n": 1, "offset_s": 0.0,  "label": "hero",        "text": "Tell us what you need. We'll tell you who to meet. The four people at Proof of Talk who'll change your year."},
+    {"n": 2, "offset_s": 6.6,  "label": "set_password","text": "Your ticket already gives you a profile. Just set a password to claim it — and unlock messaging."},
+    {"n": 3, "offset_s": 13.2, "label": "profile",     "text": "Sharpen your write-up. Tap Regenerate with AI, and the matches sharpen with it."},
+    {"n": 4, "offset_s": 19.8, "label": "matches",     "text": "Your top introductions land here — ranked, with exactly why each meeting matters."},
+    {"n": 5, "offset_s": 25.9, "label": "messages",    "text": "Tap I'd like to meet. When they accept back, your messages unlock."},
+    {"n": 6, "offset_s": 31.0, "label": "mutual_book", "text": "Mutual match — and you're both free. Book a slot in one tap."},
+    {"n": 7, "offset_s": 35.7, "label": "threads",     "text": "Or jump into a sector thread now — start the conversation before Paris."},
+    {"n": 8, "offset_s": 40.7, "label": "cta",         "text": "Proof of Talk Matchmaker. Find the people who'll change your year."}
+  ]
+}
