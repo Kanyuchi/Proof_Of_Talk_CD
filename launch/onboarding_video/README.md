@@ -129,29 +129,75 @@ regenerate the VO and re-assemble (fast).
   (`4k_vo_track.mp3`) by delaying each clip to its beat's start offset (`adelay`)
   and mixing (`amix`) — mirrors how the launch film stitched per-phrase clips.
 - `assemble_realapp_4k_vo.sh` — same real-time concat → 3840×2160 H.264, **NO
-  drawtext captions**. Audio: VO at full (1.0) + `../our_version/music.mp3` as a
-  quiet bed sidechain-compressed (`sidechaincompress`) keyed off the VO, so the
-  music dips while Brian speaks and lifts in the gaps; short fade in/out. Output:
-  `pot_onboarding_realapp_4k_vo.mp4`.
+  drawtext captions**. Audio is now mixed so the **voice clearly dominates**:
+  - VO is normalised through `loudnorm=I=-14:TP=-1.5:LRA=11` (broadcast loudness)
+    so speech sits front and centre regardless of the source mp3's mastering.
+  - Music bed is dropped to `volume=0.06` (≈ -24 dB linear) with a 1.5s fade in
+    and 2.5s fade out — already a faint backdrop before any ducking.
+  - `sidechaincompress` keyed off the VO (`threshold=0.02:ratio=20:attack=8:release=350`)
+    pulls the music down another ~10 dB whenever Brian speaks, then lifts it back
+    to the (still quiet) bed in the gaps.
+  - Measured on the output: VO segments mean ≈ **-15 dB**, music-only gaps mean
+    ≈ **-31 dB** → VO is ~15 dB louder than the bed. The mix is unambiguously
+    voice-forward; verify on a re-render with the `volumedetect` snippets below.
 
 ```bash
 # frames4k/ already exists (from record_realapp_4k.mjs) → just:
 bash launch/onboarding_video/generate_vo_4k.sh        # → 4k_vo_track.mp3
+#   ↑ idempotent — re-uses frames4k/vo/*.mp3 if present, skips ElevenLabs
+#     entirely. Delete the per-line mp3s to force a fresh TTS pass.
 bash launch/onboarding_video/assemble_realapp_4k_vo.sh # → pot_onboarding_realapp_4k_vo.mp4
 # verify: ffprobe must report 3840×2160, ~64s, h264 + an aac AUDIO stream
 ```
 
-### Narration lines + beat offsets (auditable)
+### Narration lines + beat offsets (FINAL-VIDEO timeline, eyeball-verified)
 
-| Beat | offset | line |
-|------|--------|------|
-| 1 · set-password   | 0.4s  | You're in. Tap your magic link, set a password, and your account is ready. |
-| 2 · profile        | 8.0s  | Sharpen your profile. Add your goals, and let the AI draft your write-up — the more it knows, the more of the room it opens. |
-| 3 · matches/accept | 21.9s | Here are your matches — ranked, scored, and explained, with a reason for every meeting. |
-| 4 · messages/mutual| 30.0s | Accept the people you want. The moment they accept back, it's a mutual match, and your messages unlock. |
-| 5 · booking        | 42.1s | Now book a time you're both free — locked in, right there at the Louvre. |
-| 6 · threads        | 51.5s | Don't want to wait for a yes? Jump into Threads and start the conversation today. |
-| CTA (threads tail) | 61.3s | Open your matches. They're already in the room. |
+The original VO pass aligned to `beats.json` capture offsets (when Playwright
+DECIDED to navigate). Frame-accurate inspection of the assembled mp4 showed
+each scene only renders 2–4s later — e.g. `beat3.t = 21.5s` is the moment
+`page.goto('/matches')` fires, but the ranked match cards only paint at
+~23.5s. The offsets below come from extracting frames from the assembled
+output at candidate offsets and confirming the right visual is on screen.
+**If you re-record, re-derive these by extraction** — do not substitute
+`beats.json` `t` values.
+
+| # | offset | line | verified on-screen content |
+|---|--------|------|----------------------------|
+| 1 | 0.4s   | You're in. Tap your magic link, set a password, and your account is ready. | Welcome + "Set your password" + Create my account |
+| 2 | 8.0s   | Sharpen your profile. Add your goals, and let the AI draft your write-up — the more it knows, the more of the room it opens. | Profile editor (name/title/Goals/Interests) |
+| 3 | 23.5s  | Here are your matches — ranked, scored, and explained, with a reason for every meeting. | "Your Top Introductions…match quality 0.83, Priya Nair Good match" |
+| 4 | 34.5s  | Accept the people you want. The moment they accept back, it's a mutual match, and your messages unlock. | Messages with Thomas Weber + composer typing |
+| 5 | 46.5s  | Now book a time you're both free — locked in, right there at the Louvre. | "Mutual match — both accepted" + "Both free at — tap to book" chips |
+| 6 | 53.0s  | Don't want to wait for a yes? Jump into Threads and start the conversation today. | Discussion Threads list |
+| 7 | 61.0s  | Open your matches. They're already in the room. | Builders Circle thread with replies + composer |
+
+### Verify the mix + sync after any rebuild
+
+Audio dominance — VO segments should be at least ~10 dB above music-only gaps:
+
+```bash
+# VO segment (line1)
+ffmpeg -nostats -ss 1.0 -t 3.0 -i pot_onboarding_realapp_4k_vo.mp4 \
+  -af volumedetect -vn -f null - 2>&1 | grep volume
+# expect mean ~ -15 dB, max ~ -1 to -2 dB
+
+# Music-only gap (between line2 and line3)
+ffmpeg -nostats -ss 15.5 -t 4.5 -i pot_onboarding_realapp_4k_vo.mp4 \
+  -af volumedetect -vn -f null - 2>&1 | grep volume
+# expect mean ~ -30 dB or lower
+```
+
+Sync — extract a frame at each line's start offset and confirm the right
+scene is on screen (saved as `sync_check_<beat>.png` in this dir):
+
+```bash
+for spec in 0.4:setpassword 8.0:profile 23.5:matches 34.5:mutual \
+            46.5:booking 53.0:threads 61.0:cta; do
+  off="${spec%%:*}"; lbl="${spec##*:}"
+  ffmpeg -y -ss "$off" -i pot_onboarding_realapp_4k_vo.mp4 \
+    -frames:v 1 "sync_check_${lbl}.png"
+done
+```
 
 ## Audio — captioned cut uses music only
 

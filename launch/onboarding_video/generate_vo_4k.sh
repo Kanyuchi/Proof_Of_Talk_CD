@@ -4,11 +4,28 @@
 # ~64s VO track timed to the recording's REAL beat offsets (frames4k/beats.json).
 #
 # Why per-line clips + adelay/amix (mirrors the launch film's stitched VO):
-#   Each narration line is generated as its own mp3, then placed at its beat's
-#   start offset via ffmpeg `adelay` (delay = beat offset in ms) and merged with
-#   `amix`. That keeps each line locked to the moment its UI step is on screen,
-#   with natural silence in the gaps — instead of one wall-to-wall take that
-#   drifts off the visuals.
+#   Each narration line is generated as its own mp3, then placed at its
+#   start offset via ffmpeg `adelay` (delay in ms) and merged with `amix`. That
+#   keeps each line locked to the moment its UI step is on screen, with natural
+#   silence in the gaps — instead of one wall-to-wall take that drifts off the
+#   visuals.
+#
+# IMPORTANT — offsets are FINAL-VIDEO timestamps, NOT capture-time beats.
+# The first VO pass aligned to `beats.json` capture offsets, which mark when the
+# script DECIDED to navigate (e.g. beat3 t=21.48s → page.goto('/matches')).
+# Frame-accurate inspection of the assembled mp4 showed each scene only renders
+# 2–4s later: the matches grid only paints at ~23s, the messages composer at
+# ~34s, the booking chips at ~46s. The hardcoded LINE_STARTS below come from
+# extracting frames from the rendered output at candidate offsets and
+# eyeballing which moment each line should narrate (set-password panel,
+# profile/regenerate write-up, ranked-and-scored match cards, mutual-match
+# composer, "Both free at — tap to book" chips, Discussion Threads list, thread
+# reply for the CTA). If you re-record, re-derive these by extracting frames
+# from the assembled mp4 — capture-time beats are NOT a substitute.
+#
+# Re-running is idempotent: if line_N.mp3 already exists, the script SKIPS
+# ElevenLabs (no API call, no key needed) and just re-stitches. Delete the per-
+# line mp3s to force a fresh TTS pass.
 #
 # Voice: Brian — Deep, Resonant, Comforting (ElevenLabs premade,
 #   nPczCjzI2devNBz1zQrb) — same male voice as launch/our_version. Model
@@ -34,13 +51,7 @@ TRACK="$DIR/4k_vo_track.mp3"
 VOICE_ID="nPczCjzI2devNBz1zQrb"     # Brian (male) — same as launch/our_version
 MODEL="eleven_multilingual_v2"
 
-[ -f "$ENV_FILE" ] || { echo "no backend/.env at $ENV_FILE" >&2; exit 1; }
-[ -f "$BEATS" ]    || { echo "no beats.json — run record_realapp_4k.mjs first" >&2; exit 1; }
-
-# Pull the key WITHOUT printing it.
-API_KEY="$(grep -E '^ELEVENLABS_API_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' \r\n')"
-[ -n "$API_KEY" ] || { echo "ELEVENLABS_API_KEY not set in backend/.env" >&2; exit 1; }
-
+[ -f "$BEATS" ] || { echo "no beats.json — run record_realapp_4k.mjs first" >&2; exit 1; }
 mkdir -p "$VO_DIR"
 
 # ── Narration lines, one per beat (+ a closing CTA in the threads tail) ────────
@@ -61,69 +72,96 @@ declare -a TEXTS=(
 )
 
 # ── Generate each line as its own mp3 via the ElevenLabs REST TTS endpoint ─────
-for i in "${!LABELS[@]}"; do
-  label="${LABELS[$i]}"
-  text="${TEXTS[$i]}"
-  out="$VO_DIR/${label}.mp3"
-  echo "[vo] generating ${label}: \"${text}\""
-  # JSON-escape the text safely via python (handles quotes/em-dashes/apostrophes).
-  payload="$(TEXT="$text" MODEL="$MODEL" python3 -c '
+# Skip TTS entirely if every line_*.mp3 + cta.mp3 already exists (re-stitch only).
+NEED_TTS=0
+for label in "${LABELS[@]}"; do
+  [ -s "$VO_DIR/${label}.mp3" ] || { NEED_TTS=1; break; }
+done
+
+if [ "$NEED_TTS" -eq 1 ]; then
+  [ -f "$ENV_FILE" ] || { echo "no backend/.env at $ENV_FILE (needed for ELEVENLABS_API_KEY)" >&2; exit 1; }
+  # Pull the key WITHOUT printing it.
+  API_KEY="$(grep -E '^ELEVENLABS_API_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"'"'"' \r\n')"
+  [ -n "$API_KEY" ] || { echo "ELEVENLABS_API_KEY not set in backend/.env" >&2; exit 1; }
+
+  for i in "${!LABELS[@]}"; do
+    label="${LABELS[$i]}"
+    text="${TEXTS[$i]}"
+    out="$VO_DIR/${label}.mp3"
+    if [ -s "$out" ]; then
+      echo "[vo] skip ${label} (already exists)"
+      continue
+    fi
+    echo "[vo] generating ${label}: \"${text}\""
+    # JSON-escape the text safely via python (handles quotes/em-dashes/apostrophes).
+    payload="$(TEXT="$text" MODEL="$MODEL" python3 -c '
 import json, os
 print(json.dumps({
   "text": os.environ["TEXT"],
   "model_id": os.environ["MODEL"],
   "voice_settings": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.0, "use_speaker_boost": True},
 }))')"
-  http_code="$(curl -sS -w '%{http_code}' -o "$out" \
-    -X POST "https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}?output_format=mp3_44100_128" \
-    -H "xi-api-key: ${API_KEY}" \
-    -H "Content-Type: application/json" \
-    -H "Accept: audio/mpeg" \
-    -d "$payload")"
-  if [ "$http_code" != "200" ]; then
-    echo "[vo] ElevenLabs returned HTTP ${http_code} for ${label}:" >&2
-    head -c 400 "$out" >&2; echo >&2
-    exit 1
-  fi
-  dur="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$out")"
-  echo "[vo]   -> ${out} (${dur}s)"
-done
+    http_code="$(curl -sS -w '%{http_code}' -o "$out" \
+      -X POST "https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}?output_format=mp3_44100_128" \
+      -H "xi-api-key: ${API_KEY}" \
+      -H "Content-Type: application/json" \
+      -H "Accept: audio/mpeg" \
+      -d "$payload")"
+    if [ "$http_code" != "200" ]; then
+      echo "[vo] ElevenLabs returned HTTP ${http_code} for ${label}:" >&2
+      head -c 400 "$out" >&2; echo >&2
+      exit 1
+    fi
+    dur="$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$out")"
+    echo "[vo]   -> ${out} (${dur}s)"
+  done
+else
+  echo "[vo] all per-line mp3s present — skipping ElevenLabs TTS"
+fi
 
-# ── Resolve per-line start offsets from beats.json (seconds) ──────────────────
-# CTA is anchored a fixed offset before the end so the threads-reply visual reads
-# first, then the call to action lands in the final ~4s.
+# ── Resolve per-line start offsets — FINAL-VIDEO timeline (seconds) ──────────
+# These come from extract-and-eyeball verification against the assembled mp4.
+# DO NOT replace these with capture-time beats.json offsets — those mark when
+# Playwright navigated, NOT when the target scene actually painted (which lags
+# 2–4s for the matches grid, messages composer, and booking chips).
+#
+# Verified target visuals (see sync_check_<label>.png produced by the assembler):
+#   line1 @ 0.4s   — set-password panel
+#   line2 @ 8.0s   — profile editor (name/title/goals/write-up + Regenerate AI)
+#   line3 @ 23.5s  — ranked match cards visible (Priya "Good match" score)
+#   line4 @ 34.5s  — mutual thread open w/ composer typing
+#   line5 @ 46.5s  — "Mutual match — both accepted" + "Both free at" slot chips
+#   line6 @ 53.0s  — Discussion Threads list
+#   cta   @ 61.0s  — thread reply being typed in Builders Circle
 read_offsets() {
-  python3 - "$BEATS" "$VO_DIR" <<'PY'
-import json, sys, os, subprocess
-beats_path, vo_dir = sys.argv[1:3]
-d = json.load(open(beats_path))
-bt = {b["label"]: b["t"] for b in d["beats"]}
-end = d["duration_s"]
+  python3 - "$VO_DIR" <<'PY'
+import sys, os, subprocess
+vo_dir = sys.argv[1]
+
+LINE_STARTS = [
+    ("line1",  0.4),
+    ("line2",  8.0),
+    ("line3", 23.5),
+    ("line4", 34.5),
+    ("line5", 46.5),
+    ("line6", 53.0),
+    ("cta",   61.0),
+]
 
 def dur(p):
     return float(subprocess.check_output(
         ["ffprobe","-v","error","-show_entries","format=duration","-of","csv=p=0",p]).strip())
 
-# (label, slot) pairs must match the bash arrays above.
-plan = [
-    ("line1","beat1"), ("line2","beat2"), ("line3","beat3"),
-    ("line4","beat4"), ("line5","beat5"), ("line6","beat6"), ("cta","cta"),
-]
-# Small lead-in so the visual reads ~0.4s before the VO starts on each beat.
-LEAD = 0.4
-rows = []
-for label, slot in plan:
+prev_end = -1.0
+for label, start in LINE_STARTS:
     mp3 = os.path.join(vo_dir, f"{label}.mp3")
     dlen = dur(mp3)
-    if slot == "cta":
-        # land the CTA so it ENDS ~0.6s before the video end
-        start = max(0.0, end - 0.6 - dlen)
-    else:
-        start = bt[slot] + LEAD
-    rows.append((label, round(start,3), round(dlen,3)))
-# guard: clamp so a line never overruns the next line's start (trim handled in mix)
-for (label, start, dlen) in rows:
-    print(f"{label} {start} {dlen}")
+    if start < prev_end:
+        # Should never trigger with the hardcoded offsets above; loud error if so.
+        print(f"ERROR: {label} starts at {start} but previous line ended at {prev_end:.3f}", file=sys.stderr)
+        sys.exit(2)
+    prev_end = start + dlen
+    print(f"{label} {start:.3f} {dlen:.3f}")
 PY
 }
 

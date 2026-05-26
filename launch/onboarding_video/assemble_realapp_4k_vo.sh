@@ -60,18 +60,33 @@ echo "[assemble4k-vo] target ~${DUR}s @ ${FPS}fps   vo: $VO   music: $MUSIC"
 # Video filter: re-time to constant 30fps, yuv420p. NO captions.
 VF="fps=${FPS},format=yuv420p"
 
-# Audio mix:
+# Audio mix — VOICE DOMINATES, music is a faint bed:
 #   [1] = music, [2] = VO.
-#   - music: gentle bed level + fade in/out, then sidechain-compressed (ducked)
-#     keyed off the VO so it dips while Brian speaks and lifts in the gaps.
-#   - VO: full level (slight bump for presence).
-#   - amix VO + ducked music; VO drives loudness.
+#
+#   VO path: loudnorm to broadcast loudness (-14 LUFS) so the speech sits front
+#     and centre regardless of how the source mp3 was mastered, then a small
+#     +2dB safety bump for extra presence. dynaudnorm smooths line-to-line gain
+#     drift inside a single track.
+#
+#   Music path: dropped to LINEAR ≈ 0.06 (≈ -24.4 dB) as the base bed — already
+#     much quieter than the VO before any ducking. Then sidechain-compressed
+#     keyed off the VO with an aggressive ratio + low threshold so when Brian
+#     speaks the music dips another ~10 dB (target -32 to -36 dB), then lifts
+#     back to the (still quiet) bed in the gaps. Music fades in/out at the ends.
+#
+#   The VO sidechain key is taken BEFORE loudnorm (raw VO envelope is the
+#   cleanest trigger), but only its envelope drives the compressor — the mix
+#   uses the loudnorm'd VO.
 FADE_OUT_START=$(python3 -c "print(round($DUR-2.5, 3))")
+# loudnorm here is the single-pass dynamic mode (good enough for a 64s clip; we
+# don't need the two-pass measure→apply for broadcast spec). TP=-1.5 leaves
+# headroom so the post-mix isn't clipped when ffmpeg re-encodes to AAC.
 FILTER_A="\
-[1:a]volume=0.55,afade=t=in:st=0:d=1.5,afade=t=out:st=${FADE_OUT_START}:d=2.5[mus];\
-[2:a]volume=1.0,asplit=2[vo_mix][vo_key];\
-[mus][vo_key]sidechaincompress=threshold=0.05:ratio=12:attack=20:release=400:makeup=1[ducked];\
-[vo_mix][ducked]amix=inputs=2:normalize=0:dropout_transition=0[a]"
+[1:a]volume=0.06,afade=t=in:st=0:d=1.5,afade=t=out:st=${FADE_OUT_START}:d=2.5[mus_bed];\
+[2:a]asplit=2[vo_raw][vo_key];\
+[vo_raw]loudnorm=I=-14:TP=-1.5:LRA=11[vo];\
+[mus_bed][vo_key]sidechaincompress=threshold=0.02:ratio=20:attack=8:release=350:makeup=1:level_sc=1[ducked];\
+[vo][ducked]amix=inputs=2:normalize=0:dropout_transition=0[a]"
 
 ffmpeg -y -loglevel error -stats \
   -f concat -safe 0 -i "$CONCAT" \
