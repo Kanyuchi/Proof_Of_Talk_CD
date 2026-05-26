@@ -712,6 +712,46 @@ Return ONLY the JSON array. No markdown, no commentary."""
             persisted.append(match)
         return persisted
 
+    async def _purge_stale_matches_and_collect_locked(
+        self, attendee_id: uuid.UUID,
+    ) -> set:
+        """Delete only "stale" matches involving this attendee — pending on
+        both sides, no meeting, no decline reason, not hidden, never met —
+        and return the set of counterpart ids whose match rows survived (i.e.
+        carry user input). These counterparts must be excluded from new
+        candidate generation so a regen never duplicates a locked pair and
+        never resurfaces a previously-declined counterpart.
+
+        Replaces the pre-2026-05-26 unconditional delete that wiped accepts/
+        declines/scheduled meetings on every profile save.
+        """
+        await self.db.execute(
+            sql_delete(Match).where(
+                and_(
+                    or_(
+                        Match.attendee_a_id == attendee_id,
+                        Match.attendee_b_id == attendee_id,
+                    ),
+                    Match.status_a == "pending",
+                    Match.status_b == "pending",
+                    Match.meeting_time.is_(None),
+                    Match.decline_reason.is_(None),
+                    Match.hidden_by_user.is_(False),
+                    Match.met_at.is_(None),
+                )
+            )
+        )
+        await self.db.commit()
+        survivors = (await self.db.execute(
+            select(Match.attendee_a_id, Match.attendee_b_id).where(
+                or_(
+                    Match.attendee_a_id == attendee_id,
+                    Match.attendee_b_id == attendee_id,
+                )
+            )
+        )).all()
+        return {(b if a == attendee_id else a) for a, b in survivors}
+
     async def generate_matches_for_attendee(
         self, attendee_id: uuid.UUID, top_k: int = 10, clear_existing: bool = True,
         notify: bool = True,
@@ -740,22 +780,23 @@ Return ONLY the JSON array. No markdown, no commentary."""
         if attendee.embedding is None:
             attendee = await self.process_attendee(attendee)
 
-        # Clear stale matches for this attendee (both directions) when called individually
+        # Regenerate without wiping user decisions. Pre-2026-05-26 this branch
+        # ran an unconditional sql_delete that silently destroyed accepts,
+        # declines, scheduled meetings, and hides on every profile save
+        # (David Chapman / Summ EMEA reported the user-visible damage). Now
+        # we purge only fully-stale rows and lock the surviving counterparts
+        # out of new candidate generation so a) we never duplicate a locked
+        # pair and b) we never resurface a previously-declined counterpart.
+        locked_counterparts: set = set()
         if clear_existing:
-            await self.db.execute(
-                sql_delete(Match).where(
-                    or_(
-                        Match.attendee_a_id == attendee_id,
-                        Match.attendee_b_id == attendee_id,
-                    )
-                )
-            )
-            await self.db.commit()
+            locked_counterparts = await self._purge_stale_matches_and_collect_locked(attendee_id)
 
         # Stage 2: Retrieve a deeper neighbour set so we can split into
         # a curated head (GPT-explained) and a similarity-only deep tail.
         pool_size = max(top_k, DEEP_POOL_SIZE)
         candidates = await self.retrieve_candidates(attendee, top_k=pool_size)
+        if locked_counterparts:
+            candidates = [(c, s) for c, s in candidates if c.id not in locked_counterparts]
         if not candidates:
             return []
 
