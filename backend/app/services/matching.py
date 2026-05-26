@@ -362,6 +362,36 @@ class MatchingEngine:
 
     # ── Stage 3: Rank & Explain (GPT-4o) ────────────────────────────────
 
+    @staticmethod
+    def _realign_entries_by_name(
+        ranked: list[dict], candidates: list[tuple],
+    ) -> list[dict]:
+        """Rewrite each entry's candidate_index from the verbatim candidate_name
+        the LLM was asked to echo. Defends against the LLM putting the wrong
+        candidate_index on an entry (which silently binds the explanation AND
+        the deterministic-rerank score boosts to the wrong candidate). If the
+        name doesn't match any input candidate, fall back to the supplied
+        candidate_index when in range; otherwise drop the entry.
+        """
+        name_to_idx = {
+            ((c.name or "").strip().lower()): i + 1
+            for i, (c, _s) in enumerate(candidates)
+        }
+        fixed: list[dict] = []
+        for entry in ranked:
+            cname = (entry.get("candidate_name") or "").strip().lower()
+            true_idx = name_to_idx.get(cname) if cname else None
+            if true_idx is not None:
+                entry["candidate_index"] = true_idx
+                fixed.append(entry)
+                continue
+            # Legacy / pre-fix entries: trust candidate_index only if in range.
+            idx = entry.get("candidate_index", 0)
+            if isinstance(idx, int) and 1 <= idx <= len(candidates):
+                fixed.append(entry)
+            # else: drop — neither name nor index can bind this entry safely.
+        return fixed
+
     async def rank_and_explain(
         self,
         attendee: Attendee,
@@ -478,7 +508,8 @@ ACTION ITEMS QUALITY RULES:
 
 Return a JSON array ranked from best to worst match. Each entry:
 {{
-  "candidate_index": <1-based index>,
+  "candidate_index": <1-based INPUT-position index of this candidate above>,
+  "candidate_name": "<verbatim copy of the candidate's Name field from above — used to verify the binding>",
   "overall_score": <0.0-1.0 — be conservative: only score above 0.75 if the connection is genuinely strong and specific. A score below 0.60 means the match adds little value and you should drop it rather than hedge.>,
   "complementary_score": <0.0-1.0>,
   "match_type": "complementary" | "non_obvious" | "deal_ready",
@@ -505,6 +536,11 @@ Return ONLY the JSON array. No markdown, no commentary."""
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
             ranked = json.loads(raw)
+            # Re-anchor entries by candidate_name so a misordered LLM response
+            # can't bind an explanation/score boost to the wrong candidate
+            # (bug reported by Arda Askin 2026-05-26: his #2 card showed AIVM
+            # but the explanation talked about Arrington Capital).
+            ranked = self._realign_entries_by_name(ranked, candidates)
         except json.JSONDecodeError:
             # Fallback: return candidates in similarity order
             ranked = [
