@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Sparkles, Brain, Target, MessageSquare,
+  Sparkles, Brain, Target, MessageSquare, Check,
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
 import { getMatchesByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink, acceptMatchByMagicLink } from "../api/client";
@@ -14,6 +14,7 @@ import AttendeeAvatar from "../components/AttendeeAvatar";
 export default function MagicMatches() {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [enrichForm, setEnrichForm] = useState({
     twitter_handle: "",
     target_companies: "",
@@ -23,6 +24,10 @@ export default function MagicMatches() {
   const [enrichSaved, setEnrichSaved] = useState(false);
   const [claimForm, setClaimForm] = useState({ email: "", password: "" });
   const [claimError, setClaimError] = useState("");
+  // When set, the claim flow chains in an accept-this-match call before
+  // redirecting — so a no-login user can confirm interest with one password.
+  const [pendingAcceptMatchId, setPendingAcceptMatchId] = useState<string | null>(null);
+  const [pendingAcceptPersonName, setPendingAcceptPersonName] = useState<string | null>(null);
   // Arriving from the welcome email's "Unlock Full Access" CTA (?unlock=1)
   // pre-opens the claim panel and scrolls to it.
   const [searchParams] = useSearchParams();
@@ -94,19 +99,34 @@ export default function MagicMatches() {
   // Claim a full account from this magic link. The token authenticates the
   // request server-side, so it bypasses the registration ticket gate — this
   // is how placeholder-email speakers get a real login. On success we store
-  // the JWT and hard-navigate so AuthProvider picks up the session on mount.
+  // the JWT, optionally chain in an accept for the match the user clicked,
+  // and hard-navigate so AuthProvider picks up the session on mount.
   const claimMutation = useMutation({
     mutationFn: () => claimAccount({
       magic_token: token!,
       password: claimForm.password,
       email: claimForm.email.trim() || undefined,
     }),
-    onSuccess: (tok) => {
+    onSuccess: async (tok) => {
       localStorage.setItem("token", tok.access_token);
-      window.location.href = "/matches";
+      if (pendingAcceptMatchId) {
+        try {
+          await acceptMatchByMagicLink(token!, pendingAcceptMatchId, "accepted");
+        } catch {
+          // Best-effort — if the accept fails the user still lands logged in
+          // on /matches and can re-tap the green button there.
+        }
+      }
+      window.location.href = pendingAcceptMatchId ? "/matches?accepted=1" : "/matches";
     },
     onError: (e: unknown) => {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      // Already claimed → route them to sign in. They'll land on /attendees
+      // (Login.tsx hard-codes that) then can navigate to matches to confirm.
+      if (detail && /already/i.test(detail)) {
+        navigate("/login");
+        return;
+      }
       setClaimError(detail || "Couldn't create your account. Please try again.");
     },
   });
@@ -194,10 +214,15 @@ export default function MagicMatches() {
           >
             <KeyRound className="w-5 h-5 text-[#E76315]" />
             <div className="flex-1">
-              <h3 className="font-semibold text-[#E76315]">Set your password</h3>
+              <h3 className="font-semibold text-[#E76315]">
+                {pendingAcceptPersonName
+                  ? `Confirm interest in ${pendingAcceptPersonName.split(" ")[0]}`
+                  : "Set your password"}
+              </h3>
               <p className="text-xs text-white/40">
-                You already have a profile from your ticket — just choose a password
-                to log in and unlock messaging and the AI Concierge.
+                {pendingAcceptPersonName
+                  ? `Set a quick password (10 seconds) — we'll save your interest and let ${pendingAcceptPersonName.split(" ")[0]} know.`
+                  : "You already have a profile from your ticket — just choose a password to log in and unlock messaging and the AI Concierge."}
               </p>
             </div>
             <span className="text-white/30 text-sm">{claimOpen ? "−" : "+"}</span>
@@ -235,7 +260,9 @@ export default function MagicMatches() {
                 disabled={claimMutation.isPending || !claimForm.password}
                 className="w-full py-2.5 rounded-lg bg-[#E76315] text-white text-sm font-semibold hover:bg-[#E76315]/90 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
               >
-                {claimMutation.isPending ? "Creating your account…" : "Create my account"}
+                {claimMutation.isPending
+                  ? (pendingAcceptMatchId ? "Confirming…" : "Creating your account…")
+                  : (pendingAcceptMatchId ? "Confirm & create my account" : "Create my account")}
               </button>
               <p className="text-[10px] text-white/30 text-center">
                 Already have a password? <Link to="/login" className="text-[#E76315] hover:underline">Sign in</Link>
@@ -537,13 +564,33 @@ export default function MagicMatches() {
                     </div>
                   )}
 
-                  <button
-                    onClick={() => deferMutation.mutate(match.id)}
-                    disabled={deferMutation.isPending}
-                    className="mt-3 w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-1 disabled:opacity-50"
-                  >
-                    Maybe later
-                  </button>
+                  <div className="mt-3 space-y-2">
+                    <button
+                      onClick={() => {
+                        setPendingAcceptMatchId(match.id);
+                        setPendingAcceptPersonName(person?.name ?? null);
+                        setClaimError("");
+                        setClaimOpen(true);
+                        setTimeout(() => {
+                          claimRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          });
+                        }, 50);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20"
+                    >
+                      <Check className="w-4 h-4" />
+                      I'd like to meet
+                    </button>
+                    <button
+                      onClick={() => deferMutation.mutate(match.id)}
+                      disabled={deferMutation.isPending}
+                      className="w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-1 disabled:opacity-50"
+                    >
+                      Maybe later
+                    </button>
+                  </div>
                 </div>
               </div>
             );
