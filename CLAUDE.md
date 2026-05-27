@@ -133,12 +133,15 @@ Enrichment runs as background jobs per attendee. Sources are layered:
 - Twitter/X handle stored, no scraping today.
 
 **Daily cron jobs (UTC):**
-- 02:00 — Extasy ticket-holder sync
-- 02:05 — Check-ins sync (recover per-attendee claimed passes; runs after Extasy so the orders feed for the pass join is fresh)
-- 02:15 — Speaker sheet sync
-- 02:30 — Grid audit
-- 02:45 — Match refresh
-- 03:00 — Enrichment sweep (Grid + website + AI summary + embedding for new rows)
+- 02:00 - Extasy ticket-holder sync
+- 02:05 - Check-ins sync (recover per-attendee claimed passes; runs after Extasy so the orders feed for the pass join is fresh)
+- 02:15 - Speaker sheet sync
+- 02:30 - Grid audit
+- 03:00 - Enrichment sweep (Grid + website + AI summary + embedding for new rows)
+- 03:30 - Match refresh (`refresh_matches_for_new_attendees` only - net-new attendees with zero matches yet; existing Match rows are NEVER auto-refreshed)
+- 03:45 - Usage snapshot
+
+Plus an `IntervalTrigger(hours=2)` `_reciprocity_notify` job (gated by `RECIPROCITY_NOTIFY_ENABLED`).
 
 Each cron writes a row to `sync_status` (heartbeat table) so silent failures are visible on the dashboard.
 
