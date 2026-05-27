@@ -61,3 +61,51 @@ def test_realign_falls_back_to_index_when_name_missing():
     fixed = MatchingEngine._realign_entries_by_name(ranked, candidates)
     assert len(fixed) == 1
     assert fixed[0]["candidate_index"] == 2
+
+
+def test_realign_drops_explicit_unmatched_name_even_when_index_in_range():
+    """If the LLM supplies a candidate_name that doesn't match any input
+    candidate, the entry must be DROPPED — NOT fall back to candidate_index.
+    The old fallback silently kept hallucinated explanations (Arda Askin's
+    AIVM card, 2026-05-26)."""
+    candidates = [(_cand("Real Person"), 0.9)]   # only one valid input
+    ranked = [{
+        "candidate_index": 1,                     # in range, would silently bind
+        "candidate_name": "Rob Hadick",           # but the name is hallucinated
+        "explanation": "Rob Hadick from Dragonfly is a prime match...",
+    }]
+    assert MatchingEngine._realign_entries_by_name(ranked, candidates) == []
+
+
+def test_b2b_only_candidate_is_looked_up_by_company_name():
+    """For privacy_mode='b2b_only' candidates the LLM is shown the COMPANY
+    name (not the real person's name) so it can't leak identity into the
+    explanation. The realign helper must look them up by company name."""
+    b2b = SimpleNamespace(name="Marcello Mari", company="AIVM", privacy_mode="b2b_only")
+    plain = SimpleNamespace(name="Marc Taverner", company="Polaris", privacy_mode="full")
+    candidates = [(b2b, 0.9), (plain, 0.8)]
+    # LLM echoes the masked Name ("AIVM" for b2b, real name for full)
+    ranked = [
+        {"candidate_index": 1, "candidate_name": "AIVM",          "explanation": "..."},
+        {"candidate_index": 2, "candidate_name": "Marc Taverner", "explanation": "..."},
+    ]
+    fixed = MatchingEngine._realign_entries_by_name(ranked, candidates)
+    assert len(fixed) == 2
+    by_idx = {e["candidate_index"]: e["candidate_name"] for e in fixed}
+    assert by_idx[1] == "AIVM"
+    assert by_idx[2] == "Marc Taverner"
+
+
+def test_b2b_only_real_name_is_NOT_a_valid_match_key():
+    """The defense in depth: even if the LLM somehow echoes the real person's
+    name for a b2b candidate, the realign must NOT bind to that candidate via
+    the masked-name dictionary — the entry is dropped, the privacy promise
+    holds."""
+    b2b = SimpleNamespace(name="Marcello Mari", company="AIVM", privacy_mode="b2b_only")
+    candidates = [(b2b, 0.9)]
+    ranked = [{
+        "candidate_index": 1,
+        "candidate_name": "Marcello Mari",        # leaked real name
+        "explanation": "Marcello Mari at AIVM...",
+    }]
+    assert MatchingEngine._realign_entries_by_name(ranked, candidates) == []

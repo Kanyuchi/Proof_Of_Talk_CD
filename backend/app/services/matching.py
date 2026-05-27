@@ -363,33 +363,58 @@ class MatchingEngine:
     # ── Stage 3: Rank & Explain (GPT-4o) ────────────────────────────────
 
     @staticmethod
+    def _display_name(candidate) -> str:
+        """The name the LLM is allowed to see for this candidate. For
+        privacy_mode='b2b_only' attendees we substitute the company name so
+        the LLM cannot leak the real identity into the explanation text
+        before mutual match. The realign dictionary uses this same view so
+        b2b candidates match by company, not by their real name.
+        """
+        if getattr(candidate, "privacy_mode", "full") == "b2b_only":
+            return (getattr(candidate, "company", None) or "").strip()
+        return (getattr(candidate, "name", None) or "").strip()
+
+    @staticmethod
     def _realign_entries_by_name(
         ranked: list[dict], candidates: list[tuple],
     ) -> list[dict]:
         """Rewrite each entry's candidate_index from the verbatim candidate_name
-        the LLM was asked to echo. Defends against the LLM putting the wrong
-        candidate_index on an entry (which silently binds the explanation AND
-        the deterministic-rerank score boosts to the wrong candidate). If the
-        name doesn't match any input candidate, fall back to the supplied
-        candidate_index when in range; otherwise drop the entry.
+        the LLM was asked to echo. Three policies, in priority order:
+
+        1. LLM supplied a candidate_name that MATCHES an input candidate's
+           display name -> rewrite candidate_index from the lookup and keep.
+        2. LLM supplied a candidate_name that does NOT match any input
+           display name -> DROP. (The pre-2026-05-27 fallback to candidate_index
+           silently kept hallucinated names like "Rob Hadick" on Arda's AIVM
+           card; that's the leak this drop closes.)
+        3. LLM supplied no candidate_name at all (legacy / pre-fix shape) ->
+           trust candidate_index if it's in range, drop otherwise.
+
+        Defense in depth for privacy_mode='b2b_only': the dictionary is built
+        from _display_name, so the LLM can only match a b2b candidate via its
+        company name. If it leaks the real person's name into candidate_name
+        anyway, that entry is dropped (test pins this).
         """
-        name_to_idx = {
-            ((c.name or "").strip().lower()): i + 1
-            for i, (c, _s) in enumerate(candidates)
-        }
+        name_to_idx: dict[str, int] = {}
+        for i, (c, _s) in enumerate(candidates):
+            dn = MatchingEngine._display_name(c).lower()
+            if dn:
+                name_to_idx[dn] = i + 1
+
         fixed: list[dict] = []
         for entry in ranked:
             cname = (entry.get("candidate_name") or "").strip().lower()
-            true_idx = name_to_idx.get(cname) if cname else None
-            if true_idx is not None:
-                entry["candidate_index"] = true_idx
-                fixed.append(entry)
+            if cname:
+                true_idx = name_to_idx.get(cname)
+                if true_idx is not None:
+                    entry["candidate_index"] = true_idx
+                    fixed.append(entry)
+                # else: drop — explicit but unmatched name = hallucination
                 continue
-            # Legacy / pre-fix entries: trust candidate_index only if in range.
+            # No candidate_name supplied. Trust candidate_index only if in range.
             idx = entry.get("candidate_index", 0)
             if isinstance(idx, int) and 1 <= idx <= len(candidates):
                 fixed.append(entry)
-            # else: drop — neither name nor index can bind this entry safely.
         return fixed
 
     async def rank_and_explain(
@@ -442,10 +467,18 @@ class MatchingEngine:
                 f"\n  ICP MATCH SIGNAL: candidate profile contains target's ICP keywords: {', '.join(icp_hits[:6])}"
                 if icp_hits else ""
             )
+            # Privacy: for privacy_mode='b2b_only' candidates the LLM sees only
+            # the company name (not the real name) and a blank title, so the
+            # explanation it writes can't leak the real identity before mutual
+            # match. The realign dictionary uses this same view (see
+            # _display_name + _realign_entries_by_name).
+            is_b2b = getattr(candidate, "privacy_mode", "full") == "b2b_only"
+            display_name = self._display_name(candidate) or candidate.name
+            display_title = "" if is_b2b else (candidate.title or "")
             candidate_descriptions.append(
                 f"Candidate {i+1}:\n"
-                f"  Name: {candidate.name}\n"
-                f"  Title: {candidate.title}\n"
+                f"  Name: {display_name}\n"
+                f"  Title: {display_title}\n"
                 f"  Company: {candidate.company}\n"
                 f"  Goals: {candidate.goals or 'Not specified'}\n"
                 f"  Interests: {', '.join(candidate.interests) if candidate.interests else 'Not specified'}\n"
