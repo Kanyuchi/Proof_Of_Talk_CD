@@ -12,7 +12,7 @@ from openai import AsyncOpenAI
 from app.core.config import get_settings
 from app.models.attendee import Attendee, Match
 from app.models.user import User
-from app.services.embeddings import embed_attendee, generate_ai_summary, classify_intents, infer_customer_profile
+from app.services.embeddings import embed_attendee, generate_ai_summary, classify_intents, classify_verticals, infer_customer_profile
 
 settings = get_settings()
 client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
@@ -176,6 +176,16 @@ class MatchingEngine:
 
         # Classify intents
         attendee.intent_tags = await classify_intents(attendee)
+
+        # Classify sector verticals. Prior to 2026-05-27 this only ran on the
+        # extasy_sync + speakers_sync ingest paths, so attendees who arrived
+        # through any other path (admin-created, sponsor-invite, magic-link
+        # claim, manual seed) ended up with empty vertical_tags. Empty
+        # vertical_tags blocks the COMPLEMENTARY_VERTICALS rerank boost in
+        # _deterministic_rerank — which is what surfaces non-obvious
+        # cross-sector matches. Always reclassify so the embedding text and
+        # rerank both reflect the current profile.
+        attendee.vertical_tags = await classify_verticals(attendee)
 
         # Compute deal-readiness score based on intents
         deal_signals = {"deploying_capital", "raising_capital", "deal_making", "seeking_customers"}
