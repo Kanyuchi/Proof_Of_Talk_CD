@@ -1,6 +1,7 @@
 import json
 import asyncio
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -375,6 +376,43 @@ class MatchingEngine:
         return (getattr(candidate, "name", None) or "").strip()
 
     @staticmethod
+    def _mask_text_for_candidate(text: str | None, candidate) -> str:
+        """Redact a b2b candidate's real name from free-text fields before
+        the LLM sees them. Companion to _display_name: that helper masks the
+        labelled Name/Title slots; this one closes the follow-on leak where
+        AI Summary, Goals, and the Grid context blob re-state the person's
+        name verbatim (the gap flagged after 13d35a0). For non-b2b
+        candidates the text is returned unchanged.
+
+        Strategy: replace word-boundary occurrences of the candidate's full
+        name, then their first and last name (parts >= 3 chars), with the
+        company name — the same referent _display_name gives the LLM, so
+        the surrounding text stays coherent. Tokens shorter than 3 chars
+        are skipped to avoid clobbering common English words (e.g. "Bo",
+        "Li" would match "bonds", "links"). Third-party names mentioned in
+        the text are left alone — the privacy promise is about *this*
+        candidate's identity, not anyone they reference.
+        """
+        if not text:
+            return ""
+        if getattr(candidate, "privacy_mode", "full") != "b2b_only":
+            return text
+        name = (getattr(candidate, "name", None) or "").strip()
+        if not name:
+            return text
+        company = (getattr(candidate, "company", None) or "").strip() or "the company"
+        tokens = sorted(
+            {name, *(p for p in name.split() if len(p) >= 3)},
+            key=len,
+            reverse=True,
+        )
+        masked = text
+        for token in tokens:
+            pattern = re.compile(rf"\b{re.escape(token)}\b", re.IGNORECASE)
+            masked = pattern.sub(company, masked)
+        return masked
+
+    @staticmethod
     def _realign_entries_by_name(
         ranked: list[dict], candidates: list[tuple],
     ) -> list[dict]:
@@ -417,6 +455,52 @@ class MatchingEngine:
                 fixed.append(entry)
         return fixed
 
+    @classmethod
+    def _describe_candidate(
+        cls,
+        candidate,
+        sim_score: float,
+        position: int,
+        target_icp_keywords: set[str],
+    ) -> str:
+        """Build the per-candidate description block that goes into the
+        rank_and_explain prompt. Extracted from the loop so tests can pin
+        the privacy wiring directly: for privacy_mode='b2b_only' candidates
+        the Name/Title slots use _display_name and the AI Summary, Goals
+        and Grid context fields go through _mask_text_for_candidate, so
+        the LLM has no path to leak the real identity into the explanation.
+        """
+        grid_info = _grid_context(candidate)
+        candidate_icp = _icp_summary(candidate, max_personas=2)
+        candidate_text = _candidate_signal_text(candidate)
+        icp_hits = sorted(kw for kw in target_icp_keywords if kw and kw in candidate_text)
+        icp_hit_line = (
+            f"\n  ICP MATCH SIGNAL: candidate profile contains target's ICP keywords: {', '.join(icp_hits[:6])}"
+            if icp_hits else ""
+        )
+        is_b2b = getattr(candidate, "privacy_mode", "full") == "b2b_only"
+        display_name = cls._display_name(candidate) or candidate.name
+        display_title = "" if is_b2b else (candidate.title or "")
+        display_goals = cls._mask_text_for_candidate(candidate.goals, candidate) or "Not specified"
+        display_summary = cls._mask_text_for_candidate(candidate.ai_summary, candidate) or "Not available"
+        display_grid = cls._mask_text_for_candidate(grid_info, candidate)
+        return (
+            f"Candidate {position+1}:\n"
+            f"  Name: {display_name}\n"
+            f"  Title: {display_title}\n"
+            f"  Company: {candidate.company}\n"
+            f"  Goals: {display_goals}\n"
+            f"  Interests: {', '.join(candidate.interests) if candidate.interests else 'Not specified'}\n"
+            f"  AI Summary: {display_summary}\n"
+            f"  Intent Tags: {', '.join(candidate.intent_tags) if candidate.intent_tags else 'Not classified'}\n"
+            f"  Vertical Tags: {', '.join(candidate.vertical_tags) if candidate.vertical_tags else 'Not classified'}\n"
+            f"  Deal Readiness: {candidate.deal_readiness_score or 0:.2f}\n"
+            f"  Vector Similarity: {sim_score:.3f}"
+            + (f"\n  {display_grid}" if display_grid else "")
+            + (f"\n  Candidate's own ICP:\n{candidate_icp}" if candidate_icp else "")
+            + icp_hit_line
+        )
+
     async def rank_and_explain(
         self,
         attendee: Attendee,
@@ -456,41 +540,10 @@ class MatchingEngine:
         # Precompute target attendee's ICP keyword set for "candidate matches my ICP" hints
         target_icp_keywords = _icp_signal_keywords(attendee)
 
-        candidate_descriptions = []
-        for i, (candidate, sim_score) in enumerate(candidates):
-            grid_info = _grid_context(candidate)
-            candidate_icp = _icp_summary(candidate, max_personas=2)
-            # Does this candidate's profile contain any of the target's ICP keywords?
-            candidate_text = _candidate_signal_text(candidate)
-            icp_hits = sorted(kw for kw in target_icp_keywords if kw and kw in candidate_text)
-            icp_hit_line = (
-                f"\n  ICP MATCH SIGNAL: candidate profile contains target's ICP keywords: {', '.join(icp_hits[:6])}"
-                if icp_hits else ""
-            )
-            # Privacy: for privacy_mode='b2b_only' candidates the LLM sees only
-            # the company name (not the real name) and a blank title, so the
-            # explanation it writes can't leak the real identity before mutual
-            # match. The realign dictionary uses this same view (see
-            # _display_name + _realign_entries_by_name).
-            is_b2b = getattr(candidate, "privacy_mode", "full") == "b2b_only"
-            display_name = self._display_name(candidate) or candidate.name
-            display_title = "" if is_b2b else (candidate.title or "")
-            candidate_descriptions.append(
-                f"Candidate {i+1}:\n"
-                f"  Name: {display_name}\n"
-                f"  Title: {display_title}\n"
-                f"  Company: {candidate.company}\n"
-                f"  Goals: {candidate.goals or 'Not specified'}\n"
-                f"  Interests: {', '.join(candidate.interests) if candidate.interests else 'Not specified'}\n"
-                f"  AI Summary: {candidate.ai_summary or 'Not available'}\n"
-                f"  Intent Tags: {', '.join(candidate.intent_tags) if candidate.intent_tags else 'Not classified'}\n"
-                f"  Vertical Tags: {', '.join(candidate.vertical_tags) if candidate.vertical_tags else 'Not classified'}\n"
-                f"  Deal Readiness: {candidate.deal_readiness_score or 0:.2f}\n"
-                f"  Vector Similarity: {sim_score:.3f}"
-                + (f"\n  {grid_info}" if grid_info else "")
-                + (f"\n  Candidate's own ICP:\n{candidate_icp}" if candidate_icp else "")
-                + icp_hit_line
-            )
+        candidate_descriptions = [
+            self._describe_candidate(c, s, i, target_icp_keywords)
+            for i, (c, s) in enumerate(candidates)
+        ]
 
         prompt = f"""You are the AI matchmaking engine for Proof of Talk 2026, an exclusive Web3 conference at the Louvre Palace with 2,500 decision-makers controlling $18 trillion in assets.
 
