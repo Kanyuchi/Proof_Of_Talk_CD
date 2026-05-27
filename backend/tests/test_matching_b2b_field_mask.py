@@ -185,6 +185,31 @@ def test_describe_candidate_does_not_leak_b2b_name_into_any_free_text_field():
     assert "Title: \n" in block
 
 
+def test_describe_candidate_does_not_leak_b2b_name_when_company_is_empty():
+    """Edge case: a b2b candidate without a company set must NOT fall back
+    to the real name in the Name slot. _display_name returns "" in that
+    case; the block helper must use a safe sentinel, not candidate.name."""
+    cand = SimpleNamespace(
+        name="Marcello Mari",
+        title="CEO",
+        company="",  # empty
+        privacy_mode="b2b_only",
+        goals="Marcello is looking to partner.",
+        ai_summary="Marcello Mari built AIVM.",
+        interests=[],
+        intent_tags=[],
+        vertical_tags=[],
+        deal_readiness_score=0.5,
+        inferred_customer_profile={},
+        enriched_profile={},
+    )
+    block = MatchingEngine._describe_candidate(
+        cand, sim_score=0.7, position=0, target_icp_keywords=set(),
+    )
+    assert "Marcello" not in block, f"name leaked despite empty company:\n{block}"
+    assert "Mari" not in block, f"surname leaked despite empty company:\n{block}"
+
+
 def test_describe_candidate_preserves_full_profile_for_non_b2b():
     """Sanity: the mask is a no-op for full-profile candidates — the real
     name still appears in Name/AI Summary/Goals/Grid so the LLM has the

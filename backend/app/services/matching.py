@@ -497,7 +497,12 @@ class MatchingEngine:
             if icp_hits else ""
         )
         is_b2b = getattr(candidate, "privacy_mode", "full") == "b2b_only"
-        display_name = cls._display_name(candidate) or candidate.name
+        # For a b2b candidate with no company set, _display_name returns "";
+        # falling back to candidate.name would leak the real name. Use a safe
+        # sentinel for b2b instead so the privacy promise holds in the edge case.
+        display_name = cls._display_name(candidate)
+        if not display_name:
+            display_name = "Anonymous B2B attendee" if is_b2b else (getattr(candidate, "name", "") or "")
         display_title = "" if is_b2b else (candidate.title or "")
         display_goals = cls._mask_text_for_candidate(candidate.goals, candidate) or "Not specified"
         display_summary = cls._mask_text_for_candidate(candidate.ai_summary, candidate) or "Not available"

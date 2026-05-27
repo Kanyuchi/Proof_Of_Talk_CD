@@ -13,6 +13,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import httpx
 from openai import AsyncOpenAI
@@ -21,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.services.grid_enrichment import enrich_from_grid
+from app.services.matching import MatchingEngine
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -245,7 +247,7 @@ async def _find_relevant_attendees(
     query = text("""
         SELECT id, name, email, title, company, company_website,
                goals, ticket_type, ai_summary, vertical_tags, intent_tags,
-               deal_readiness_score, enriched_profile,
+               deal_readiness_score, enriched_profile, privacy_mode,
                1 - (embedding <=> :embedding) as similarity
         FROM attendees
         WHERE embedding IS NOT NULL
@@ -284,6 +286,12 @@ async def _find_relevant_attendees(
             "similarity": float(r.similarity),
             "grid_name": grid.get("grid_name", ""),
             "grid_sector": grid.get("grid_sector", ""),
+            # privacy_mode is consumed by _describe_attendee_block to mask
+            # b2b_only attendees in the GPT-4o prompt. Not surfaced in the
+            # admin-facing response (admin already sees full attendee data
+            # elsewhere; the leak we close is the LLM learning the
+            # company<->person mapping and writing it into report text).
+            "privacy_mode": getattr(r, "privacy_mode", None) or "full",
         })
     return attendees
 
@@ -303,6 +311,49 @@ async def _find_sponsor_team(db: AsyncSession, sponsor_name: str) -> list[dict]:
     ]
 
 
+def _describe_attendee_block(a: dict, position: int) -> str:
+    """Build one `Attendee {N+1}:` block for the sponsor intelligence GPT-4o
+    prompt. For privacy_mode='b2b_only' attendees, the Name slot is masked
+    to the company name, the Title is blanked, and the goals + ai_summary
+    fields are run through MatchingEngine._mask_text_for_candidate before
+    the existing 200-char truncation. Reuses the matching-engine helpers
+    so both LLM surfaces apply identical privacy semantics. Returns the
+    finished string ready to join into the prompt.
+    """
+    mask_target = SimpleNamespace(
+        name=a.get("name") or "",
+        company=a.get("company") or "",
+        privacy_mode=a.get("privacy_mode") or "full",
+    )
+    is_b2b = mask_target.privacy_mode == "b2b_only"
+    # _display_name returns "" for a b2b attendee with no company set; that
+    # falsy result must NOT fall back to the real name. Use a safe sentinel
+    # instead so the privacy promise holds even in the data-quality edge case.
+    display_name = MatchingEngine._display_name(mask_target)
+    if not display_name:
+        display_name = "Anonymous B2B attendee" if is_b2b else (a.get("name") or "")
+    display_title = "" if is_b2b else (a.get("title", "") or "")
+    raw_goals = a.get("goals") or ""
+    raw_summary = a.get("ai_summary") or ""
+    masked_goals = MatchingEngine._mask_text_for_candidate(raw_goals, mask_target)
+    masked_summary = MatchingEngine._mask_text_for_candidate(raw_summary, mask_target)
+    goals_display = masked_goals[:200] if masked_goals else "NOT SPECIFIED"
+    summary_display = masked_summary[:200] if masked_summary else "N/A"
+    return (
+        f"Attendee {position+1}:\n"
+        f"  Name: {display_name}\n"
+        f"  Title: {display_title}\n"
+        f"  Company: {a.get('company', '')}\n"
+        f"  Ticket: {a.get('ticket_type', '')}\n"
+        f"  Goals: {goals_display}\n"
+        f"  AI Summary: {summary_display}\n"
+        f"  Sectors: {', '.join((a.get('vertical_tags') or [])[:3]) or 'NONE'}\n"
+        f"  Intent: {', '.join((a.get('intent_tags') or [])[:3]) or 'NONE'}\n"
+        f"  Deal Readiness: {(a.get('deal_readiness') or 0):.0%}\n"
+        f"  Relevance Score: {(a.get('similarity') or 0):.3f}"
+    )
+
+
 async def _generate_explanations(
     sponsor: dict, grid: dict | None, attendees: list[dict]
 ) -> list[dict]:
@@ -318,21 +369,9 @@ Grid Verified Company Data:
 - Products: {products or 'N/A'}
 """
 
-    attendee_blocks = []
-    for i, a in enumerate(attendees[:20]):
-        attendee_blocks.append(
-            f"Attendee {i+1}:\n"
-            f"  Name: {a['name']}\n"
-            f"  Title: {a['title']}\n"
-            f"  Company: {a['company']}\n"
-            f"  Ticket: {a['ticket_type']}\n"
-            f"  Goals: {a['goals'][:200] if a['goals'] else 'NOT SPECIFIED'}\n"
-            f"  AI Summary: {a['ai_summary'][:200] if a['ai_summary'] else 'N/A'}\n"
-            f"  Sectors: {', '.join(a['vertical_tags'][:3]) or 'NONE'}\n"
-            f"  Intent: {', '.join(a['intent_tags'][:3]) or 'NONE'}\n"
-            f"  Deal Readiness: {a['deal_readiness']:.0%}\n"
-            f"  Relevance Score: {a['similarity']:.3f}"
-        )
+    attendee_blocks = [
+        _describe_attendee_block(a, i) for i, a in enumerate(attendees[:20])
+    ]
 
     prompt = f"""You are generating a sponsor intelligence report for Proof of Talk 2026, an exclusive Web3 conference at the Louvre Palace with 2,500 decision-makers.
 
