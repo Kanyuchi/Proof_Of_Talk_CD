@@ -44,6 +44,27 @@ async def _upsert_attendee_from_payload(
         select(Attendee).where(Attendee.email == data.email)
     )).scalars().first()
 
+    # Live Extasy fallback before the gate-block: cron at 02:00 UTC is the
+    # only path creating attendee rows from Rhuna in practice (the
+    # /integration/ticket-purchased webhook is never called by Runa —
+    # verified 2026-05-27). Anyone who bought a ticket since the last cron
+    # would otherwise be blocked with "we couldn't find a ticket" until the
+    # next morning. Fetch the Extasy feed live; on a hit, create the row
+    # inline so the rest of register() proceeds normally.
+    if not existing and enforce_ticket_gate and get_settings().REQUIRE_TICKET_TO_REGISTER:
+        from app.services.extasy_sync import (
+            find_extasy_order_by_email, attendee_from_extasy_order,
+        )
+        live_order = await find_extasy_order_by_email(data.email)
+        if live_order:
+            existing = attendee_from_extasy_order(live_order)
+            db.add(existing)
+            await db.flush()
+            logger.info(
+                "register: live-Extasy hit for %s (order=%s) — attendee created inline",
+                data.email, live_order.get("id"),
+            )
+
     if existing:
         for field in ("name", "company", "title", "linkedin_url",
                       "twitter_handle", "company_website", "goals",
@@ -134,8 +155,15 @@ async def register(
     await db.commit()
 
     # Re-embed + generate matches immediately so new registrants see matches
-    # within seconds instead of waiting for the 02:45 UTC cron.
-    asyncio.create_task(refresh_profile_matches(attendee.id))
+    # within seconds instead of waiting for the 02:45 UTC cron. If this is a
+    # fresh same-day buyer that the live-Extasy fallback just created (no
+    # enrichment ever run), kick off the full cold-start pipeline so Grid +
+    # website data lands before their first match view — otherwise matches
+    # would be weak until tomorrow's 03:00 UTC enrichment sweep.
+    if attendee.enriched_at is None:
+        asyncio.create_task(run_full_enrichment(attendee.id))
+    else:
+        asyncio.create_task(refresh_profile_matches(attendee.id))
 
     token = create_access_token({"sub": str(user.id)})
     return Token(access_token=token)

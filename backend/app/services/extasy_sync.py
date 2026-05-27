@@ -122,6 +122,88 @@ def _parse_extasy_dt(s: str | None) -> datetime | None:
         return None
 
 
+# ── Live registration-time lookup ──────────────────────────────────────────────
+# Used by /auth/register to self-heal the same-day-buyer race: cron at 02:00 UTC
+# is the only path creating attendee rows from Rhuna in practice (Runa's
+# /integration/ticket-purchased webhook is never called — verified 2026-05-27:
+# 0 rows with enriched_profile.source='runa_webhook'). Without this, anyone who
+# buys a ticket and tries to register before the next cron run gets blocked by
+# the ticket gate.
+
+async def find_extasy_order_by_email(email: str) -> dict | None:
+    """Live fetch the Extasy orders feed and return the first valid order for
+    `email`, or None. Applies the same status / test-buyer / test-ticket filters
+    as the daily sync so this can't promote a QA order into a real attendee.
+    Network failures swallow to None so a flaky Extasy API can't take down
+    registration."""
+    email_lower = (email or "").strip().lower()
+    if not email_lower:
+        return None
+    try:
+        orders = await _fetch_csv(ORDERS_URL)
+    except Exception as exc:
+        logger.warning("find_extasy_order_by_email: lookup for %s failed: %s", email, exc)
+        return None
+    for o in orders:
+        if (o.get("email") or "").strip().lower() != email_lower:
+            continue
+        if o.get("status") not in VALID_STATUSES:
+            continue
+        ticket_name = (o.get("ticketNames") or "").split(",")[0].strip()
+        if ticket_name.lower().strip() in TEST_TICKET_NAMES:
+            continue
+        buyer_full = f"{(o.get('firstName') or '').strip()} {(o.get('lastName') or '').strip()}".strip().lower()
+        if any(p in buyer_full for p in TEST_BUYER_NAME_PATTERNS):
+            continue
+        return o
+    return None
+
+
+def attendee_from_extasy_order(order: dict) -> Attendee:
+    """Build an UNSAVED Attendee from an Extasy order dict. Mirrors the row
+    shape produced by `_process_order_chunk` so a live-lookup attendee is
+    indistinguishable from a cron-synced one. Caller is responsible for
+    db.add() + flush + commit."""
+    email       = (order.get("email") or "").strip().lower()
+    first       = (order.get("firstName") or "").strip()
+    last        = (order.get("lastName")  or "").strip()
+    name        = f"{first} {last}".strip() or "Unknown"
+    ticket_name = (order.get("ticketNames") or "").split(",")[0].strip()
+    order_id    = order.get("id")
+    country     = order.get("countryIso3Code") or None
+    bought_at   = _parse_extasy_dt(order.get("createdAtUtc"))
+    company, website = _infer_company(email)
+
+    extasy_block = {
+        "order_id":     order_id,
+        "ticket_code":  (order.get("ticketCodes") or "").split(",")[0].strip(),
+        "ticket_name":  ticket_name,
+        "phone":        order.get("phoneNumber") or None,
+        "city":         order.get("city") or None,
+        "country":      country,
+        "paid_amount":  order.get("paymentsAmount") or None,
+        "voucher_code": order.get("voucherCode") or None,
+        "synced_at":    datetime.now(timezone.utc).isoformat(),
+    }
+    attendee = Attendee(
+        name=name,
+        email=email,
+        company=company,
+        title="",
+        ticket_type=_map_ticket_type(ticket_name),
+        interests=[],
+        goals=None,
+        company_website=website or None,
+        enriched_profile={"source": "extasy_live_register", "extasy": extasy_block},
+    )
+    attendee.extasy_order_id = order_id
+    if country:
+        attendee.country_iso3 = country
+    if bought_at:
+        attendee.ticket_bought_at = bought_at
+    return attendee
+
+
 # ── Main sync function ─────────────────────────────────────────────────────────
 
 async def sync_extasy_to_db() -> dict:

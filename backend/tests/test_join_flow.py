@@ -56,7 +56,11 @@ def _fake_ct():
 
 
 @pytest.mark.asyncio
-async def test_register_dispatches_refresh_profile_matches():
+async def test_register_fresh_attendee_dispatches_full_enrichment():
+    """A brand-new attendee row (no enriched_at) must trigger the full
+    cold-start pipeline — Grid + website enrichment, then re-embed + match
+    refresh — so first matches aren't computed from a bare ticket-only
+    profile. Mirrors the join-flow contract for the same reason."""
     data = _reg_data()
     db = AsyncMock()
     db.add = MagicMock()
@@ -67,12 +71,50 @@ async def test_register_dispatches_refresh_profile_matches():
                                               SPONSOR_INVITE_CODE="")), \
          patch.object(auth, "get_password_hash", lambda p: "hashed"), \
          patch.object(auth, "create_access_token", lambda c: "jwt"), \
+         patch.object(auth, "run_full_enrichment", AsyncMock()) as enrich, \
+         patch.object(auth, "refresh_profile_matches", AsyncMock()) as refresh, \
+         patch("asyncio.create_task", ct):
+        out = await auth.register.__wrapped__(SimpleNamespace(), data, None, db)
+    assert out.access_token == "jwt"
+    enrich.assert_called_once()
+    refresh.assert_not_called()
+    ct.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_register_existing_enriched_attendee_dispatches_refresh_only():
+    """An attendee row that already has enrichment data (cron picked them up
+    yesterday, they're just claiming their account now) should skip the
+    expensive cold-start pipeline and only re-embed + refresh matches."""
+    from datetime import datetime, timezone
+    existing_attendee = SimpleNamespace(
+        id="11111111-1111-1111-1111-111111111111",
+        email="new@x.com",
+        name="Existing", company="Existing Co", title="",
+        linkedin_url=None, twitter_handle=None, company_website=None,
+        goals=None, deal_stage=None, target_companies=None,
+        interests=[], seeking=[], not_looking_for=[], preferred_geographies=[],
+        privacy_mode="full", ticket_type="delegate",
+        magic_access_token="existing-token",
+        enriched_at=datetime.now(timezone.utc),
+    )
+    data = _reg_data()
+    db = AsyncMock()
+    db.add = MagicMock()
+    db.execute.side_effect = [_ScalarResult(None), _ScalarResult(existing_attendee)]
+    ct = _fake_ct()
+    with patch.object(auth, "get_settings",
+                      lambda: SimpleNamespace(REQUIRE_TICKET_TO_REGISTER=True,
+                                              SPONSOR_INVITE_CODE="")), \
+         patch.object(auth, "get_password_hash", lambda p: "hashed"), \
+         patch.object(auth, "create_access_token", lambda c: "jwt"), \
+         patch.object(auth, "run_full_enrichment", AsyncMock()) as enrich, \
          patch.object(auth, "refresh_profile_matches", AsyncMock()) as refresh, \
          patch("asyncio.create_task", ct):
         out = await auth.register.__wrapped__(SimpleNamespace(), data, None, db)
     assert out.access_token == "jwt"
     refresh.assert_called_once()
-    ct.assert_called_once()
+    enrich.assert_not_called()
 
 
 def _join_data(**over):
