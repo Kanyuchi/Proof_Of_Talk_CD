@@ -376,6 +376,24 @@ class MatchingEngine:
         return (getattr(candidate, "name", None) or "").strip()
 
     @staticmethod
+    def _format_decline_feedback_entry(other, decline_reason: str | None) -> str:
+        """Single formatted line for the PRIOR FEEDBACK block in
+        rank_and_explain. For privacy_mode='b2b_only' counterparts the
+        labelled name slot is masked to the company (via _display_name)
+        AND any occurrence of the real name inside the decline_reason text
+        is replaced too (via _mask_text_for_candidate). Without this the
+        feedback loop leaked the company->person mapping to the LLM, which
+        could then reference the real name in unrelated match explanations.
+        Falls back to 'Unknown' when the counterpart row is gone or when a
+        b2b counterpart has no company set.
+        """
+        if other is None:
+            return f"- Declined Unknown: {decline_reason or ''}"
+        name = MatchingEngine._display_name(other) or "Unknown"
+        reason = MatchingEngine._mask_text_for_candidate(decline_reason, other)
+        return f"- Declined {name}: {reason}"
+
+    @staticmethod
     def _mask_text_for_candidate(text: str | None, candidate) -> str:
         """Redact a b2b candidate's real name from free-text fields before
         the LLM sees them. Companion to _display_name: that helper masks the
@@ -528,8 +546,7 @@ class MatchingEngine:
                 for dm in declined_matches[:5]:  # cap at 5 to control prompt length
                     other_id = dm.attendee_b_id if dm.attendee_a_id == attendee.id else dm.attendee_a_id
                     other = await self.db.get(Attendee, other_id)
-                    name = other.name if other else "Unknown"
-                    reasons.append(f"- Declined {name}: {dm.decline_reason}")
+                    reasons.append(self._format_decline_feedback_entry(other, dm.decline_reason))
                 decline_feedback = (
                     "\n\nPRIOR FEEDBACK (matches this attendee declined and why — avoid similar matches):\n"
                     + "\n".join(reasons)
