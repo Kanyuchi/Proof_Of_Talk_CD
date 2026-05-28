@@ -194,11 +194,20 @@ async def get_matches_by_magic_link(
     vms = [_to_viewer_match(m, attendee.id) for m in rows]
     visible, locked = order_and_cap(vms, tier_limit(tier))
     responses = [await _build_match_response(db, vm.match, attendee.id) for vm in visible]
+
+    # Drives the MagicMatches "Set your password" panel: default-expanded for
+    # unclaimed visitors, collapsed for those who already have a User row.
+    user_row = await db.execute(
+        select(User.id).where(User.attendee_id == attendee.id).limit(1)
+    )
+    has_account = user_row.scalars().first() is not None
+
     return MatchListResponse(
         matches=responses, attendee_id=attendee.id, tier=tier,
         viewer=AttendeeResponse.model_validate(attendee),
         visible_count=len(responses), locked_count=locked,
         next_tier_at=next_tier_unlock(tier), completeness_pct=pct,
+        has_account=has_account,
     )
 
 

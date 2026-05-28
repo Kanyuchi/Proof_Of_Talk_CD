@@ -35,6 +35,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   // away from / to /matches inside HomeLanding itself, so these chrome
   // tweaks only ever apply to cold visitors.
   const isLanding = location.pathname === "/";
+  // Magic-link visitors already have an attendee profile — the canonical CTA
+  // is "Claim your account" inside the page, not "Register" in the nav.
+  // Phase 1 of the conversion-funnel work hides Register entries here so the
+  // nav stops competing with the in-page claim flow.
+  const isMagicLink = location.pathname.startsWith("/m/");
 
   const isActive = (to: string) =>
     to === "/" ? location.pathname === to : location.pathname.startsWith(to);
@@ -146,13 +151,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   <LogIn className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Sign in</span>
                 </Link>
-                <Link
-                  to="/register"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E76315] text-black text-xs font-semibold hover:bg-amber-300 transition-all min-h-[44px]"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Register</span>
-                </Link>
+                {!isMagicLink && (
+                  <Link
+                    to="/register"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#E76315] text-black text-xs font-semibold hover:bg-amber-300 transition-all min-h-[44px]"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Register</span>
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -255,13 +262,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <LogIn className="w-5 h-5" />
               Sign in
             </Link>
-            <Link
-              to="/register"
-              className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium text-[#E76315] active:text-amber-300 transition-all"
-            >
-              <UserPlus className="w-5 h-5" />
-              Register
-            </Link>
+            {!isMagicLink && (
+              <Link
+                to="/register"
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[10px] font-medium text-[#E76315] active:text-amber-300 transition-all"
+              >
+                <UserPlus className="w-5 h-5" />
+                Register
+              </Link>
+            )}
           </>
         )}
       </nav>

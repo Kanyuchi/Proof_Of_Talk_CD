@@ -123,6 +123,10 @@ class MatchListResponse(BaseModel):
     locked_count: int = 0              # review-pool matches hidden behind the cap
     next_tier_at: int | None = None     # review matches unlocked at the next tier (None at GOOD)
     completeness_pct: int | None = None # 0-100, for the nudge copy
+    # True iff a `users` row exists for the viewer (they've claimed an account
+    # and set a password). The magic-link page uses this to default-expand the
+    # "Set your password" panel for unclaimed visitors.
+    has_account: bool = False
 
 
 class MatchStatusUpdate(BaseModel):

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Download, X } from "lucide-react";
 
 // Chrome / Edge / Samsung Internet fire `beforeinstallprompt` when the
@@ -36,9 +37,15 @@ function recentlyDismissed(): boolean {
 }
 
 export default function InstallBanner() {
+  const location = useLocation();
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIOSHint, setShowIOSHint] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  // Suppress on magic-link routes — the in-page "Set your password" CTA owns
+  // the top real-estate for first-impression conversion. The banner returns
+  // once the visitor claims an account and lands on /matches.
+  const isMagicLink = location.pathname.startsWith("/m/");
 
   useEffect(() => {
     if (isInstalled() || recentlyDismissed()) return;
@@ -76,6 +83,7 @@ export default function InstallBanner() {
   };
 
   if (dismissed) return null;
+  if (isMagicLink) return null;
   if (!installEvent && !showIOSHint) return null;
 
   return (
