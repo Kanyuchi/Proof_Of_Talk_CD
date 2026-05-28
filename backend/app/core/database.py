@@ -21,10 +21,20 @@ _is_pooler = "pooler.supabase.com" in _url or ":6543" in _url
 
 _connect_args: dict = {}
 if _is_pooler:
-    # The transaction-mode pooler (pgbouncer) doesn't support the prepared
-    # statements asyncpg caches by default — leaving the cache on makes every
-    # query fail with "prepared statement does not exist". Must be 0 here.
+    # The transaction-mode pooler (pgbouncer) routes a client transaction
+    # to one server connection but the next transaction may land on a
+    # different one. Prepared statements cached on connection A fail with
+    # "prepared statement __asyncpg_stmt_X__ does not exist" when re-used
+    # on connection B. We must disable BOTH cache layers to be pgbouncer-
+    # safe: asyncpg's own statement_cache_size AND SQLAlchemy's asyncpg
+    # dialect prepared_statement_cache_size (consumed by the dialect before
+    # asyncpg.connect, so it's valid in connect_args here even though raw
+    # asyncpg.connect would reject it).
+    # 2026-05-28: only setting statement_cache_size produced ~100% failure
+    # on /matches/m/{token} after the forced pooler migration; adding
+    # prepared_statement_cache_size cleared the Postgres ERROR logs.
     _connect_args["statement_cache_size"] = 0
+    _connect_args["prepared_statement_cache_size"] = 0
 
 engine = create_async_engine(
     _url,
