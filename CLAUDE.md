@@ -170,7 +170,7 @@ The embedding is generated from a composite text blob combining: name, title, co
 ## Environment Variables
 
 Copy `backend/.env.example` to `backend/.env` and fill in:
-- `DATABASE_URL` — Supabase PostgreSQL connection string; format: `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres`
+- `DATABASE_URL` — Supabase PostgreSQL connection string. **Use port 6543 (dedicated transaction pooler)**, not 5432 (direct). Supabase migrated this project off the direct endpoint 2026-05-28 without notice — `db.<project>.supabase.co:5432` started refusing TCP connections while the same host on 6543 (pgbouncer pooler) keeps working. Format: `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT.supabase.co:6543/postgres`. `database.py` auto-sets `statement_cache_size=0` + `prepared_statement_cache_size=0` when it detects `:6543` (both are needed — only the first leads to ~100% `__asyncpg_stmt_X__ does not exist` errors).
 - `OPENAI_API_KEY` — required for embeddings and match explanations
 - `RESEND_API_KEY` — Resend email delivery (production, no sandbox)
 - `RESEND_FROM_EMAIL` — sender address (`Proof of Talk <team@xventures.de>` — warm domain; the correct value is also the default in `app/core/config.py`, so leaving this env var unset is safe. Do NOT set it to `matches@proofoftalk.io` — that cold domain lands in spam. Keep local `.env` in sync with Railway.)
