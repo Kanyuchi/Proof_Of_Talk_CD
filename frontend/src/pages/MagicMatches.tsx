@@ -188,6 +188,24 @@ export default function MagicMatches() {
 
   const matches = data?.matches ?? [];
 
+  // Phase 4 — paywall the deep tier for unclaimed magic-link visitors. Top 8
+  // render in full (rich explanations + accept/defer); the rest are replaced
+  // by a single paywall card. Claimed visitors see everything (they're past
+  // the funnel). The backend still returns the full list — truncation is
+  // purely frontend so the same endpoint serves the logged-in app intact.
+  const PAYWALL_VISIBLE = 8;
+  const lockedFromBackend = data?.locked_count ?? 0;
+  const paywallActive =
+    data?.has_account === false && matches.length + lockedFromBackend > PAYWALL_VISIBLE;
+  const displayedMatches = paywallActive ? matches.slice(0, PAYWALL_VISIBLE) : matches;
+  const paywalledCount = paywallActive
+    ? Math.max(0, matches.length - PAYWALL_VISIBLE) + lockedFromBackend
+    : 0;
+  // Show a few teaser avatars behind the paywall card.
+  const paywallTeasers = paywallActive
+    ? matches.slice(PAYWALL_VISIBLE, PAYWALL_VISIBLE + 5)
+    : [];
+
   if (isLoading) {
     return (
       <div className="text-center py-20">
@@ -529,7 +547,7 @@ export default function MagicMatches() {
         </div>
       ) : (
         <div className="space-y-4">
-          {matches.map((match, idx) => {
+          {displayedMatches.map((match, idx) => {
             const config = matchTypeConfig[match.match_type] ?? matchTypeConfig.complementary;
             const Icon = config.icon;
             const person = match.matched_attendee;
@@ -726,6 +744,51 @@ export default function MagicMatches() {
               </div>
             );
           })}
+
+          {/* Phase 4 paywall — replaces the deep tier for unclaimed visitors.
+              The backend still returns the full list; only this surface
+              truncates so the logged-in app stays unchanged. */}
+          {paywallActive && paywalledCount > 0 && (
+            <div className="relative mt-2 rounded-2xl border border-[#E76315]/40 bg-gradient-to-b from-[#E76315]/10 to-[#E76315]/5 p-6 overflow-hidden">
+              {paywallTeasers.length > 0 && (
+                <div className="absolute inset-x-0 top-0 flex justify-center gap-2 pt-2 opacity-30 pointer-events-none">
+                  {paywallTeasers.map((m) =>
+                    m.matched_attendee ? (
+                      <AttendeeAvatar
+                        key={m.id}
+                        attendee={m.matched_attendee}
+                        size="sm"
+                      />
+                    ) : null
+                  )}
+                </div>
+              )}
+              <div className="relative z-10 text-center space-y-3 pt-10">
+                <h3 className="text-lg font-bold text-white">
+                  You have {paywalledCount} more {paywalledCount === 1 ? "match" : "matches"} in your pool
+                </h3>
+                <p className="text-sm text-white/60 max-w-sm mx-auto">
+                  Set a password to unlock your full match list, message them, and book meetings at the Louvre.
+                </p>
+                <button
+                  onClick={() => {
+                    setClaimError("");
+                    setClaimToggled(true);
+                    setClaimOpen(true);
+                    setTimeout(() => {
+                      claimRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                      });
+                    }, 50);
+                  }}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#E76315] text-white font-semibold text-sm hover:bg-[#D35400] transition-colors shadow-lg shadow-[#E76315]/20"
+                >
+                  Unlock my full match list →
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
