@@ -1,3 +1,4 @@
+import asyncio
 import structlog
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
@@ -335,4 +336,48 @@ app.include_router(integration.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": settings.APP_NAME}
+    """Process-alive check that ALSO exercises the DB so 'app up but DB down'
+    is visible to external monitors. Always returns 200 (so Railway doesn't
+    restart pods on transient DB blips); the JSON body reports `db` as
+    `ok|error` plus the exception class on failure. For monitors that page
+    on non-2xx (UptimeRobot, Better Stack), use /health/db instead - it
+    returns 503 when the DB is unreachable. Added 2026-05-28 after the
+    Supabase silent migration broke every DB-dependent endpoint for ~13h
+    and the only signal was a user emailing in."""
+    from app.core.database import async_session
+    from sqlalchemy import text
+    db_status = "ok"
+    db_error = None
+    try:
+        async with async_session() as session:
+            await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=3)
+    except Exception as exc:  # noqa: BLE001 - we want every failure mode visible
+        db_status = "error"
+        db_error = f"{type(exc).__name__}: {str(exc)[:200]}"
+    return {
+        "status": "ok",
+        "service": settings.APP_NAME,
+        "db": db_status,
+        "db_error": db_error,
+    }
+
+
+@app.get("/health/db")
+async def health_db():
+    """Strict DB reachability check. Returns 200 with `{db: 'reachable'}`
+    when `SELECT 1` succeeds, 503 with the exception class otherwise.
+    Wire this into an external monitor (UptimeRobot, Better Stack, Sentry
+    Cron) and you'll be paged on the next silent Supabase migration
+    instead of finding out from a user 13h in."""
+    from app.core.database import async_session
+    from sqlalchemy import text
+    from fastapi import HTTPException
+    try:
+        async with async_session() as session:
+            await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=3)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=503,
+            detail=f"db unreachable: {type(exc).__name__}: {str(exc)[:200]}",
+        )
+    return {"status": "ok", "db": "reachable"}
