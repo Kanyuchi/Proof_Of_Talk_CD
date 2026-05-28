@@ -211,6 +211,51 @@ async def get_matches_by_magic_link(
     )
 
 
+@router.get("/m/{token}/incoming-summary")
+async def magic_link_incoming_summary(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Aggregate counts for the Phase 2 reciprocity banner on MagicMatches.
+
+    Returns counts across the FULL match set (not the capped/visible window
+    GET /m/{token} returns), so the banner stays honest even when the matches
+    driving it sit below the tier cap.
+    """
+    if not token or len(token) < 16:
+        raise HTTPException(status_code=400, detail="Invalid link")
+
+    result = await db.execute(select(Attendee).where(Attendee.magic_access_token == token))
+    attendee = result.scalars().first()
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+
+    match_result = await db.execute(
+        select(Match).where(
+            or_(Match.attendee_a_id == attendee.id, Match.attendee_b_id == attendee.id)
+            & (Match.hidden_by_user.is_(False))
+        )
+    )
+    rows = list(match_result.scalars().all())
+
+    pending_for_you = 0
+    accepted_back = 0
+    for m in rows:
+        if m.attendee_a_id == attendee.id:
+            my_status, other_status = m.status_a, m.status_b
+        else:
+            my_status, other_status = m.status_b, m.status_a
+        if other_status == "accepted" and my_status == "pending":
+            pending_for_you += 1
+        if my_status == "accepted" and other_status == "accepted":
+            accepted_back += 1
+
+    return {
+        "count_pending_for_you": pending_for_you,
+        "count_accepted_back": accepted_back,
+    }
+
+
 class MagicDeferRequest(BaseModel):
     match_id: UUID
 
