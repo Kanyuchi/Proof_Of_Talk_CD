@@ -5,7 +5,7 @@ import {
   Sparkles, Brain, Target, MessageSquare, Check,
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
-import { getMatchesByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink, acceptMatchByMagicLink } from "../api/client";
+import { getMatchesByMagicLink, getIncomingSummaryByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink, acceptMatchByMagicLink } from "../api/client";
 import PhotoUpload from "../components/PhotoUpload";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import GridOrgCard from "../components/GridOrgCard";
@@ -45,6 +45,14 @@ export default function MagicMatches() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["magic-matches", token],
     queryFn: () => getMatchesByMagicLink(token!, 10),
+    enabled: !!token,
+  });
+
+  // Phase 2 reciprocity reveal — aggregate counts across the FULL match set
+  // (not just the visible cap), so the top banner stays honest.
+  const { data: incomingSummary } = useQuery({
+    queryKey: ["magic-incoming-summary", token],
+    queryFn: () => getIncomingSummaryByMagicLink(token!),
     enabled: !!token,
   });
 
@@ -218,6 +226,49 @@ export default function MagicMatches() {
           <FileText className="w-4 h-4" /> View Meeting Prep Brief
         </Link>
       </div>
+
+      {/* Reciprocity reveal — surfaces FULL-pool incoming-accept counts above
+          the claim panel. Pending-for-you (someone accepted, viewer hasn't)
+          wins over accepted-back so we never manufacture double urgency.
+          Hidden entirely when both counts are zero. Clicking expands the
+          claim panel — the default "Set your password" header already reads
+          as the right conversion CTA for the message-them ask. */}
+      {data?.attendee_id && incomingSummary && (
+        (incomingSummary.count_pending_for_you > 0 ||
+         incomingSummary.count_accepted_back > 0) && (
+          <button
+            onClick={() => {
+              setClaimError("");
+              setClaimToggled(true);
+              setClaimOpen(true);
+              setTimeout(() => {
+                claimRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }, 50);
+            }}
+            className="w-full text-left rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-5 hover:bg-emerald-500/15 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"></span>
+              </span>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-semibold text-white">
+                  {incomingSummary.count_pending_for_you > 0
+                    ? `${incomingSummary.count_pending_for_you} ${incomingSummary.count_pending_for_you === 1 ? "person" : "people"} accepted your interest`
+                    : `You have ${incomingSummary.count_accepted_back} mutual ${incomingSummary.count_accepted_back === 1 ? "match" : "matches"} waiting`}
+                </h3>
+                <p className="text-sm text-emerald-200/80 mt-0.5">
+                  {incomingSummary.count_pending_for_you > 0
+                    ? "Set a password to message them."
+                    : "Set a password to start the conversation."}
+                </p>
+              </div>
+              <span className="text-emerald-300 text-lg shrink-0">→</span>
+            </div>
+          </button>
+        )
+      )}
 
       {/* Claim full account — token-authenticated, bypasses the ticket gate */}
       {data?.attendee_id && (

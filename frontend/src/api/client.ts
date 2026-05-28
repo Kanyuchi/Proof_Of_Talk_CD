@@ -112,6 +112,20 @@ export async function getMatchesByMagicLink(
   return data;
 }
 
+export interface IncomingSummary {
+  count_pending_for_you: number;
+  count_accepted_back: number;
+}
+
+// Aggregate match counts for the magic-link reciprocity banner. Reads the
+// FULL match set, not the capped/visible window from GET /m/{token}.
+export async function getIncomingSummaryByMagicLink(
+  token: string
+): Promise<IncomingSummary> {
+  const { data } = await api.get(`/matches/m/${token}/incoming-summary`);
+  return data;
+}
+
 export async function getPendingMatchCount(): Promise<{ pending_count: number }> {
   const { data } = await api.get("/matches/pending-count");
   return data;
