@@ -99,6 +99,12 @@ class MatchResponse(BaseModel):
     hidden_by_user: bool = False
     explanation_confidence: float | None = None
     tier: str = "curated"
+    accepted_a_at: datetime | None = None
+    accepted_b_at: datetime | None = None
+    # Populated only when tier == "priority_intro". Surfaces requester-side
+    # context to the frontend (so the card can render "requested from your
+    # concierge" framing without an extra fetch).
+    priority_intro_meta: dict | None = None
     created_at: datetime
 
     # Populated in the endpoint
@@ -180,3 +186,24 @@ class DashboardStats(BaseModel):
     post_meeting_satisfaction: float = 0.0
     top_sectors: list[dict]
     match_type_distribution: dict
+
+
+class PriorityIntroResponse(BaseModel):
+    """One row in the requester's priority-intro list. Includes unresolved
+    targets (target_attendee_id IS NULL) so the UI can render greyed-out
+    'Not yet attending' cards."""
+    id: UUID
+    requester_attendee_id: UUID
+    target_attendee_id: UUID | None
+    target_name_raw: str
+    target_company_raw: str | None
+    source: str
+    added_at: datetime
+    resolved_at: datetime | None
+    # Joined for convenience when target_attendee_id is set.
+    target: AttendeeResponse | None = None
+    # The corresponding Match row id, if one already exists. Lets the UI
+    # link the unresolved card to its match row once the target registers.
+    match_id: UUID | None = None
+
+    model_config = {"from_attributes": True}
