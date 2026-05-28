@@ -338,8 +338,12 @@ async def update_match_status_by_magic_link(
     if not match or attendee.id not in (match.attendee_a_id, match.attendee_b_id):
         raise HTTPException(status_code=404, detail="Match not found")
     if match.attendee_a_id == attendee.id:
+        if data.status == "accepted" and match.accepted_a_at is None:
+            match.accepted_a_at = datetime.utcnow()
         match.status_a = data.status
     else:
+        if data.status == "accepted" and match.accepted_b_at is None:
+            match.accepted_b_at = datetime.utcnow()
         match.status_b = data.status
     match.status = _compute_overall_status(match.status_a, match.status_b)
     if data.status == "declined":
@@ -643,8 +647,12 @@ async def update_match_status(
 
     # Determine which side this user is on, based on their linked attendee_id
     if user.attendee_id and str(user.attendee_id) == str(match.attendee_a_id):
+        if data.status == "accepted" and match.accepted_a_at is None:
+            match.accepted_a_at = datetime.utcnow()
         match.status_a = data.status
     elif user.attendee_id and str(user.attendee_id) == str(match.attendee_b_id):
+        if data.status == "accepted" and match.accepted_b_at is None:
+            match.accepted_b_at = datetime.utcnow()
         match.status_b = data.status
     else:
         # Admin or unlinked user — update the legacy status field directly
