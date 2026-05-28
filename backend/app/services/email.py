@@ -588,13 +588,67 @@ def send_morning_schedule_email(
     event_day: str,
     magic_token: str | None = None,
     app_url: str | None = None,
-) -> None:
+    force: bool = False,
+) -> bool:
     """At-event morning email: "You have N meetings today" (Phase 5).
 
-    Sent at 07:00 on each conference day (June 2 and June 3).
+    Sent at 07:00 Europe/Paris on each conference day (June 2 and June 3).
     meetings_today: list of dicts with keys name, company, time, location.
-    event_day: "Day 1 — June 2" or "Day 2 — June 3".
+    event_day: "Day 1 - June 2" or "Day 2 - June 3".
+
+    `force=True` is for the morning-schedule cron (off the request path).
     """
+    settings = get_settings()
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
+    if not meetings_today:
+        return False
+    first_name = attendee_name.split()[0] if attendee_name else attendee_name
+    matches_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
+    n = len(meetings_today)
+    noun = "meeting" if n == 1 else "meetings"
+
+    rows = []
+    for m in meetings_today:
+        rows.append(
+            f"<tr><td style=\"padding:14px 20px; background:#FBF8F3; border-left:3px solid #C2632A;\">"
+            f"  <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:12px; font-weight:700; letter-spacing:0.08em; color:#C2632A;\">{m['time']}</div>"
+            f"  <div style=\"font-family:Georgia,'Playfair Display',serif; font-size:17px; color:#211500; font-weight:600; margin-top:4px;\">{m['name']}</div>"
+            f"  <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:13px; color:#7A7268;\">{m['company']}</div>"
+            f"  <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:12px; color:#7A7268; margin-top:6px;\">{m['location']}</div>"
+            f"</td></tr>"
+            f"<tr><td style=\"height:10px; line-height:10px;\">&nbsp;</td></tr>"
+        )
+    meetings_block = (
+        f"<tr><td style=\"padding:0 0 12px;\">"
+        f"  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">{''.join(rows)}</table>"
+        f"</td></tr>"
+    )
+
+    subject = f"{first_name}, you have {n} {noun} at the Louvre today"
+    body_html = _render_email(
+        preheader=f"{n} {noun} scheduled for {event_day}. Tap to open your schedule.",
+        eyebrow=event_day,
+        heading=f"Today at the Louvre, {first_name}",
+        body_html=(
+            f"<tr><td style=\"padding:0 0 14px;\">You have <strong>{n} {noun}</strong> booked today. The day moves fast - here is your schedule.</td></tr>"
+            + meetings_block
+        ),
+        cta_label="Open your schedule",
+        cta_url=matches_url,
+        cta_color="#E76315",
+        footer_note="Times are local (Paris). Plus-or-minus 5 minutes is normal - the room number is the source of truth.",
+        unsubscribe=True,
+        unsubscribe_token=magic_token,
+    )
+
+    lines = [f"Today at the Louvre, {first_name}", "", f"You have {n} {noun} booked today.", ""]
+    for m in meetings_today:
+        lines.append(f"{m['time']} - {m['name']} ({m['company']}) - {m['location']}")
+    lines.extend(["", f"Open your schedule: {matches_url}", "", "Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"])
+    body_text = "\n".join(lines)
+
+    return _send_email(to_email, subject, body_html, body_text, force=force)
 
 
 def send_post_event_wrapup_email(

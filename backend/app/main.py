@@ -149,6 +149,17 @@ async def _daily_usage_snapshot():
     await _run_with_heartbeat("daily_usage_snapshot", _go)
 
 
+async def _morning_schedule_email():
+    """07:00 Europe/Paris on each conference day: 'You have N meetings today'.
+
+    Wired year-round; the service short-circuits on non-conference days so
+    leaving the CronTrigger active is safe (no-op except 2026-06-02 / 06-03).
+    Force-sends (off the request path) - EMAIL_MODE does not gate it.
+    """
+    from app.services.morning_schedule import run_morning_schedule
+    await _run_with_heartbeat("morning_schedule_email", run_morning_schedule)
+
+
 async def _reciprocity_notify():
     """Every-2h job: forward-notify pending interests + mutual-completion emails.
 
@@ -221,11 +232,15 @@ scheduler.add_job(_daily_usage_snapshot,    CronTrigger(hour=3, minute=45, timez
 # mutual-completion emails. IntervalTrigger fires immediately on startup
 # then every 2h. mutual_notified_at dedup prevents double-sends.
 scheduler.add_job(_reciprocity_notify,      IntervalTrigger(hours=2), **_JOB_DEFAULTS)
+# Morning-of email at 07:00 Europe/Paris: 'You have N meetings today'. Wired
+# year-round but only fires on the two conference days (2026-06-02 / 06-03);
+# the service guards that internally so leaving the trigger live is safe.
+scheduler.add_job(_morning_schedule_email,  CronTrigger(hour=7, minute=0, timezone="Europe/Paris"), **_JOB_DEFAULTS)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
-    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, enrichment 03:00, match refresh 03:30, usage snapshot 03:45 (UTC); reciprocity_notify every 2h")
+    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, enrichment 03:00, match refresh 03:30, usage snapshot 03:45 (UTC); reciprocity_notify every 2h; morning_schedule 07:00 Europe/Paris (only fires June 2/3 2026)")
     yield
     scheduler.shutdown(wait=False)
     logger.info("scheduler: stopped")
