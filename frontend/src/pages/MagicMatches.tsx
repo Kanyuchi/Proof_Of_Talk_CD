@@ -31,6 +31,9 @@ export default function MagicMatches() {
   // Arriving from the welcome email's "Unlock Full Access" CTA (?unlock=1)
   // pre-opens the claim panel and scrolls to it.
   const [searchParams] = useSearchParams();
+  // Track whether the user has manually collapsed the panel so the
+  // has_account-driven default doesn't override their explicit choice.
+  const [claimToggled, setClaimToggled] = useState(false);
   const [claimOpen, setClaimOpen] = useState(searchParams.get("unlock") === "1");
   const claimRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -44,6 +47,17 @@ export default function MagicMatches() {
     queryFn: () => getMatchesByMagicLink(token!, 10),
     enabled: !!token,
   });
+
+  // Phase 1 of the conversion funnel: unclaimed visitors land with the claim
+  // panel expanded; claimed visitors keep it collapsed (they don't need it).
+  // Only fires once per visit and only before the user has touched the toggle.
+  useEffect(() => {
+    if (claimToggled) return;
+    if (searchParams.get("unlock") === "1") return; // already opened above
+    if (data && data.has_account === false) {
+      setClaimOpen(true);
+    }
+  }, [data, claimToggled, searchParams]);
 
   // The viewer's own profile rides along on the magic-link match response, so
   // no-login users get it without the auth-gated GET /attendees/{id} (which
@@ -209,7 +223,7 @@ export default function MagicMatches() {
       {data?.attendee_id && (
         <div ref={claimRef} className="p-5 rounded-2xl border border-white/10 bg-white/[0.03]">
           <button
-            onClick={() => setClaimOpen((v) => !v)}
+            onClick={() => { setClaimToggled(true); setClaimOpen((v) => !v); }}
             className="w-full flex items-center gap-2 text-left"
           >
             <KeyRound className="w-5 h-5 text-[#E76315]" />

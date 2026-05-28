@@ -171,4 +171,7 @@ export interface MatchListResult {
   locked_count?: number;
   next_tier_at?: number | null;
   completeness_pct?: number | null;
+  // True iff the viewer already has a `users` row (claimed their account).
+  // Drives the magic-link "Set your password" panel's default-expanded state.
+  has_account?: boolean;
 }
