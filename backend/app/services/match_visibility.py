@@ -76,8 +76,13 @@ def order_and_cap(vms: list[ViewerMatch], limit: int) -> tuple[list[ViewerMatch]
         [v for v in review if v.viewer_deferred_at is not None],
         key=lambda v: v.viewer_deferred_at,
     )
-    review_ordered = fresh + deferred
+    # Deferred cards stay hidden while any fresh review item exists; they
+    # resurface (ordered by deferred_at asc) only once fresh is exhausted.
+    # Sorting deferred to the back of fresh + applying the cap rarely actually
+    # hid them - review pools usually fit under the limit, so the same cards
+    # kept reappearing after "Not now" (David Chapman, 2026-05-28).
+    review_ordered = fresh if fresh else deferred
     shown_review = review_ordered[:limit]
-    locked = len(review_ordered) - len(shown_review)
+    locked = (len(fresh) + len(deferred)) - len(shown_review)
     visible = incoming + shown_review + committed
     return visible, locked

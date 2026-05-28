@@ -39,16 +39,36 @@ def test_review_pool_capped_and_ranked():
     assert locked == 2
 
 
-def test_deferred_go_to_back_after_fresh():
+def test_deferred_hidden_while_fresh_remains():
+    """A deferred card stays out of view as long as at least one fresh review
+    item exists - matches the defer_match docstring ("leaves the visible
+    window and resurfaces at the back once fresh ones run out"). Before this
+    fix, deferred items were merely sorted to the back of fresh and the cap
+    rarely actually hid them, so users (David Chapman, Martijn Leentjes, 2026-05-28)
+    saw the same cards reappear after clicking "Not now"."""
     t0 = datetime(2026, 5, 21, 10, 0, 0)
     vms = [
-        _vm(0.95, deferred=t0),                 # deferred, high score
-        _vm(0.60),                              # fresh, lower score
-        _vm(0.50, deferred=t0 + timedelta(minutes=5)),  # deferred later
+        _vm(0.95, deferred=t0),                            # deferred, high score
+        _vm(0.60),                                         # fresh, lower score
+        _vm(0.50, deferred=t0 + timedelta(minutes=5)),     # deferred later
     ]
     visible, locked = order_and_cap(vms, limit=3)
-    # fresh first (by score), then deferred (by deferred_at asc)
-    assert [round(v.overall_score, 2) for v in visible] == [0.60, 0.95, 0.50]
+    # Only fresh is visible; the 2 deferred are hidden (locked).
+    assert [round(v.overall_score, 2) for v in visible] == [0.60]
+    assert locked == 2
+
+
+def test_deferred_resurface_when_fresh_runs_out():
+    """Once every fresh item has been decided / cleared, the deferred items
+    come back (in deferred_at asc order) so the viewer can revisit them."""
+    t0 = datetime(2026, 5, 21, 10, 0, 0)
+    vms = [
+        _vm(0.95, deferred=t0),                            # earlier defer, higher score
+        _vm(0.50, deferred=t0 + timedelta(minutes=5)),     # later defer, lower score
+    ]
+    visible, locked = order_and_cap(vms, limit=5)
+    # No fresh exists → deferred resurfaces, ordered by deferred_at ascending.
+    assert [round(v.overall_score, 2) for v in visible] == [0.95, 0.50]
     assert locked == 0
 
 
