@@ -26,7 +26,14 @@ MIN_NON_OBVIOUS_SCORE = 0.65
 
 # Deep-pool tiers (deeper-match-pool spec, 2026-05-21)
 CURATED_COUNT = 8          # top candidates that get the full GPT-4o rerank + explanation
-DEEP_POOL_SIZE = 20        # total ranked candidates persisted per attendee (curated + deep)
+DEEP_POOL_SIZE = 20        # default total ranked candidates per attendee (curated + deep)
+# Gold-partner sponsors pay for volume + lead-gen, not the default "few people
+# worth your time" frame regular attendees use. ticket_type=SPONSOR (assigned
+# via the invite-link join flow OR by manual reclassification of paid sponsors)
+# gets a larger deep tier - curated head stays the same (8 GPT-explained) so
+# LLM cost doesn't balloon, but the similarity-only tail goes to 50 so they
+# have material to work with for outbound prospecting.
+SPONSOR_DEEP_POOL_SIZE = 50
 DEEP_MATCH_SCORE = 0.45    # lower floor for the similarity-only deep tier
 DEEP_TIER_EXPLANATION = (
     "Surfaced from your deeper match pool — a strong profile-similarity match "
@@ -947,7 +954,14 @@ Return ONLY the JSON array. No markdown, no commentary."""
 
         # Stage 2: Retrieve a deeper neighbour set so we can split into
         # a curated head (GPT-explained) and a similarity-only deep tail.
-        pool_size = max(top_k, DEEP_POOL_SIZE)
+        # SPONSOR ticket_type gets a larger pool (50 vs 20) - gold partners
+        # need volume for prospecting, regular attendees do not.
+        ticket_str = str(
+            attendee.ticket_type.value if hasattr(attendee.ticket_type, "value") else attendee.ticket_type
+        ).lower()
+        is_sponsor = ticket_str == "sponsor"
+        default_pool = SPONSOR_DEEP_POOL_SIZE if is_sponsor else DEEP_POOL_SIZE
+        pool_size = max(top_k, default_pool)
         candidates = await self.retrieve_candidates(attendee, top_k=pool_size)
         if locked_counterparts:
             candidates = [(c, s) for c, s in candidates if c.id not in locked_counterparts]
