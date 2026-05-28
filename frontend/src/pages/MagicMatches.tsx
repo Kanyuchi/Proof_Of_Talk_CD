@@ -36,11 +36,33 @@ export default function MagicMatches() {
   const [claimToggled, setClaimToggled] = useState(false);
   const [claimOpen, setClaimOpen] = useState(searchParams.get("unlock") === "1");
   const claimRef = useRef<HTMLDivElement>(null);
+  // Phase 3 — Maybe-later microcopy (shown for 5s on the FIRST defer of the
+  // visit only) + Concierge-gating reason flag for the claim-panel header.
+  const [deferHintForMatchId, setDeferHintForMatchId] = useState<string | null>(null);
+  const deferHintEverShown = useRef(false);
+  const [claimReason, setClaimReason] = useState<"concierge" | null>(null);
   useEffect(() => {
     if (searchParams.get("unlock") === "1") {
       claimRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [searchParams]);
+
+  // Phase 3 — ChatWidget on /m/ routes dispatches this when a non-claimed
+  // visitor taps the Concierge button. Open the claim panel with the
+  // Concierge-flavoured copy instead of letting the panel 401.
+  useEffect(() => {
+    const handler = () => {
+      setClaimError("");
+      setClaimReason("concierge");
+      setClaimToggled(true);
+      setClaimOpen(true);
+      setTimeout(() => {
+        claimRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    };
+    window.addEventListener("pot:open-magic-claim", handler);
+    return () => window.removeEventListener("pot:open-magic-claim", handler);
+  }, []);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["magic-matches", token],
@@ -280,14 +302,18 @@ export default function MagicMatches() {
             <KeyRound className="w-5 h-5 text-[#E76315]" />
             <div className="flex-1">
               <h3 className="font-semibold text-[#E76315]">
-                {pendingAcceptPersonName
-                  ? `Confirm interest in ${pendingAcceptPersonName.split(" ")[0]}`
-                  : "Set your password"}
+                {claimReason === "concierge"
+                  ? "AI Concierge"
+                  : pendingAcceptPersonName
+                    ? `Confirm interest in ${pendingAcceptPersonName.split(" ")[0]}`
+                    : "Set your password"}
               </h3>
               <p className="text-xs text-white/40">
-                {pendingAcceptPersonName
-                  ? `Set a quick password (10 seconds) — we'll save your interest and let ${pendingAcceptPersonName.split(" ")[0]} know.`
-                  : "You already have a profile from your ticket — just choose a password to log in and unlock messaging and the AI Concierge."}
+                {claimReason === "concierge"
+                  ? "Claim your account in 10 seconds to chat with the AI Concierge about your matches."
+                  : pendingAcceptPersonName
+                    ? `Set a quick password (10 seconds) — we'll save your interest and let ${pendingAcceptPersonName.split(" ")[0]} know.`
+                    : "You already have a profile from your ticket — just choose a password to log in and unlock messaging and the AI Concierge."}
               </p>
             </div>
             <span className="text-white/30 text-sm">{claimOpen ? "−" : "+"}</span>
@@ -649,12 +675,52 @@ export default function MagicMatches() {
                       I'd like to meet
                     </button>
                     <button
-                      onClick={() => deferMutation.mutate(match.id)}
+                      onClick={() => {
+                        // Phase 3 — show the "skip them permanently" microcopy
+                        // for 5s on the FIRST defer of the visit only. Gated to
+                        // unclaimed visitors; claimed users already have the
+                        // logged-in Decline tool and don't need the nudge.
+                        if (
+                          !deferHintEverShown.current &&
+                          data?.has_account === false
+                        ) {
+                          deferHintEverShown.current = true;
+                          setDeferHintForMatchId(match.id);
+                          setTimeout(() => {
+                            setDeferHintForMatchId((prev) =>
+                              prev === match.id ? null : prev
+                            );
+                          }, 5000);
+                        }
+                        deferMutation.mutate(match.id);
+                      }}
                       disabled={deferMutation.isPending}
                       className="w-full text-center text-xs text-white/30 hover:text-white/50 transition-colors py-1 disabled:opacity-50"
                     >
                       Maybe later
                     </button>
+                    {deferHintForMatchId === match.id && (
+                      <p className="text-[11px] text-white/40 text-center mt-1 animate-in fade-in">
+                        They'll resurface next session. Want to skip them permanently?{" "}
+                        <button
+                          onClick={() => {
+                            setDeferHintForMatchId(null);
+                            setClaimError("");
+                            setClaimToggled(true);
+                            setClaimOpen(true);
+                            setTimeout(() => {
+                              claimRef.current?.scrollIntoView({
+                                behavior: "smooth",
+                                block: "center",
+                              });
+                            }, 50);
+                          }}
+                          className="underline text-emerald-300 hover:text-emerald-200"
+                        >
+                          Set a password to decline →
+                        </button>
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

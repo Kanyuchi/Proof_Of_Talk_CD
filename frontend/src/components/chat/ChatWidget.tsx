@@ -1,16 +1,34 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Brain, X } from "lucide-react";
 import ChatPanel from "./ChatPanel";
+import { useAuth } from "../../hooks/useAuth";
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const { isAuthenticated } = useAuth();
+  // Phase 3 of the magic-link conversion funnel: unclaimed visitors on /m/
+  // routes can't actually use the Concierge (it requires a JWT). Instead of
+  // opening a panel that 401s, redirect them to the claim flow via a
+  // CustomEvent that MagicMatches listens for.
+  const isMagicLinkUnclaimed =
+    location.pathname.startsWith("/m/") && !isAuthenticated;
 
   return (
     <>
       {/* Floating button — lifted above the mobile bottom-tab bar so it
           doesn't cover the right-most tab (Sign out / Dashboard). */}
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (isMagicLinkUnclaimed) {
+            window.dispatchEvent(
+              new CustomEvent("pot:open-magic-claim", { detail: { reason: "concierge" } })
+            );
+            return;
+          }
+          setOpen((v) => !v);
+        }}
         className={`fixed bottom-[calc(env(safe-area-inset-bottom)+5rem)] sm:bottom-6 right-4 sm:right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 ${
           open
             ? "bg-white/10 border border-white/20 text-white/60 scale-90"
