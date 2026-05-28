@@ -255,7 +255,7 @@ export default function MagicMatches() {
               <div className="flex-1 min-w-0">
                 <h3 className="text-base font-semibold text-white">
                   {incomingSummary.count_pending_for_you > 0
-                    ? `${incomingSummary.count_pending_for_you} ${incomingSummary.count_pending_for_you === 1 ? "person" : "people"} accepted your interest`
+                    ? `${incomingSummary.count_pending_for_you} ${incomingSummary.count_pending_for_you === 1 ? "person" : "people"} ${incomingSummary.count_pending_for_you === 1 ? "wants" : "want"} to meet you`
                     : `You have ${incomingSummary.count_accepted_back} mutual ${incomingSummary.count_accepted_back === 1 ? "match" : "matches"} waiting`}
                 </h3>
                 <p className="text-sm text-emerald-200/80 mt-0.5">
