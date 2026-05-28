@@ -16,8 +16,19 @@ export default function ForgotPassword() {
     try {
       await forgotPassword(email);
       setSent(true);
-    } catch {
-      setError("Something went wrong. Please try again.");
+    } catch (err: unknown) {
+      // Distinguish backend-down (5xx) from validation/rate-limit (4xx) so
+      // users aren't told to "try again" when the issue is server-side and
+      // retry won't help for minutes. Added 2026-05-28 after the silent
+      // Supabase outage caused forgot-password to silently no-op for 13h.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status && status >= 500) {
+        setError(
+          "Our backend is having trouble right now. Please try again in a few minutes.",
+        );
+      } else {
+        setError("Something went wrong. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

@@ -23,12 +23,28 @@ export default function Login() {
     setSetupLoading(true);
     try {
       await forgotPassword(email);
-    } catch {
-      // fall through — always show confirmation (no enumeration)
+      // Only show the "check your inbox" confirmation on a real 2xx; the
+      // no-enumeration guarantee still holds because the backend always
+      // returns 200 when the email-exists check succeeds, regardless of
+      // whether an account was found.
+      setError(null);
+      setSetupSent(true);
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status && status >= 500) {
+        // Don't pretend the email went out when the backend is down. Pre-2026-05-28
+        // this branch silently set setupSent=true and the user kept refreshing
+        // their inbox for an email that never sent.
+        setError(
+          "Our backend is having trouble sending the link right now. Please try again in a minute, or use the password form below if you have a password set.",
+        );
+      } else {
+        // 4xx (validation/rate-limit) - fall back to the no-enumeration confirmation.
+        setError(null);
+        setSetupSent(true);
+      }
     } finally {
       setSetupLoading(false);
-      setError(null); // clear any error so red + green don't clash
-      setSetupSent(true);
     }
   };
 
@@ -39,8 +55,25 @@ export default function Login() {
     try {
       await login(email, password);
       navigate("/attendees");
-    } catch {
-      setError("Invalid email or password. Please try again.");
+    } catch (err: unknown) {
+      // Distinguish actual auth failure (401) from backend trouble (5xx).
+      // Pre-2026-05-28 this catch was a blanket "Invalid email or password" -
+      // when the backend was down (13h outage that morning), Elena, Robert
+      // Zovko, Chris Robert and four others all saw the auth message and
+      // assumed they'd forgotten their password.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 401) {
+        setError("Invalid email or password. Please try again.");
+      } else if (status && status >= 500) {
+        setError(
+          "Our backend is having trouble right now. Please try again in a minute, or use the 'Email me a sign-in link' option above.",
+        );
+      } else {
+        // Network error, timeout, CORS - anything else. Still useful to be specific.
+        setError(
+          "Couldn't reach the server. Check your connection and try again, or use the 'Email me a sign-in link' option above.",
+        );
+      }
     } finally {
       setLoading(false);
     }

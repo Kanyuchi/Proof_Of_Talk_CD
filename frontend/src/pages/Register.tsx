@@ -60,8 +60,20 @@ export default function Register() {
       });
       navigate("/matches");
     } catch (err: unknown) {
+      // Distinguish backend-down (5xx) from validation failures (4xx) so
+      // we don't show users the backend's generic "An internal error
+      // occurred" detail during an outage and have them retry uselessly.
+      // Sergio Consuegra and Heslin Kim both hit this verbatim on
+      // 2026-05-28 during the silent Supabase outage; updated then.
+      const status = (err as { response?: { status?: number } })?.response?.status;
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg || "Registration failed. Please try again.");
+      if (status && status >= 500) {
+        setError(
+          "Our backend is having trouble right now. Please try again in a few minutes - if you already have a ticket, you can also use the 'Email me a sign-in link' option on the login page.",
+        );
+      } else {
+        setError(msg || "Registration failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
