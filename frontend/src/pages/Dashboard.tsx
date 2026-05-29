@@ -570,51 +570,82 @@ export default function Dashboard() {
 
               {/* Usage block — anchored to tracking start. */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5" title="Distinct accounts (non-admin, non-demo) that have either password-logged-in or opened a magic link since tracking started.">
                   <div className="text-2xl font-bold">{adoption.usage.cumulative_active}</div>
-                  <div className="text-[10px] text-white/40 uppercase">Active (since tracking began {adoption.tracking_started_at})</div>
+                  <div className="text-[10px] text-white/40 uppercase">Active accounts (since {adoption.tracking_started_at})</div>
                 </div>
-                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5" title="Same definition as Active accounts, restricted to the last 7 days.">
                   <div className="text-2xl font-bold">{adoption.usage.active_last_7d}</div>
-                  <div className="text-[10px] text-white/40 uppercase">Active last 7d (since tracking began {adoption.tracking_started_at})</div>
+                  <div className="text-[10px] text-white/40 uppercase">Active accounts last 7d</div>
                 </div>
-                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5" title="Accounts that have used the password-login path at least once. Not currently-signed-in — there is no session tracker. Subset of Active accounts.">
                   <div className="text-2xl font-bold">{adoption.usage.login_active}</div>
-                  <div className="text-[10px] text-white/40 uppercase">Logged in</div>
+                  <div className="text-[10px] text-white/40 uppercase">Used password login</div>
                 </div>
-                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
+                <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5" title="Attendees who have opened their magic-link email. Includes directory rows that received the welcome email but never created an account — that is intentional (engagement signal).">
                   <div className="text-2xl font-bold">{adoption.usage.magic_link_active}</div>
-                  <div className="text-[10px] text-white/40 uppercase">Magic-link opens</div>
+                  <div className="text-[10px] text-white/40 uppercase">Magic-link opens (incl. unregistered)</div>
                 </div>
               </div>
 
-              {/* Day-by-day usage trend, once usage_daily has rows; else explainer. */}
+              {/* Day-by-day usage trend. Each bar = people active in the 24h
+                  window ending at the 03:45 UTC snapshot for that day.
+                  Days with no usage_daily row (e.g. snapshot cron skipped on
+                  2026-05-28 during the Supabase pooler migration) render as
+                  "no data" placeholders so the timeline stays continuous
+                  without inventing a number for the missed day. */}
               {adoption.usage_by_day.length > 0 ? (
                 <div className="mt-5">
-                  <div className="text-xs font-semibold text-white/60 mb-2">Daily active</div>
+                  <div className="text-xs font-semibold text-white/60 mb-2">Active accounts per day (24h rolling)</div>
                   <div className="space-y-1.5">
-                    {adoption.usage_by_day.map(({ day, active_today }) => {
-                      const maxA = Math.max(...adoption.usage_by_day.map((d) => d.active_today), 1);
-                      const label = (() => {
-                        try {
-                          return new Date(day).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
-                        } catch { return day; }
-                      })();
-                      return (
-                        <div key={day} className="flex items-center gap-2">
-                          <span className="w-14 text-[10px] text-white/40 text-right shrink-0">{label}</span>
-                          <div className="flex-1 h-5 bg-white/5 rounded overflow-hidden relative">
-                            <div className="h-full bg-emerald-500 rounded transition-all" style={{ width: `${(active_today / maxA) * 100}%` }} />
-                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/70">{active_today}</span>
+                    {(() => {
+                      const sorted = [...adoption.usage_by_day].sort((a, b) => a.day.localeCompare(b.day));
+                      const byDay = new Map(sorted.map((d) => [d.day, d.active_today]));
+                      const start = new Date(sorted[0].day + "T00:00:00Z");
+                      const end = new Date(sorted[sorted.length - 1].day + "T00:00:00Z");
+                      const filled: Array<{ day: string; active_today: number | null }> = [];
+                      for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+                        const iso = d.toISOString().slice(0, 10);
+                        filled.push({ day: iso, active_today: byDay.has(iso) ? byDay.get(iso)! : null });
+                      }
+                      const maxA = Math.max(...filled.map((d) => d.active_today ?? 0), 1);
+                      return filled.map(({ day, active_today }) => {
+                        const label = (() => {
+                          try {
+                            return new Date(day).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+                          } catch {
+                            return day;
+                          }
+                        })();
+                        const missing = active_today === null;
+                        return (
+                          <div key={day} className="flex items-center gap-2">
+                            <span className="w-14 text-[10px] text-white/40 text-right shrink-0">{label}</span>
+                            <div
+                              className="flex-1 h-5 bg-white/5 rounded overflow-hidden relative"
+                              title={missing ? "Snapshot cron did not write a row for this day (see session_log 2026-05-28). Showing as no data rather than backfilling an undercount." : undefined}
+                            >
+                              {missing ? (
+                                <div className="h-full w-full rounded" style={{ background: "repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 6px, rgba(255,255,255,0.10) 6px 12px)" }} />
+                              ) : (
+                                <div className="h-full bg-emerald-500 rounded transition-all" style={{ width: `${((active_today as number) / maxA) * 100}%` }} />
+                              )}
+                              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/70">
+                                {missing ? "no data" : active_today}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
+                  </div>
+                  <div className="mt-2 text-[10px] text-white/30">
+                    Each bar counts people active in the rolling 24h ending at that day's 03:45 UTC snapshot run. Striped bar = snapshot cron skipped; not backfilled.
                   </div>
                 </div>
               ) : (
                 <div className="mt-5 p-3 rounded-lg bg-white/[0.02] border border-white/5 text-xs text-white/40">
-                  Usage tracking started {adoption.tracking_started_at} — numbers build from here. The daily snapshot fills this in from day one.
+                  Usage tracking started {adoption.tracking_started_at}. Numbers build from here; the daily snapshot fills this in from day one.
                 </div>
               )}
             </div>
