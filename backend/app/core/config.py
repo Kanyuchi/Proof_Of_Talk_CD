@@ -10,14 +10,14 @@ class Settings(BaseSettings):
 
     # Database (Supabase PostgreSQL + pgvector)
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/pot_matchmaker"
-    # Connection-pool sizing per worker. Defaults are safe for the DIRECT
-    # Supabase connection (db.…:5432), which has a low backend-connection
-    # ceiling: pool_size + max_overflow per Railway worker must stay well
-    # under it. When DATABASE_URL points at the transaction-mode POOLER
-    # (…pooler.supabase.com:6543), pgbouncer multiplexes, so these can be
-    # raised via env for a bigger spike ceiling.
-    DB_POOL_SIZE: int = 5
-    DB_MAX_OVERFLOW: int = 10
+    # Connection-pool sizing per worker. Prod runs on the transaction-mode
+    # POOLER (…:6543) since the 2026-05-28 forced Supabase migration, so
+    # pgbouncer multiplexes and these can be larger than they were for the
+    # direct connection. Bumped 5/10 → 20/30 on 2026-05-29 after
+    # daily_extasy_sync hit "QueuePool limit of size 5 overflow 10 reached"
+    # on a 57-attendee enrichment loop; ceiling is now 50 concurrent.
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 30
 
     # OpenAI
     OPENAI_API_KEY: str = ""

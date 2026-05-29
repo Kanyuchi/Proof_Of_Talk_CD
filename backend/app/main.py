@@ -63,9 +63,14 @@ async def _run_with_heartbeat(job_name: str, coro_factory):
             status = "partial"
         logger.info(f"scheduler: {job_name} complete", status=status, **{k: v for k, v in stats.items() if k != "inserted_ids"})
     except Exception as exc:
+        # Capture the full traceback in stats too — `str(exc)` alone produces
+        # empty/cryptic strings for many timeout types (e.g. httpx ReadTimeout
+        # surfaces as "ReadTimeout: " with no provider attribution), making
+        # recurrences un-diagnosable from the dashboard's sync_status table.
+        import traceback as _traceback
         status = "error"
         error_msg = f"{type(exc).__name__}: {exc}"
-        stats = {"error": error_msg}
+        stats = {"error": error_msg, "traceback": _traceback.format_exc()}
         logger.error(f"scheduler: {job_name} failed", error=error_msg)
 
     # Heartbeat write in its own session — a poisoned scheduler event loop
