@@ -269,3 +269,14 @@ Other Elliptic staff to check: James Smith (Co-Founder & CSO, line 1442 in the s
 | 1393 | Blank separator | - |
 | 1394-1539 | Speakers / VIP list (4 cols, 145 rows) | NO |
 | 1540-1554 | Partners grid (unstructured) | NO |
+
+
+---
+
+## 2026-05-29 amendment - Oliver dropped
+
+Verified against the Extasy/Rhuna live feed (1935 orders, 1660 tickets) on 2026-05-29: Oliver from Elliptic has NOT bought a ticket. Elliptic vouchers used: ELLIPTICVIP1 (Ylli), ELLIPTICVIP2 (Aylin), ELLIPTICVIPBLACK1 (James Smith), ELLIPTICVIPBLACK2 (Martijn), + Speaker Pass for stephen@elliptic.co (labelled James Smith, real attendee Stephen).
+
+Ingest scope reduced to TWO tabs: Aylin (34 rows) and Ylli (32 rows). Oliver tab (101 rows) skipped.
+
+Ylli has a duplicate attendee row (`ylli@elliptic.co` AND `ylli.vllasolli@elliptic.co`). Use `ylli@elliptic.co` (matches the Rhuna voucher attendee record) as the requester; the .vllasolli row is a clone that should be deduped separately.
