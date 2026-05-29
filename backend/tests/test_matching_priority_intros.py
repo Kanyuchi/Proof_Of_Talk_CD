@@ -152,6 +152,12 @@ async def test_out_of_pool_target_force_added():
     target = _make_attendee(name="Jane Target", goals="raise series B")
     intro = _make_intro(requester.id, target.id, target_name=target.name)
 
+    # Savepoint context manager mock (the race-guard wraps each insert
+    # in `async with db.begin_nested()`).
+    class _NestedCM:
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+
     db = AsyncMock()
     db.execute.side_effect = [
         _Scalar([intro]),     # intros query
@@ -159,6 +165,8 @@ async def test_out_of_pool_target_force_added():
     ]
     db.add = MagicMock()
     db.flush = AsyncMock()
+    db.begin_nested = MagicMock(side_effect=lambda: _NestedCM())
+    db.commit = AsyncMock()
 
     engine = _make_engine(db)
     result = await engine._apply_priority_intros(requester, [])
