@@ -166,6 +166,16 @@ async def _morning_schedule_email():
     await _run_with_heartbeat("morning_schedule_email", run_morning_schedule)
 
 
+async def _t_minus_one_reminder():
+    """One-shot 'Tomorrow at the Louvre' email at 17:00 Europe/Paris on
+    2026-06-01. CronTrigger pins year/month/day so the trigger is
+    structurally inert outside that window. Force-sends (off the request
+    path) - EMAIL_MODE does not gate it.
+    """
+    from app.services.t_minus_one_reminder import run_t_minus_one_reminder
+    await _run_with_heartbeat("t_minus_one_reminder", run_t_minus_one_reminder)
+
+
 async def _daily_match_digest():
     """09:00 UTC: 'N new top matches' digest for existing attendees whose
     curated pool gained >=3 new matches since their last digest. Per-attendee
@@ -266,6 +276,9 @@ scheduler.add_job(_reciprocity_notify,      IntervalTrigger(hours=2), **_JOB_DEF
 # year-round but only fires on the two conference days (2026-06-02 / 06-03);
 # the service guards that internally so leaving the trigger live is safe.
 scheduler.add_job(_morning_schedule_email,  CronTrigger(hour=7, minute=0, timezone="Europe/Paris"), **_JOB_DEFAULTS)
+# T-1 reminder: one-shot at 17:00 Europe/Paris on 2026-06-01 ("Tomorrow at the
+# Louvre"). Date-bound trigger - never fires before/after that date, so no flag.
+scheduler.add_job(_t_minus_one_reminder,    CronTrigger(year=2026, month=6, day=1, hour=17, minute=0, timezone="Europe/Paris"), **_JOB_DEFAULTS)
 # Match digest at 09:00 UTC (10:00 BST / 11:00 Paris): "N new top matches" to
 # existing attendees whose curated pool gained >=3 new matches since their last
 # digest. Per-attendee 72h throttle. Complements the once-lifetime match-intro

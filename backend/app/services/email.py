@@ -642,6 +642,98 @@ def send_interest_notification(
     return _send_email(to_email, subject, body_html, body_text, force=force)
 
 
+# ── Pre-event emails ─────────────────────────────────────────────────
+
+
+def send_t_minus_one_reminder_email(
+    to_email: str,
+    attendee_name: str,
+    top_matches: list,
+    scheduled_count: int,
+    total_matches: int,
+    magic_token: str | None = None,
+    app_url: str | None = None,
+    force: bool = False,
+) -> bool:
+    """T-1 reminder ("Tomorrow at the Louvre"), fired once at 17:00 Paris on
+    2026-06-01 from a date-bound CronTrigger. Force-sends off the request path.
+
+    top_matches: list of {name, title, company} dicts, max 3.
+    scheduled_count: how many meetings the attendee already has booked.
+    total_matches: total curated+priority_intro pool size.
+    """
+    settings = get_settings()
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
+    if not top_matches:
+        return False
+    first_name = attendee_name.split()[0] if attendee_name else attendee_name
+    dashboard_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
+    unbooked = max(0, total_matches - scheduled_count)
+
+    if scheduled_count == 0:
+        scheduled_line = "You have no meetings booked yet."
+    elif scheduled_count == 1:
+        scheduled_line = "You have 1 meeting booked."
+    else:
+        scheduled_line = f"You have {scheduled_count} meetings booked."
+
+    if unbooked > 0:
+        book_line = f"Book {min(unbooked, 5)} more before tomorrow morning."
+    else:
+        book_line = ""
+
+    subject = f"Tomorrow at the Louvre, {first_name}"
+
+    # Render the top-3 as a vertical list of small cream cards.
+    cards = ""
+    for i, m in enumerate(top_matches[:3], 1):
+        name = (m.get("name") or "").strip() or "Top match"
+        title = (m.get("title") or "").strip()
+        company = (m.get("company") or "").strip()
+        meta = ", ".join(x for x in (title, company) if x) or ""
+        cards += (
+            f"<tr><td style=\"padding:0 0 10px;\">"
+            f"  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#FBF8F3; border-left:3px solid #C2632A;\">"
+            f"    <tr><td style=\"padding:14px 18px;\">"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#C2632A; margin-bottom:6px;\">#{i}</div>"
+            f"      <div style=\"font-family:Georgia,'Playfair Display',serif; font-size:17px; color:#211500; font-weight:600;\">{name}</div>"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:13px; color:#7A7268;\">{meta}</div>"
+            f"    </td></tr>"
+            f"  </table>"
+            f"</td></tr>"
+        )
+
+    body_html = _render_email(
+        preheader=f"The Louvre is tomorrow. {scheduled_line}",
+        eyebrow="Tomorrow at the Louvre",
+        heading=f"{first_name}, the Louvre is tomorrow",
+        body_html=(
+            f"<tr><td style=\"padding:0 0 14px;\">Proof of Talk opens at the Louvre Palace at 9:00 Paris time tomorrow. Here are your top 3 introductions for the two days:</td></tr>"
+            f"{cards}"
+            f"<tr><td style=\"padding:8px 0 4px; font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:14px; color:#3A3A3A;\">{scheduled_line} {book_line}</td></tr>"
+        ),
+        cta_label="Review your matches",
+        cta_url=dashboard_url,
+        unsubscribe=True,
+        unsubscribe_token=magic_token,
+    )
+    body_text_matches = "\n".join(
+        f"  #{i}. {m.get('name','')} - {m.get('title','')}, {m.get('company','')}"
+        for i, m in enumerate(top_matches[:3], 1)
+    )
+    body_text = (
+        f"Tomorrow at the Louvre, {first_name}.\n\n"
+        f"Proof of Talk opens at 9:00 Paris time tomorrow.\n\n"
+        f"Your top 3 introductions:\n"
+        f"{body_text_matches}\n\n"
+        f"{scheduled_line} {book_line}\n\n"
+        f"Review your matches: {dashboard_url}\n\n"
+        f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
+    )
+    return _send_email(to_email, subject, body_html, body_text, force=force)
+
+
 # ── Post-event emails (Phase 6) ─────────────────────────────────────
 
 
