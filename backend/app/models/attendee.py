@@ -140,9 +140,31 @@ class Match(Base):
     # Per-viewer "Maybe later" soft-defer timestamps (mirrors status_a/status_b)
     deferred_a_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deferred_b_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Set the first time each party transitions to status="accepted". Mirrors
+    # deferred_*_at. Used for sponsor ROI reporting on priority intros.
+    accepted_a_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    accepted_b_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     # Reciprocity-loop dedup guard — set by run_mutual_notifications after both
     # parties receive their "mutual match confirmed" email. NULL = not yet sent.
     # Prevents the cron from re-sending on every run; also decouples the email
     # from the request path (the inline send in update_match_status was removed).
     mutual_notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class RequestedIntro(Base):
+    """Per-attendee curated intro request — e.g. Elliptic gold-tier perk where
+    each Elliptic attendee has a sheet tab listing people they want to meet.
+    Surfaces in the requester's match list as the priority_intro tier."""
+
+    __tablename__ = "requested_intros"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    requester_attendee_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    # NULL when the target isn't in our DB yet (e.g. they haven't registered).
+    target_attendee_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    target_name_raw: Mapped[str] = mapped_column(Text)
+    target_company_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(Text)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

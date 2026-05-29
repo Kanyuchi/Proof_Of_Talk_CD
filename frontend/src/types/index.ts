@@ -54,7 +54,14 @@ export interface Match {
   matched_attendee?: Attendee;
   // Slots both parties are free for. Populated server-side on mutual matches with no booking yet.
   mutual_free_slots?: string[];
-  tier?: "curated" | "deep";
+  tier?: "curated" | "deep" | "priority_intro";
+  accepted_a_at?: string | null;
+  accepted_b_at?: string | null;
+  priority_intro_meta?: {
+    requested_at?: string;
+    target_in_db?: boolean;
+    concierge_note?: string | null;
+  } | null;
 }
 
 export interface DashboardStats {
@@ -174,4 +181,17 @@ export interface MatchListResult {
   // True iff the viewer already has a `users` row (claimed their account).
   // Drives the magic-link "Set your password" panel's default-expanded state.
   has_account?: boolean;
+}
+
+export interface PriorityIntro {
+  id: string;
+  requester_attendee_id: string;
+  target_attendee_id: string | null;
+  target_name_raw: string;
+  target_company_raw: string | null;
+  source: string;
+  added_at: string;
+  resolved_at: string | null;
+  target: Attendee | null;
+  match_id: string | null;
 }

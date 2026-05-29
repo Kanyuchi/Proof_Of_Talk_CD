@@ -255,3 +255,4 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 
 ### Done — 2026-05-25
 - **User-editable AI write-up** shipped & live: attendees can edit/regenerate their own write-up on the Profile page; edits are pinned so the AI never overwrites them. Backend guard + `PUT /auth/profile` (ai_summary) + `POST /auth/profile/regenerate-summary`; Profile page textarea + Regenerate button. Pouneh's bio pinned. Specs/plans in `docs/superpowers/`.
+- **[elliptic-vip-target-list]** Backend schema, matching engine integration, endpoints, and UI rendering complete on branch `priority-intros` (commits db3b8db-889c79a). Ingest + deploy pending — see the new `[priority-intros]` entry in Now.

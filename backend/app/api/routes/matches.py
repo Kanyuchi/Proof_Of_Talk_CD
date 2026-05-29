@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, or_, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.models.attendee import Attendee, Match
+from app.models.attendee import Attendee, Match, RequestedIntro
 from app.schemas.attendee import (
     MatchResponse,
     MatchListResponse,
@@ -17,6 +17,7 @@ from app.schemas.attendee import (
     ScheduleMeetingRequest,
     MatchFeedbackUpdate,
     AttendeeResponse,
+    PriorityIntroResponse,
     redact_for_privacy,
 )
 from app.services.avatars import upload_avatar, AvatarError, MAX_BYTES
@@ -102,6 +103,72 @@ async def get_pending_match_count(
     )
     count = result.scalar() or 0
     return {"pending_count": count}
+
+
+@router.get("/priority-intros", response_model=list[PriorityIntroResponse])
+async def list_priority_intros(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """Return all priority intros for the calling user. Includes resolved
+    (target_attendee_id set) and unresolved (NULL) entries."""
+    if not user.attendee_id:
+        return []
+    return await _load_priority_intros(db, user.attendee_id)
+
+
+async def _load_priority_intros(db: AsyncSession, attendee_id) -> list[PriorityIntroResponse]:
+    result = await db.execute(
+        select(RequestedIntro)
+        .where(RequestedIntro.requester_attendee_id == attendee_id)
+        .order_by(RequestedIntro.added_at.asc())
+    )
+    intros = list(result.scalars().all())
+    if not intros:
+        return []
+
+    # Hydrate target attendees in one query
+    target_ids = [i.target_attendee_id for i in intros if i.target_attendee_id]
+    targets_by_id = {}
+    if target_ids:
+        res = await db.execute(select(Attendee).where(Attendee.id.in_(target_ids)))
+        targets_by_id = {a.id: a for a in res.scalars().all()}
+
+    # Hydrate corresponding match_ids (one per requester+target pair, if any)
+    matches_by_target = {}
+    if target_ids:
+        res = await db.execute(
+            select(Match).where(
+                ((Match.attendee_a_id == attendee_id) & (Match.attendee_b_id.in_(target_ids)))
+                | ((Match.attendee_b_id == attendee_id) & (Match.attendee_a_id.in_(target_ids)))
+            )
+        )
+        for m in res.scalars().all():
+            other = m.attendee_b_id if m.attendee_a_id == attendee_id else m.attendee_a_id
+            matches_by_target[other] = m.id
+
+    out = []
+    for intro in intros:
+        target_resp = None
+        match_id = None
+        if intro.target_attendee_id:
+            target_attendee = targets_by_id.get(intro.target_attendee_id)
+            if target_attendee:
+                target_resp = AttendeeResponse.model_validate(target_attendee)
+            match_id = matches_by_target.get(intro.target_attendee_id)
+        out.append(PriorityIntroResponse(
+            id=intro.id,
+            requester_attendee_id=intro.requester_attendee_id,
+            target_attendee_id=intro.target_attendee_id,
+            target_name_raw=intro.target_name_raw,
+            target_company_raw=intro.target_company_raw,
+            source=intro.source,
+            added_at=intro.added_at,
+            resolved_at=intro.resolved_at,
+            target=target_resp,
+            match_id=match_id,
+        ))
+    return out
 
 
 @router.get("/{attendee_id}", response_model=MatchListResponse)
@@ -338,8 +405,12 @@ async def update_match_status_by_magic_link(
     if not match or attendee.id not in (match.attendee_a_id, match.attendee_b_id):
         raise HTTPException(status_code=404, detail="Match not found")
     if match.attendee_a_id == attendee.id:
+        if data.status == "accepted" and match.accepted_a_at is None:
+            match.accepted_a_at = datetime.utcnow()
         match.status_a = data.status
     else:
+        if data.status == "accepted" and match.accepted_b_at is None:
+            match.accepted_b_at = datetime.utcnow()
         match.status_b = data.status
     match.status = _compute_overall_status(match.status_a, match.status_b)
     if data.status == "declined":
@@ -347,6 +418,21 @@ async def update_match_status_by_magic_link(
     await db.commit()
     await db.refresh(match)
     return await _build_match_response(db, match, attendee.id)
+
+
+@router.get("/m/{token}/priority-intros", response_model=list[PriorityIntroResponse])
+async def list_priority_intros_by_magic_link(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Magic-link variant of /priority-intros — no auth required, keyed by token."""
+    if not token or len(token) < 16:
+        raise HTTPException(status_code=400, detail="Invalid link")
+    result = await db.execute(select(Attendee).where(Attendee.magic_access_token == token))
+    attendee = result.scalars().first()
+    if not attendee:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    return await _load_priority_intros(db, attendee.id)
 
 
 def _unsub_html(title: str, heading: str, body: str, link_href: str | None = None, link_label: str | None = None) -> str:
@@ -643,8 +729,12 @@ async def update_match_status(
 
     # Determine which side this user is on, based on their linked attendee_id
     if user.attendee_id and str(user.attendee_id) == str(match.attendee_a_id):
+        if data.status == "accepted" and match.accepted_a_at is None:
+            match.accepted_a_at = datetime.utcnow()
         match.status_a = data.status
     elif user.attendee_id and str(user.attendee_id) == str(match.attendee_b_id):
+        if data.status == "accepted" and match.accepted_b_at is None:
+            match.accepted_b_at = datetime.utcnow()
         match.status_b = data.status
     else:
         # Admin or unlinked user — update the legacy status field directly

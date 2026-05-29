@@ -11,6 +11,7 @@ import type {
   ConversationSummary,
   ConversationDetail,
   MessageData,
+  PriorityIntro,
 } from "../types";
 
 export const api = axios.create({
@@ -109,6 +110,16 @@ export async function getMatchesByMagicLink(
   limit = 50
 ): Promise<MatchListResult> {
   const { data } = await api.get(`/matches/m/${token}`, { params: { limit } });
+  return data;
+}
+
+export async function getPriorityIntros(): Promise<PriorityIntro[]> {
+  const { data } = await api.get<PriorityIntro[]>("/matches/priority-intros");
+  return data;
+}
+
+export async function getMagicPriorityIntros(token: string): Promise<PriorityIntro[]> {
+  const { data } = await api.get<PriorityIntro[]>(`/matches/m/${token}/priority-intros`);
   return data;
 }
 

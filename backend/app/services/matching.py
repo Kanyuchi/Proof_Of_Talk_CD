@@ -34,6 +34,19 @@ DEEP_POOL_SIZE = 20        # default total ranked candidates per attendee (curat
 # LLM cost doesn't balloon, but the similarity-only tail goes to 50 so they
 # have material to work with for outbound prospecting.
 SPONSOR_DEEP_POOL_SIZE = 50
+
+# Priority intro requests (concierge-curated, e.g. Elliptic gold-tier perk).
+# Per-attendee cap on priority_intro-tier rows — protects UI + matching pipeline
+# from a runaway sheet. Matches SPONSOR_DEEP_POOL_SIZE.
+PRIORITY_INTRO_CAP = 50
+
+PRIORITY_INTRO_EXPLANATION_TEMPLATE = (
+    "You asked your concierge to introduce you to {target_first_name}. "
+    "They're attending Proof of Talk 2026.\n\n"
+    "Their focus: {target_focus}\n\n"
+    "William may reach out to set up a soft intro."
+)
+
 DEEP_MATCH_SCORE = 0.45    # lower floor for the similarity-only deep tier
 DEEP_TIER_EXPLANATION = (
     "Surfaced from your deeper match pool — a strong profile-similarity match "
@@ -913,6 +926,84 @@ Return ONLY the JSON array. No markdown, no commentary."""
         )).all()
         return {(b if a == attendee_id else a) for a, b in survivors}
 
+    async def _apply_priority_intros(
+        self,
+        attendee,
+        existing_matches: list,
+    ) -> list:
+        """Tier-upgrade existing matches whose other side is on the requester's
+        priority list, and force-add new Match rows for targets that didn't
+        survive the retrieval cut. Cap at PRIORITY_INTRO_CAP rows. Targets with
+        target_attendee_id IS NULL are skipped (they're not in our DB yet)."""
+        from app.models.attendee import RequestedIntro, Attendee
+
+        result = await self.db.execute(
+            select(RequestedIntro).where(
+                RequestedIntro.requester_attendee_id == attendee.id,
+                RequestedIntro.target_attendee_id.is_not(None),
+            ).order_by(RequestedIntro.added_at.asc()).limit(PRIORITY_INTRO_CAP)
+        )
+        intros = list(result.scalars().all())
+        if not intros:
+            return existing_matches
+
+        target_ids = {intro.target_attendee_id for intro in intros}
+
+        # Index existing matches by counterparty id
+        matches_by_other = {}
+        for m in existing_matches:
+            other_id = m.attendee_b_id if m.attendee_a_id == attendee.id else m.attendee_a_id
+            matches_by_other[other_id] = m
+
+        # Tier-upgrade matches whose counterparty is on the priority list
+        for tid in target_ids:
+            if tid in matches_by_other:
+                matches_by_other[tid].tier = "priority_intro"
+
+        # Force-add missing targets
+        missing_ids = target_ids - set(matches_by_other.keys())
+        if not missing_ids:
+            return existing_matches
+
+        result = await self.db.execute(
+            select(Attendee).where(Attendee.id.in_(missing_ids))
+        )
+        missing_targets = {a.id: a for a in result.scalars().all()}
+
+        added = 0
+        for tid in missing_ids:
+            target = missing_targets.get(tid)
+            if not target:
+                continue
+            first_name = (target.name or "them").split()[0]
+            focus = (
+                target.goals
+                or (target.ai_summary[:200] if target.ai_summary else "")
+                or "Profile incomplete"
+            )
+            explanation = PRIORITY_INTRO_EXPLANATION_TEMPLATE.format(
+                target_first_name=first_name,
+                target_focus=focus,
+            )
+            new_match = Match(
+                attendee_a_id=attendee.id,
+                attendee_b_id=target.id,
+                similarity_score=0.0,
+                complementary_score=0.0,
+                overall_score=0.0,
+                match_type="priority_intro",
+                explanation=explanation,
+                shared_context={},
+                tier="priority_intro",
+            )
+            self.db.add(new_match)
+            existing_matches.append(new_match)
+            added += 1
+
+        if added:
+            await self.db.flush()
+        return existing_matches
+
     async def generate_matches_for_attendee(
         self, attendee_id: uuid.UUID, top_k: int = 10, clear_existing: bool = True,
         notify: bool = True,
@@ -1043,6 +1134,11 @@ Return ONLY the JSON array. No markdown, no commentary."""
                     break
 
         await self.db.commit()
+
+        # Priority intro tier — upgrades in-pool matches + force-adds missing targets.
+        # Runs after commit so the priority rows are layered on top of the
+        # curated/deep/fallback set already flushed to the session.
+        matches = await self._apply_priority_intros(attendee, matches)
 
         # Fire-and-forget: notify attendee of their top match via email.
         # Skipped for bulk regeneration (notify=False) to avoid a 739-email blast.
