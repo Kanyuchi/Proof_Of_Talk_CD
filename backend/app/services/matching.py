@@ -267,12 +267,18 @@ class MatchingEngine:
         return False
 
     def _is_candidate_eligible(self, attendee: Attendee, candidate: Attendee) -> bool:
-        # Drop POT / X Ventures organiser staff from candidate sets — they're
-        # not real attendees from a matchmaker perspective. Zohair + Victor
-        # are allowlisted (see staff_filter.ALLOWED_NAMES) so they remain
-        # matchable in both directions.
+        # Drop demo personas from real attendees' candidate sets (see
+        # staff_filter.py). PoT and X Ventures staff are matchable as of
+        # 2026-05-29; only @demo.proofoftalk.io stays blocked.
         from app.services.staff_filter import is_internal_staff
         if is_internal_staff(candidate):
+            return False
+
+        # Same-organization filter: never recommend two attendees who work at
+        # the same company / share a corporate email domain. Reported by Erin
+        # McMahon 2026-05-29 — her #1 match was the CEO of her own company.
+        from app.services.same_org_filter import is_same_organization
+        if is_same_organization(attendee, candidate):
             return False
 
         # Consent gate: high-profile speakers withheld until they consent.
