@@ -32,6 +32,7 @@ async def test_magic_accept_sets_a_side_and_computes_mutual():
     match = SimpleNamespace(
         id=uuid4(), attendee_a_id=aid_a, attendee_b_id=aid_b,
         status_a="pending", status_b="accepted", status="pending", decline_reason=None,
+        accepted_a_at=None, accepted_b_at=None,
     )
     db = _fake_db(attendee, match)
     with patch("app.api.routes.matches._build_match_response", AsyncMock(return_value="ok")):
@@ -53,6 +54,7 @@ async def test_magic_accept_sets_b_side():
     match = SimpleNamespace(
         id=uuid4(), attendee_a_id=aid_a, attendee_b_id=aid_b,
         status_a="accepted", status_b="pending", status="pending", decline_reason=None,
+        accepted_a_at=None, accepted_b_at=None,
     )
     db = _fake_db(attendee, match)
     with patch("app.api.routes.matches._build_match_response", AsyncMock(return_value="ok")):
