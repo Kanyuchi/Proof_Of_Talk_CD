@@ -5,7 +5,8 @@ import {
   Sparkles, Brain, Target, MessageSquare, Check,
   Linkedin, Twitter, Globe, UserPlus, Send, CheckCheck, FileText, KeyRound,
 } from "lucide-react";
-import { getMatchesByMagicLink, getIncomingSummaryByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink, acceptMatchByMagicLink } from "../api/client";
+import { getMatchesByMagicLink, getIncomingSummaryByMagicLink, updateProfileViaMagicLink, claimAccount, deferMatchByMagicLink, uploadPhotoViaMagicLink, acceptMatchByMagicLink, getMagicPriorityIntros } from "../api/client";
+import type { PriorityIntro } from "../types";
 import PhotoUpload from "../components/PhotoUpload";
 import { matchTypeConfig, twitterUrl } from "../utils/matchHelpers";
 import GridOrgCard from "../components/GridOrgCard";
@@ -75,6 +76,12 @@ export default function MagicMatches() {
   const { data: incomingSummary } = useQuery({
     queryKey: ["magic-incoming-summary", token],
     queryFn: () => getIncomingSummaryByMagicLink(token!),
+    enabled: !!token,
+  });
+
+  const { data: priorityIntros } = useQuery<PriorityIntro[]>({
+    queryKey: ["magic-priority-intros", token],
+    queryFn: () => getMagicPriorityIntros(token!),
     enabled: !!token,
   });
 
@@ -186,7 +193,8 @@ export default function MagicMatches() {
     !attendee.photo_url
   );
 
-  const matches = data?.matches ?? [];
+  const allMatches = data?.matches ?? [];
+  const matches = allMatches.filter((m) => m.tier !== "priority_intro");
 
   // Phase 4 — paywall the deep tier for unclaimed magic-link visitors. Top 8
   // render in full (rich explanations + accept/defer); the rest are replaced
@@ -477,6 +485,161 @@ export default function MagicMatches() {
           <CheckCheck className="w-5 h-5 text-emerald-400" />
           <p className="text-sm text-emerald-300">Saved! Your matches will improve on the next refresh.</p>
         </div>
+      )}
+
+      {/* Priority Intros */}
+      {priorityIntros && priorityIntros.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-white mb-1">Your priority intros</h2>
+          <p className="text-sm text-white/40 mb-4">
+            From your concierge request. William may reach out about these.
+          </p>
+          <div className="space-y-4">
+            {priorityIntros.map((intro) => {
+              if (intro.target_attendee_id && intro.match_id) {
+                const match = allMatches.find((m) => m.id === intro.match_id);
+                if (match) {
+                  const config = matchTypeConfig[match.match_type] ?? matchTypeConfig.complementary;
+                  const Icon = config.icon;
+                  const person = match.matched_attendee;
+                  return (
+                    <div
+                      key={match.id}
+                      className={`rounded-2xl border border-l-4 ${config.leftBorder} border-white/10 bg-white/[0.03] overflow-hidden`}
+                    >
+                      {/* Card header */}
+                      <div className="px-5 py-3 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${config.bg}`}>
+                            <Icon className="w-3 h-3" />
+                            {config.label}
+                          </span>
+                          <span className="text-xs text-white/30 hidden sm:block">{config.description}</span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-white/30">Match Score</div>
+                          <div className="text-lg font-bold text-[#E76315]">
+                            {(match.overall_score * 100).toFixed(0)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card body */}
+                      <div className="p-5 space-y-4">
+                        <div className="flex items-start gap-4">
+                          {person ? (
+                            <AttendeeAvatar attendee={person} size="lg" />
+                          ) : (
+                            <div className="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center text-white/20 text-lg font-bold shrink-0">
+                              ?
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-bold truncate">
+                                {person?.name ?? "Matched Attendee"}
+                              </h3>
+                              {person?.privacy_mode === "b2b_only" && (
+                                <span className="px-1.5 py-0.5 rounded bg-white/5 text-white/30 text-[9px] uppercase tracking-wider shrink-0">B2B Profile</span>
+                              )}
+                            </div>
+                            <p className="text-white/50 text-sm">
+                              {person?.title ? `${person.title} · ${person.company}` : person?.company}
+                            </p>
+                            <div className="flex items-center gap-3 mt-2">
+                              {person?.linkedin_url && (
+                                <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
+                                  className="text-white/30 hover:text-blue-400 transition-colors">
+                                  <Linkedin className="w-4 h-4" />
+                                </a>
+                              )}
+                              {person?.twitter_handle && (
+                                <a href={twitterUrl(person.twitter_handle)} target="_blank" rel="noopener noreferrer"
+                                  className="text-white/30 hover:text-sky-400 transition-colors">
+                                  <Twitter className="w-4 h-4" />
+                                </a>
+                              )}
+                              {person?.company_website && (
+                                <a href={person.company_website} target="_blank" rel="noopener noreferrer"
+                                  className="text-white/30 hover:text-[#E76315] transition-colors">
+                                  <Globe className="w-4 h-4" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {person && (person.enriched_profile as Record<string, any>)?.grid?.grid_description && (
+                          <GridOrgCard grid={(person.enriched_profile as Record<string, any>).grid} />
+                        )}
+
+                        {person?.ai_summary && (
+                          <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                            <div className="text-xs text-white/40 font-medium mb-2 uppercase tracking-wider">
+                              About {person.name?.split(" ")[0] ?? "this attendee"}
+                            </div>
+                            <p className="text-sm text-white/60 leading-relaxed">{person.ai_summary}</p>
+                          </div>
+                        )}
+
+                        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <MessageSquare className="w-4 h-4 text-[#E76315]" />
+                            <span className="text-xs font-medium text-[#E76315]">Why this meeting matters</span>
+                          </div>
+                          <p className="text-sm text-white/60 leading-relaxed">{match.explanation}</p>
+                        </div>
+
+                        {match.shared_context && Object.keys(match.shared_context).length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {Object.entries(match.shared_context).slice(0, 6).map(([key, val]) => (
+                              <span key={key} className="px-2.5 py-1 rounded-full bg-white/5 text-white/30 text-xs">
+                                {String(val)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-3 space-y-2">
+                          <button
+                            onClick={() => {
+                              setPendingAcceptMatchId(match.id);
+                              setPendingAcceptPersonName(person?.name ?? null);
+                              setClaimError("");
+                              setClaimOpen(true);
+                              setTimeout(() => {
+                                claimRef.current?.scrollIntoView({
+                                  behavior: "smooth",
+                                  block: "center",
+                                });
+                              }, 50);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-sm font-semibold hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20"
+                          >
+                            <Check className="w-4 h-4" />
+                            I'd like to meet
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+              }
+              // Unresolved intro — target not yet in the attendee DB
+              return (
+                <div key={intro.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4 opacity-70">
+                  <div className="text-sm font-medium text-white/70">{intro.target_name_raw}</div>
+                  {intro.target_company_raw && (
+                    <div className="text-xs text-white/40">{intro.target_company_raw}</div>
+                  )}
+                  <div className="mt-2 text-xs text-amber-400/80">
+                    Not yet attending - we'll let you know if they register.
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {/* Match count */}
