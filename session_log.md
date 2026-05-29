@@ -1804,3 +1804,22 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - **Existing prod state.** 17 staff rows surfaced (1 zero-match: Hamid Behbudi; the rest 1-32 matches mostly intra-staff). Hamid's existing 0-match state is unrelated to the filter — his `seeking=['Barry Silbert']` is too narrow to match anyone. The 03:30 UTC `refresh_matches_for_new_attendees` cron will retry the zero-match staffers tonight.
 - **Open question for Shaun.** Existing Match rows for paying attendees were NOT auto-refreshed (per CLAUDE.md policy). They will not contain any new PoT/XVentures candidates until: (a) the attendee saves a profile change → `refresh_profile_matches` runs, OR (b) an admin triggers a full refresh. If Shaun wants staff to appear in everyone's existing match cards immediately, we need to kick off a full refresh — flagged for him to decide.
 - **Commit + push.** `4846e72` on main; Railway auto-redeploys.
+
+## 2026-05-29 15:10 — [adoption-dashboard] Active count fix — drop unregistered magic-link openers from cumulative_active
+
+- **Symptom.** Shaun: dashboard showed "438 Active (since tracking began 2026-05-24)" alongside "391 Accounts" — Active > total accounts is impossible. He thought the 2026-05-25 PR #11 fix had covered this.
+- **Diagnosis (not a regression).** PR #11 only moved Active off the lagging `usage_daily` snapshot to a live query against `users.last_login_at`/`attendees.last_seen_at` — it kept the original "any attendee with `last_seen_at` counts" rule. That rule pre-dated the welcome-blast era. Prod numbers (queried via Supabase MCP):
+  - 391 accounts, 382 real
+  - 123 logged-in users
+  - 425 attendees with `last_seen_at` set (the "magic-link opens" stat)
+  - **132 of those 425 have NO `users` row at all** — they're directory rows that received a welcome email (168 sent 2026-05-28 + 219 sent 2026-05-29), clicked the magic link, but never registered.
+  - Dedup math: 123 ∪ 425 - 110-overlap = 438. The 132 unregistered openers are the structural cause of Active > Accounts.
+- **Why it only just showed up.** On 2026-05-25 the ratios were `magic=115 / login=19 / cumulative=120` against 161 real accounts — Active ≤ Accounts held by accident. The two welcome blasts pushed magic-link opens past total accounts and exposed the original conflation.
+- **Decision.** Shaun chose option 1: scope Active to "attendees with an account". Keep `magic_link_active` (425) untouched so the "Magic-link opens" card still exposes the engagement signal including unregistered openers.
+- **Change.**
+  - New helper `_account_linked_filter()` in [usage_snapshot.py](backend/app/services/usage_snapshot.py) — EXISTS subquery requiring a non-admin non-demo `users` row tied to `attendees.id`.
+  - Applied additively (`*_active_attendee_filter(), *_account_linked_filter()`) to the `att_rows` query in `compute_and_upsert_usage_daily()` (cron) AND the `_att_rows` query feeding `cumulative_active`/`active_last_7d` in `GET /dashboard/adoption` ([dashboard.py:1028](backend/app/api/routes/dashboard.py#L1028)).
+  - `magic_link_active` query in [dashboard.py:1005](backend/app/api/routes/dashboard.py#L1005) intentionally left UNCHANGED — that stat continues to show all opens including unregistered, which is the correct engagement signal and where the 132 no-account openers are visible.
+- **Tests.** `test_account_linked_filter_requires_user_row` + `test_active_attendee_filter_alone_does_not_require_user` added to `test_usage_active_exclusion.py`; docstring on `test_cumulative_active_counts_magic_link_only_account_holders` (renamed from `_attendees`) updated to reflect new semantics (mock now represents "account holder who only uses magic-link path"). **Full suite: 370 passed**.
+- **Prod simulation.** Compiled-equivalent query (Supabase MCP): cumulative_active 438 → **307**, active_last_7d → **307**, against 392 accounts. 307 ≤ 392 ✓.
+- **Historical data.** Existing `usage_daily` rows keep their pre-fix counts — they faithfully reflect the old definition at the time and shouldn't be back-rewritten. Tonight's 03:45 UTC cron writes the first row under the new definition.

@@ -98,8 +98,11 @@ async def test_cumulative_active_counts_login_only_users():
 
 
 @pytest.mark.asyncio
-async def test_cumulative_active_counts_magic_link_only_attendees():
-    """An attendee with last_seen_at but no user row counts once."""
+async def test_cumulative_active_counts_magic_link_only_account_holders():
+    """An attendee row returned by the SQL filter represents a person whose
+    account exists (filter requires it as of 2026-05-29) but who has only ever
+    used the magic-link path — last_login_at is NULL so they're absent from
+    user_rows. They must count once."""
     aid = uuid.uuid4()
     user_rows = []
     attendee_rows = [(aid, datetime(2026, 5, 20))]

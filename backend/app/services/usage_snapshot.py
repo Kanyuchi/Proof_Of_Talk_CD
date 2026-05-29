@@ -3,8 +3,13 @@
 
 "last_active" for a person = max(users.last_login_at, attendees.last_seen_at)
 for their linked rows. A person who both logged in and opened a magic link is
-counted once (we de-dupe on the attendee link). Magic-link-only users (no
-account) are counted via attendees.last_seen_at.
+counted once (we de-dupe on the attendee link).
+
+active_today / cumulative_active count only people who have an *account*
+(a non-admin, non-demo `users` row). Magic-link openers who never created an
+account are visible separately on the dashboard via `magic_link_active` (which
+still counts every opener for engagement reporting); they are excluded here so
+that `cumulative_active <= real_accounts` by construction.
 
 See docs/superpowers/specs/2026-05-24-adoption-usage-tracking-design.md.
 """
@@ -40,6 +45,11 @@ def _active_attendee_filter():
     'active' counts. Demo personas are matched by email suffix; an admin's own
     attendee row is matched via the same admin subquery pattern used in
     dashboard `/stats`.
+
+    NOTE: this filter does NOT require the attendee to have a user account, so
+    it remains usable for the "Magic-link opens" engagement stat that includes
+    unregistered openers. For "active accounts" metrics, splat
+    `_account_linked_filter()` as well.
     """
     admin_attendee_subq = (
         select(User.attendee_id)
@@ -50,6 +60,24 @@ def _active_attendee_filter():
         ~func.lower(func.coalesce(Attendee.email, "")).like(f"%{_DEMO_SUFFIX}"),
         ~Attendee.id.in_(admin_attendee_subq),
     )
+
+
+def _account_linked_filter():
+    """WHERE clause requiring the attendee row to be linked to a real (non-admin,
+    non-demo) user account. Used alongside `_active_attendee_filter()` for the
+    "active accounts" metrics so a magic-link open from a directory row that
+    never registered does not inflate the active count above total accounts.
+    """
+    has_real_user = (
+        select(User.id)
+        .where(
+            User.attendee_id == Attendee.id,
+            User.is_admin.is_(False),
+            ~func.lower(func.coalesce(User.email, "")).like(f"%{_DEMO_SUFFIX}"),
+        )
+        .exists()
+    )
+    return (has_real_user,)
 
 
 async def compute_and_upsert_usage_daily(db: AsyncSession) -> dict:
@@ -79,12 +107,15 @@ async def compute_and_upsert_usage_daily(db: AsyncSession) -> dict:
             )
         )
     ).all()
-    # Ever-active attendees: (id, last_seen_at). Demo + admin-linked excluded.
+    # Ever-active attendees with an account: (id, last_seen_at). Demo +
+    # admin-linked + no-account openers excluded so cumulative_active stays
+    # bounded by real_accounts.
     att_rows = (
         await db.execute(
             select(Attendee.id, Attendee.last_seen_at).where(
                 Attendee.last_seen_at.isnot(None),
                 *_active_attendee_filter(),
+                *_account_linked_filter(),
             )
         )
     ).all()

@@ -958,6 +958,7 @@ async def get_adoption(
         _DEMO_SUFFIX as _DEMO,
         _active_user_filter,
         _active_attendee_filter,
+        _account_linked_filter,
     )
 
     total = (await db.execute(select(func.count(User.id)))).scalar() or 0
@@ -1011,10 +1012,11 @@ async def get_adoption(
     ).scalar() or 0
 
     # ── Live cumulative_active + active_last_7d ──────────────────────────
-    # Previously read from usage_daily (up to 24 h stale). Now computed live
-    # from users.last_login_at / attendees.last_seen_at so the "Active" cards
-    # on the dashboard are always current.  Same person-dedup + admin/demo
-    # exclusion logic as compute_and_upsert_usage_daily() in usage_snapshot.py.
+    # Live person-deduped count of people active since tracking began (and in
+    # the last 7 days). Restricted to attendees with a real user account so
+    # the metric stays bounded by total accounts — directory rows that opened
+    # a magic-link email without registering are visible separately via
+    # `magic_link_active` above. Same admin/demo exclusion as the cron.
     _seven_days_ago = _dt.utcnow() - __import__("datetime").timedelta(days=7)
 
     _user_rows = (
@@ -1030,6 +1032,7 @@ async def get_adoption(
             select(Attendee.id, Attendee.last_seen_at).where(
                 Attendee.last_seen_at.isnot(None),
                 *_active_attendee_filter(),
+                *_account_linked_filter(),
             )
         )
     ).all()
