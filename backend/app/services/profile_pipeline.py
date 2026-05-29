@@ -92,6 +92,31 @@ async def _record_refresh_error(attendee_id: uuid.UUID, exc: Exception) -> None:
         )
 
 
+def _is_pooler_prep_stmt_race(exc: BaseException) -> bool:
+    """True if `exc` (or any cause in its chain) is the pgbouncer x asyncpg
+    prepared-statement race. Pattern:
+      asyncpg.exceptions.DuplicatePreparedStatementError("...already exists")
+      asyncpg.exceptions.InvalidSQLStatementNameError("...does not exist")
+    Both bubble up wrapped in sqlalchemy.exc.ProgrammingError. database.py
+    auto-sets the cache-size flags to 0 when DATABASE_URL is the :6543
+    pooler, but rare races still leak through (e.g. SAVEPOINT statements
+    issued by begin_nested() landing on a recycled connection). Retrying
+    with a fresh session resolves it deterministically."""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        name = type(cur).__name__
+        if name in ("DuplicatePreparedStatementError", "InvalidSQLStatementNameError"):
+            return True
+        # Also match when only the str of the SQLAlchemy wrapper survives.
+        msg = str(cur)
+        if "DuplicatePreparedStatementError" in msg or "asyncpg_stmt_" in msg:
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
+
 async def refresh_profile_matches(attendee_id: uuid.UUID, notify: bool = False) -> None:
     # Per-attendee serialization: two concurrent saves for the same person
     # would otherwise both run the ~5-10s embed + GPT-4o rerank pipeline,
@@ -99,20 +124,38 @@ async def refresh_profile_matches(attendee_id: uuid.UUID, notify: bool = False) 
     # Lock is process-local — multi-worker concurrency still falls through
     # to the DB-level unique constraint as the final backstop.
     async with _lock_for(attendee_id):
-        try:
-            async with async_session() as db:
-                engine = MatchingEngine(db)
-                attendee = await db.get(Attendee, attendee_id)
-                if not attendee:
-                    return
-                await engine.process_attendee(attendee)
-                # notify defaults False: saves shouldn't spam match emails; callers may opt in.
-                await engine.generate_matches_for_attendee(
-                    attendee_id, top_k=10, notify=notify
-                )
-        except Exception as exc:
-            logger.exception("refresh_profile_matches failed for %s: %s", attendee_id, exc)
-            await _record_refresh_error(attendee_id, exc)
+        last_exc: Exception | None = None
+        # One pooler-race retry with a fresh session. The pipeline is
+        # idempotent (process_attendee + generate_matches_for_attendee both
+        # upsert) so a retried partial run is safe.
+        for attempt in (1, 2):
+            try:
+                async with async_session() as db:
+                    engine = MatchingEngine(db)
+                    attendee = await db.get(Attendee, attendee_id)
+                    if not attendee:
+                        return
+                    await engine.process_attendee(attendee)
+                    # notify defaults False: saves shouldn't spam match emails; callers may opt in.
+                    await engine.generate_matches_for_attendee(
+                        attendee_id, top_k=10, notify=notify
+                    )
+                return
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+                if attempt == 1 and _is_pooler_prep_stmt_race(exc):
+                    logger.warning(
+                        "refresh_profile_matches: pgbouncer prep-stmt race for %s; retrying with fresh session",
+                        attendee_id,
+                    )
+                    continue
+                logger.exception("refresh_profile_matches failed for %s: %s", attendee_id, exc)
+                await _record_refresh_error(attendee_id, exc)
+                return
+        # Safety net: both attempts raised but neither path returned.
+        if last_exc is not None:
+            logger.exception("refresh_profile_matches failed for %s after retry: %s", attendee_id, last_exc)
+            await _record_refresh_error(attendee_id, last_exc)
 
 
 async def run_full_enrichment(attendee_id: uuid.UUID) -> None:
