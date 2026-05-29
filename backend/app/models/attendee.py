@@ -97,6 +97,10 @@ class Attendee(Base):
     # and the future recurring cron; lets the cron skip people the backlog covered.
     last_interest_notified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # When we last emailed this attendee the "N new top matches" digest.
+    # 72h per-attendee throttle. NULL = never sent. Used by run_match_digest cron.
+    last_match_digest_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
 
 class Match(Base):
     __tablename__ = "matches"

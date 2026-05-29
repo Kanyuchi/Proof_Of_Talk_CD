@@ -166,6 +166,30 @@ async def _morning_schedule_email():
     await _run_with_heartbeat("morning_schedule_email", run_morning_schedule)
 
 
+async def _daily_match_digest():
+    """09:00 UTC: 'N new top matches' digest for existing attendees whose
+    curated pool gained >=3 new matches since their last digest. Per-attendee
+    72h throttle via attendees.last_match_digest_at.
+    Complements send_match_intro_email (which only fires on first match-gen).
+
+    Kill-switch: if MATCH_DIGEST_ENABLED is False (the default), the actual
+    send is skipped. Heartbeat still fires so the dashboard shows alive-but-
+    disabled. Flip on Railway when ready - no redeploy required.
+    """
+    if not get_settings().MATCH_DIGEST_ENABLED:
+        await _run_with_heartbeat("daily_match_digest", lambda: _async_return({"disabled": True}))
+        return
+
+    from app.core.database import async_session
+    from app.services.match_digest_cron import run_match_digest
+
+    async def _go():
+        async with async_session() as db:
+            return await run_match_digest(db)
+
+    await _run_with_heartbeat("daily_match_digest", _go)
+
+
 async def _reciprocity_notify():
     """Every-2h job: forward-notify pending interests + mutual-completion emails.
 
@@ -242,11 +266,16 @@ scheduler.add_job(_reciprocity_notify,      IntervalTrigger(hours=2), **_JOB_DEF
 # year-round but only fires on the two conference days (2026-06-02 / 06-03);
 # the service guards that internally so leaving the trigger live is safe.
 scheduler.add_job(_morning_schedule_email,  CronTrigger(hour=7, minute=0, timezone="Europe/Paris"), **_JOB_DEFAULTS)
+# Match digest at 09:00 UTC (10:00 BST / 11:00 Paris): "N new top matches" to
+# existing attendees whose curated pool gained >=3 new matches since their last
+# digest. Per-attendee 72h throttle. Complements the once-lifetime match-intro
+# email which only fires on first match-generation.
+scheduler.add_job(_daily_match_digest,      CronTrigger(hour=9, minute=0, timezone="UTC"), **_JOB_DEFAULTS)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
-    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, enrichment 03:00, match refresh 03:30, usage snapshot 03:45 (UTC); reciprocity_notify every 2h; morning_schedule 07:00 Europe/Paris (only fires June 2/3 2026)")
+    logger.info("scheduler: started — extasy 02:00, speakers 02:15, grid audit 02:30, enrichment 03:00, match refresh 03:30, usage snapshot 03:45 (UTC); reciprocity_notify every 2h; morning_schedule 07:00 Europe/Paris (only fires June 2/3 2026); match_digest 09:00 UTC")
     yield
     scheduler.shutdown(wait=False)
     logger.info("scheduler: stopped")

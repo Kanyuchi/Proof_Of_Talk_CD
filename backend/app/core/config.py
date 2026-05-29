@@ -100,6 +100,14 @@ class Settings(BaseSettings):
     # real off-switch.
     RECIPROCITY_NOTIFY_ENABLED: bool = False
 
+    # Kill-switch for the 09:00 UTC match-digest cron ("N new top matches for
+    # Proof of Talk 2026"). Cron is wired in main.py but the body short-
+    # circuits when False. Flip true on Railway only after attendees.
+    # last_match_digest_at has been bootstrapped to a sensible cutoff (and
+    # after any in-flight full-refresh has finished, which would bump every
+    # Match.created_at past the stamp and cause a fire-everyone first run).
+    MATCH_DIGEST_ENABLED: bool = False
+
     # Integration (Runa / third-party)
     INTEGRATION_API_KEY: str = ""
     INTEGRATION_API_KEY_SECONDARY: str = ""  # For key rotation

@@ -361,6 +361,70 @@ def send_match_intro_email(
     _send_email(to_email, subject, body_html, body_text)
 
 
+def send_match_digest_email(
+    to_email: str,
+    attendee_name: str,
+    new_count: int,
+    top_match_name: str,
+    top_match_title: str,
+    top_match_company: str,
+    top_explanation: str,
+    magic_token: str | None = None,
+    app_url: str | None = None,
+    force: bool = False,
+) -> bool:
+    """"N new top matches" digest. Fires from a daily cron for existing
+    attendees whose curated pool gained >=3 new matches since the last digest.
+
+    `force=True` is for the cron path (off the request path); never call with
+    force=True from a request handler.
+    """
+    settings = get_settings()
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
+    first_name = attendee_name.split()[0] if attendee_name else attendee_name
+    dashboard_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
+    noun = "match" if new_count == 1 else "matches"
+    short_explanation = (
+        top_explanation[:220] + "…" if len(top_explanation) > 220 else top_explanation
+    )
+
+    subject = f"{first_name}, {new_count} new top {noun} for Proof of Talk 2026"
+    body_html = _render_email(
+        preheader=f"{new_count} new high-quality {noun} since your last visit.",
+        eyebrow="New introductions",
+        heading=f"{new_count} new top {noun} for you",
+        body_html=(
+            f"<tr><td style=\"padding:0 0 16px;\">Hi {first_name}, since you last checked in, "
+            f"the Matchmaker added {new_count} new top-tier {noun} to your pool — ranked by who is "
+            f"most worth your time at the Louvre.</td></tr>"
+            f"<tr><td style=\"padding:0 0 8px;\">"
+            f"  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#FBF8F3; border-left:3px solid #C2632A;\">"
+            f"    <tr><td style=\"padding:18px 20px;\">"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#C2632A; margin-bottom:8px;\">Featured new introduction</div>"
+            f"      <div style=\"font-family:Georgia,'Playfair Display',serif; font-size:18px; color:#211500; font-weight:600;\">{top_match_name}</div>"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:13px; color:#7A7268; margin-bottom:10px;\">{top_match_title}, {top_match_company}</div>"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:14px; line-height:1.6; color:#3A3A3A;\">{short_explanation}</div>"
+            f"    </td></tr>"
+            f"  </table>"
+            f"</td></tr>"
+        ),
+        cta_label=f"See all {new_count} new {noun}",
+        cta_url=dashboard_url,
+        unsubscribe=True,
+        unsubscribe_token=magic_token,
+    )
+    body_text = (
+        f"{new_count} new top {noun} for Proof of Talk 2026, {first_name}.\n\n"
+        f"Since your last visit, the Matchmaker added {new_count} new top-tier {noun} to your pool.\n\n"
+        f"Featured: {top_match_name}, {top_match_title} at {top_match_company}\n\n"
+        f"{short_explanation}\n\n"
+        f"View all: {dashboard_url}\n\n"
+        f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
+    )
+    return _send_email(to_email, subject, body_html, body_text, force=force)
+
+
 def send_mutual_match_email(
     to_email: str,
     attendee_name: str,
