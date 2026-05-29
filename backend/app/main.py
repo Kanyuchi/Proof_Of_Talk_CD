@@ -166,6 +166,15 @@ async def _morning_schedule_email():
     await _run_with_heartbeat("morning_schedule_email", run_morning_schedule)
 
 
+async def _mid_event_reengagement():
+    """One-shot 'N new attendees just arrived' email at 14:00 Europe/Paris on
+    2026-06-02. CronTrigger pins year/month/day. Force-sends off the request
+    path - EMAIL_MODE does not gate it.
+    """
+    from app.services.mid_event_reengagement import run_mid_event_reengagement
+    await _run_with_heartbeat("mid_event_reengagement", run_mid_event_reengagement)
+
+
 async def _t_minus_one_reminder():
     """One-shot 'Tomorrow at the Louvre' email at 17:00 Europe/Paris on
     2026-06-01. CronTrigger pins year/month/day so the trigger is
@@ -279,6 +288,10 @@ scheduler.add_job(_morning_schedule_email,  CronTrigger(hour=7, minute=0, timezo
 # T-1 reminder: one-shot at 17:00 Europe/Paris on 2026-06-01 ("Tomorrow at the
 # Louvre"). Date-bound trigger - never fires before/after that date, so no flag.
 scheduler.add_job(_t_minus_one_reminder,    CronTrigger(year=2026, month=6, day=1, hour=17, minute=0, timezone="Europe/Paris"), **_JOB_DEFAULTS)
+# Mid-event re-engagement: one-shot at 14:00 Europe/Paris on 2026-06-02. Date-
+# bound trigger - inert outside that window. "N new attendees just arrived
+# who match you" - reaches existing attendees about day-of registrations.
+scheduler.add_job(_mid_event_reengagement,  CronTrigger(year=2026, month=6, day=2, hour=14, minute=0, timezone="Europe/Paris"), **_JOB_DEFAULTS)
 # Match digest at 09:00 UTC (10:00 BST / 11:00 Paris): "N new top matches" to
 # existing attendees whose curated pool gained >=3 new matches since their last
 # digest. Per-attendee 72h throttle. Complements the once-lifetime match-intro

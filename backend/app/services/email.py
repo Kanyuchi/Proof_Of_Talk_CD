@@ -734,6 +734,77 @@ def send_t_minus_one_reminder_email(
     return _send_email(to_email, subject, body_html, body_text, force=force)
 
 
+def send_mid_event_reengagement_email(
+    to_email: str,
+    attendee_name: str,
+    new_arrival_count: int,
+    top_arrivals: list,
+    magic_token: str | None = None,
+    app_url: str | None = None,
+    force: bool = False,
+) -> bool:
+    """Mid-event re-engagement, fired once at 14:00 Paris on 2026-06-02:
+    "N new attendees just arrived at the Louvre who match you."
+
+    `top_arrivals`: list of {name, title, company} dicts (the new arrivals
+    who became matches, sorted by overall_score), max 3.
+    """
+    settings = get_settings()
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
+    if not top_arrivals or new_arrival_count < 1:
+        return False
+    first_name = attendee_name.split()[0] if attendee_name else attendee_name
+    dashboard_url = f"{app_url}/m/{magic_token}" if magic_token else f"{app_url}/matches"
+
+    noun = "person" if new_arrival_count == 1 else "people"
+    verb = "is" if new_arrival_count == 1 else "are"
+    subject = f"{new_arrival_count} new {noun} just arrived who match you"
+
+    cards = ""
+    for i, m in enumerate(top_arrivals[:3], 1):
+        name = (m.get("name") or "").strip() or "New arrival"
+        title = (m.get("title") or "").strip()
+        company = (m.get("company") or "").strip()
+        meta = ", ".join(x for x in (title, company) if x) or ""
+        cards += (
+            f"<tr><td style=\"padding:0 0 10px;\">"
+            f"  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#FBF8F3; border-left:3px solid #C2632A;\">"
+            f"    <tr><td style=\"padding:14px 18px;\">"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#C2632A; margin-bottom:6px;\">Just arrived</div>"
+            f"      <div style=\"font-family:Georgia,'Playfair Display',serif; font-size:17px; color:#211500; font-weight:600;\">{name}</div>"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:13px; color:#7A7268;\">{meta}</div>"
+            f"    </td></tr>"
+            f"  </table>"
+            f"</td></tr>"
+        )
+
+    body_html = _render_email(
+        preheader=f"{new_arrival_count} new attendees just arrived at the Louvre who match your profile.",
+        eyebrow="Today at the Louvre",
+        heading=f"{first_name}, {new_arrival_count} new {noun} just arrived",
+        body_html=(
+            f"<tr><td style=\"padding:0 0 14px;\">{new_arrival_count} {noun} just registered today and {verb} a top match for you. Find them before the doors close:</td></tr>"
+            f"{cards}"
+        ),
+        cta_label="See all today's matches",
+        cta_url=dashboard_url,
+        unsubscribe=True,
+        unsubscribe_token=magic_token,
+    )
+    text_lines = "\n".join(
+        f"  #{i}. {m.get('name','')} - {m.get('title','')}, {m.get('company','')}"
+        for i, m in enumerate(top_arrivals[:3], 1)
+    )
+    body_text = (
+        f"{new_arrival_count} new {noun} just arrived at the Louvre who match you, {first_name}.\n\n"
+        f"Just-arrived top matches:\n{text_lines}\n\n"
+        f"See all today's matches: {dashboard_url}\n\n"
+        f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
+    )
+    return _send_email(to_email, subject, body_html, body_text, force=force)
+
+
 # ── Post-event emails (Phase 6) ─────────────────────────────────────
 
 
