@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import { Navigate, Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Check, X, Brain, Target, MessageSquare, Sparkles,
@@ -8,6 +9,8 @@ import AttendeeAvatar from "../components/AttendeeAvatar";
 import { useAuth } from "../hooks/useAuth";
 import { useAttendee } from "../hooks/useAttendee";
 import { useMatches, useUpdateMatchStatus, useScheduleMeeting, useMeetingFeedback, useDeferMatch } from "../hooks/useMatches";
+import { getPriorityIntros } from "../api/client";
+import type { PriorityIntro } from "../types";
 import { useSendMatchMessage } from "../hooks/useMessages";
 import { profileCompleteness } from "../utils/profileCompleteness";
 import { Lock, Zap } from "lucide-react";
@@ -26,6 +29,11 @@ export default function MyMatches() {
   const attendeeId = user?.attendee_id ?? undefined;
 
   const { data: matchData, isLoading: loadingMatches } = useMatches(attendeeId);
+  const { data: priorityIntros } = useQuery<PriorityIntro[]>({
+    queryKey: ["priority-intros"],
+    queryFn: getPriorityIntros,
+    enabled: !!attendeeId,
+  });
   const { data: myAttendee } = useAttendee(attendeeId);
   const updateStatus = useUpdateMatchStatus(attendeeId);
   const defer = useDeferMatch(attendeeId);
@@ -51,7 +59,8 @@ export default function MyMatches() {
     searchParams.get("tab") === "requests" ? "requests" : "all"
   );
 
-  const matches = matchData?.matches ?? [];
+  const allMatches = matchData?.matches ?? [];
+  const matches = allMatches.filter((m) => m.tier !== "priority_intro");
   const isAdmin = user?.is_admin ?? false;
 
   // Admins don't have an attendee profile, so /matches is always empty for
@@ -351,6 +360,185 @@ export default function MyMatches() {
               </div>
             );
           })()}
+
+          {/* ── Priority Intros ──────────────────────────────── */}
+          {priorityIntros && priorityIntros.length > 0 && (
+            <section className="mb-8">
+              <h2 className="text-xl font-bold text-white mb-1">Your priority intros</h2>
+              <p className="text-sm text-zinc-400 mb-4">
+                From your concierge request. William may reach out about these.
+              </p>
+              <div className="space-y-4">
+                {priorityIntros.map((intro) => {
+                  if (intro.target_attendee_id && intro.match_id) {
+                    const match = allMatches.find((m) => m.id === intro.match_id);
+                    if (match) {
+                      const config = matchTypeConfig[match.match_type] ?? matchTypeConfig.complementary;
+                      const Icon = config.icon;
+                      const person = match.matched_attendee;
+                      const isExpanded = expandedIds.has(match.id);
+                      const longExplanation = match.explanation.length > 200;
+                      const idx = allMatches.indexOf(match);
+                      return (
+                        <div
+                          key={match.id}
+                          className={`rounded-2xl border border-l-4 ${config.leftBorder} overflow-hidden transition-all ${
+                            match.status === "accepted"
+                              ? "border-emerald-400/30 bg-emerald-400/[0.03]"
+                              : match.status === "declined"
+                              ? "border-white/5 bg-white/[0.01] opacity-50"
+                              : "border-white/10 bg-white/[0.03] hover:border-white/20"
+                          }`}
+                        >
+                          {/* Card header */}
+                          <div className="px-5 py-3 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-lg font-bold text-white/20">#{idx + 1}</span>
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${config.bg}`}>
+                                <Icon className="w-3 h-3" />
+                                {config.label}
+                              </span>
+                              <span className="text-xs text-white/30 hidden sm:block">{config.description}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => toggleSaved(match.id)}
+                                className={`p-1.5 rounded-lg transition-all ${
+                                  savedMatchIds.has(match.id)
+                                    ? "text-[#E76315] bg-[#E76315]/10"
+                                    : "text-white/20 hover:text-white/50"
+                                }`}
+                                title={savedMatchIds.has(match.id) ? "Remove from saved" : "Save for later"}
+                              >
+                                {savedMatchIds.has(match.id)
+                                  ? <BookmarkCheck className="w-4 h-4" />
+                                  : <Bookmark className="w-4 h-4" />
+                                }
+                              </button>
+                              <div className="text-right">
+                                <div className="text-xs text-white/30">Compatibility</div>
+                                <div className="text-lg font-bold text-[#E76315]">
+                                  {match.overall_score >= 0.85 ? "Strong match" : match.overall_score >= 0.7 ? "Good match" : "Potential match"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Card body */}
+                          <div className="p-5 space-y-4">
+                            {person && (
+                              <div className="flex items-center gap-3">
+                                <AttendeeAvatar attendee={person} size="md" />
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold">{person.name}</span>
+                                    <span className="text-white/30">{ticketIcons[person.ticket_type]}</span>
+                                    {person.privacy_mode === "b2b_only" && (
+                                      <span className="px-1.5 py-0.5 rounded bg-white/5 text-white/30 text-[9px] uppercase tracking-wider">B2B Profile</span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-white/50">
+                                    {person.title ? `${person.title} · ${person.company}` : person.company}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {person.linkedin_url && (
+                                      <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer"
+                                        className="text-white/30 hover:text-blue-400 transition-colors">
+                                        <Linkedin className="w-3.5 h-3.5" />
+                                      </a>
+                                    )}
+                                    {person.twitter_handle && (
+                                      <a href={twitterUrl(person.twitter_handle)} target="_blank" rel="noopener noreferrer"
+                                        className="text-white/30 hover:text-sky-400 transition-colors">
+                                        <Twitter className="w-3.5 h-3.5" />
+                                      </a>
+                                    )}
+                                    {person.company_website && (
+                                      <a href={person.company_website} target="_blank" rel="noopener noreferrer"
+                                        className="text-white/30 hover:text-[#E76315] transition-colors">
+                                        <Globe className="w-3.5 h-3.5" />
+                                      </a>
+                                    )}
+                                  </div>
+                                  {(person.vertical_tags ?? []).length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1.5">
+                                      {person.vertical_tags.map((tag) => (
+                                        <span key={tag} className="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 text-[10px] border border-purple-500/20">
+                                          {verticalDisplayName(tag)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                                {person.deal_readiness_score != null && person.deal_readiness_score > 0 && (
+                                  <div className="ml-auto text-right">
+                                    <div className="text-[10px] text-white/30 uppercase">Deal Ready</div>
+                                    <div className="text-sm font-mono text-emerald-400">
+                                      {(person.deal_readiness_score * 100).toFixed(0)}%
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {person && (person.enriched_profile as Record<string, any>)?.grid?.grid_description && (
+                              <GridOrgCard grid={(person.enriched_profile as Record<string, any>).grid} />
+                            )}
+
+                            {person?.ai_summary && (
+                              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                                <div className="text-xs text-white/40 font-medium mb-2 uppercase tracking-wider">
+                                  About {person.name?.split(" ")[0] ?? "this attendee"}
+                                </div>
+                                <p className="text-sm text-white/60 leading-relaxed">
+                                  {person.ai_summary}
+                                </p>
+                              </div>
+                            )}
+
+                            <div className="p-4 rounded-xl bg-[#E76315]/5 border border-[#E76315]/10">
+                              <div className="flex items-center gap-2 text-xs text-[#E76315] font-medium mb-2">
+                                <Brain className="w-3.5 h-3.5" />
+                                Why this meeting matters
+                              </div>
+                              <p className="text-sm text-white/70 leading-relaxed">
+                                {longExplanation && !isExpanded
+                                  ? `${match.explanation.slice(0, 200)}…`
+                                  : match.explanation}
+                              </p>
+                              {longExplanation && (
+                                <button
+                                  onClick={() => toggleExpanded(match.id)}
+                                  className="mt-2 flex items-center gap-1 text-xs text-[#E76315]/60 hover:text-[#E76315] transition-colors"
+                                >
+                                  {isExpanded ? (
+                                    <><ChevronUp className="w-3 h-3" /> Show less</>
+                                  ) : (
+                                    <><ChevronDown className="w-3 h-3" /> Show more</>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+                  return (
+                    <div key={intro.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 opacity-70">
+                      <div className="text-sm font-medium text-zinc-300">{intro.target_name_raw}</div>
+                      {intro.target_company_raw && (
+                        <div className="text-xs text-zinc-500">{intro.target_company_raw}</div>
+                      )}
+                      <div className="mt-2 text-xs text-amber-400/80">
+                        Not yet attending - we'll let you know if they register.
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           <div className="space-y-4">
             {(
