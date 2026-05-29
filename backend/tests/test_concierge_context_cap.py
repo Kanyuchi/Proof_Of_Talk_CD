@@ -51,19 +51,23 @@ def test_demo_viewer_sees_only_other_demo_personas():
     demo1 = _att("amara@demo.proofoftalk.io")
     demo2 = _att("marcus@demo.proofoftalk.io")
     real = _att("ceo@realstartup.com")
-    staff = _att("team@proofoftalk.io")
-    pool = _scope_candidates([demo1, demo2, real, staff], demo1)
-    assert pool == [demo2]  # other demo only — no self, no real, no staff
+    pot_staff = _att("team@proofoftalk.io")
+    pool = _scope_candidates([demo1, demo2, real, pot_staff], demo1)
+    # Demo viewer is still isolated — only other demo personas. Real attendees
+    # AND PoT/XVentures staff are both in the "real pool" the demo can't see.
+    assert pool == [demo2]
 
 
-def test_real_viewer_excludes_demo_and_staff_and_self():
+def test_real_viewer_excludes_demo_and_self_but_includes_staff():
+    # As of 2026-05-29 PoT + XVentures staff (@proofoftalk.io, @xventures.de)
+    # are part of the matching pool. Only @demo.proofoftalk.io stays excluded.
     me = _att("me@acme.com")
     peer = _att("peer@beta.com")
     demo = _att("amara@demo.proofoftalk.io")
-    staff = _att("ops@xventures.de")
-    pool = _scope_candidates([me, peer, demo, staff], me)
-    assert peer in pool
-    assert demo not in pool and staff not in pool and me not in pool
+    pot_staff = _att("ops@xventures.de")
+    pool = _scope_candidates([me, peer, demo, pot_staff], me)
+    assert peer in pool and pot_staff in pool
+    assert demo not in pool and me not in pool
 
 
 def test_no_viewer_defaults_to_real_pool():

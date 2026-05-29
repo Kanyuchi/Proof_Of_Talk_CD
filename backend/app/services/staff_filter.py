@@ -1,44 +1,38 @@
 """
-Internal-staff filter for the matching engine.
+Demo-persona filter for the matching engine.
 
-POT and X Ventures staff are NOT real attendees from the matchmaker's
-perspective — they're organisers. They have profiles in the database for
-operational reasons (admin accounts, dashboard testing, sponsor outreach
-context) but external attendees should never be matched with them.
+The only profiles excluded from matching today are the isolated demo/video
+personas on @demo.proofoftalk.io (see scripts/seed_demo_profiles.py) — full
+fake profiles that match ONLY each other and must never surface in real
+attendees' candidate retrieval (both directions), and are excluded from
+dashboard counts.
 
-Exception: Zohair Dehnadi and Victor Blas are X Ventures partners who
-use the matchmaker exactly as any external VC would. They stay matchable
-in both directions.
+PoT and X Ventures staff (@proofoftalk.io, @xventures.de, @x-ventures.de)
+ARE in the matching pool — they participate as ordinary attendees, both
+directions. This is a 2026-05-29 change; before that the two domains were
+blocked and Zohair/Victor were the only carve-outs.
 
-This logic was previously duplicated in `scripts/match_sample_report.py`;
-this module is the single source of truth.
+The function name `is_internal_staff` is preserved for backwards-compat
+with callers in matching.py / concierge.py / export_companies_with_people.py;
+semantically it now answers "is this a demo persona?".
 """
 
 from typing import Any
 
 INTERNAL_EMAIL_DOMAINS: set[str] = {
-    "proofoftalk.io", "xventures.de", "x-ventures.de",
-    # Isolated demo/video personas — full fake profiles that match ONLY each
-    # other (see scripts/seed_demo_profiles.py). Treated as internal so they
-    # never surface in real attendees' candidate retrieval (both directions),
-    # and they're excluded from dashboard counts too.
     "demo.proofoftalk.io",
 }
 
-INTERNAL_COMPANY_PATTERNS: set[str] = {
-    "proof of talk", "proofoftalk", "proof of talk sa",
-    "xventures", "x ventures", "x-ventures", "xventures labs",
-}
+INTERNAL_COMPANY_PATTERNS: set[str] = set()
 
-# Names kept matchable despite being on an internal domain.
-ALLOWED_NAMES: set[str] = {
-    "zohair dehnadi",
-    "victor blas",
-}
+ALLOWED_NAMES: set[str] = set()
 
 
 def is_internal_staff(attendee: Any) -> bool:
-    """Return True if this attendee is POT/X Ventures organiser staff.
+    """Return True if this attendee should be excluded from matching.
+
+    Today the only excluded profiles are the @demo.proofoftalk.io demo
+    personas. PoT and X Ventures staff are included as ordinary attendees.
 
     Accepts both ORM Attendee instances and dicts (uses getattr/get).
     """
