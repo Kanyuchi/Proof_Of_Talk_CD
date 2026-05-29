@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 from sqlalchemy import select, text, delete as sql_delete, or_, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from openai import AsyncOpenAI
 from app.core.config import get_settings
@@ -882,8 +883,17 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 explanation_confidence=entry.get("explanation_confidence"),
                 tier=tier,
             )
-            self.db.add(match)
-            persisted.append(match)
+            # Savepoint-wrap so a concurrent writer that won the
+            # (LEAST(a,b), GREATEST(a,b)) unique-index race causes us to
+            # skip this row instead of aborting the entire transaction.
+            try:
+                async with self.db.begin_nested():
+                    self.db.add(match)
+                    await self.db.flush()
+                persisted.append(match)
+            except IntegrityError:
+                # Other writer beat us to it; their row stands, move on.
+                pass
         return persisted
 
     async def _purge_stale_matches_and_collect_locked(
@@ -996,12 +1006,17 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 shared_context={},
                 tier="priority_intro",
             )
-            self.db.add(new_match)
-            existing_matches.append(new_match)
-            added += 1
+            # Same race-guard as _persist_ranked: savepoint so a concurrent
+            # writer doesn't blow the whole commit.
+            try:
+                async with self.db.begin_nested():
+                    self.db.add(new_match)
+                    await self.db.flush()
+                existing_matches.append(new_match)
+                added += 1
+            except IntegrityError:
+                pass
 
-        if added:
-            await self.db.flush()
         # Commit so tier upgrades + force-added rows survive the session close.
         # _apply_priority_intros is called after generate_matches_for_attendee's
         # own commit, so a flush-only here gets rolled back at session __aexit__.
@@ -1132,8 +1147,14 @@ Return ONLY the JSON array. No markdown, no commentary."""
                     shared_context={"sectors": shared, "fallback": True},
                     explanation_confidence=0.4,
                 )
-                self.db.add(fallback)
-                matches.append(fallback)
+                # Race-guard: skip on unique-index conflict.
+                try:
+                    async with self.db.begin_nested():
+                        self.db.add(fallback)
+                        await self.db.flush()
+                    matches.append(fallback)
+                except IntegrityError:
+                    pass
                 if len(matches) >= 3:
                     break
 
