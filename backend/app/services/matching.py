@@ -1002,6 +1002,10 @@ Return ONLY the JSON array. No markdown, no commentary."""
 
         if added:
             await self.db.flush()
+        # Commit so tier upgrades + force-added rows survive the session close.
+        # _apply_priority_intros is called after generate_matches_for_attendee's
+        # own commit, so a flush-only here gets rolled back at session __aexit__.
+        await self.db.commit()
         return existing_matches
 
     async def generate_matches_for_attendee(
