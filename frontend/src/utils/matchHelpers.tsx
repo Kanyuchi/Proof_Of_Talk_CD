@@ -10,11 +10,11 @@ export function twitterUrl(handle: string): string {
 
 // Conference time slots — June 2 & 3, 2026
 export const CONFERENCE_SLOTS = [
-  { day: "June 2", label: "Mon 2 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },
-  { day: "June 2", label: "Mon 2 Jun — Afternoon", slots: ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
-  { day: "June 2", label: "Mon 2 Jun — Evening", slots: ["18:00", "18:30", "19:00"] },
-  { day: "June 3", label: "Tue 3 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },
-  { day: "June 3", label: "Tue 3 Jun — Afternoon", slots: ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
+  { day: "June 2", label: "Tue 2 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },
+  { day: "June 2", label: "Tue 2 Jun — Afternoon", slots: ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
+  { day: "June 2", label: "Tue 2 Jun — Evening", slots: ["18:00", "18:30", "19:00"] },
+  { day: "June 3", label: "Wed 3 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },
+  { day: "June 3", label: "Wed 3 Jun — Afternoon", slots: ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
 ];
 
 export function slotToISO(day: string, time: string): string {
@@ -30,12 +30,12 @@ export function formatMeetingTime(iso: string): string {
   });
 }
 
-/** Compact slot label for one-click-book chips, e.g. "Mon 09:30". */
+/** Compact slot label for one-click-book chips, e.g. "Tue 09:30". */
 export function formatSlotChip(iso: string): string {
   // Slots come from the backend as naive ISO strings ("2026-06-02T09:00:00").
   // Treat them as wall-clock — `new Date(iso)` parses naive ISO as local time.
   const d = new Date(iso);
-  const day = d.getDate() === 2 ? "Mon" : "Tue";
+  const day = d.getDate() === 2 ? "Tue" : "Wed";
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${day} ${hh}:${mm}`;

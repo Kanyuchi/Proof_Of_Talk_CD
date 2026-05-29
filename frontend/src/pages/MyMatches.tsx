@@ -896,7 +896,7 @@ export default function MyMatches() {
                                               : "bg-white/5 border-white/10 text-white/40 hover:text-white/60"
                                           }`}
                                         >
-                                          {day === "June 2" ? "Mon, Jun 2" : "Tue, Jun 3"}
+                                          {day === "June 2" ? "Tue, Jun 2" : "Wed, Jun 3"}
                                         </button>
                                       ))}
                                     </div>
