@@ -594,6 +594,51 @@ def send_welcome_email(
     return _send_email(to_email, subject, body_html, body_text, force=force)
 
 
+def _interest_copy_for_count(count: int) -> dict:
+    """Count-aware copy tiers for send_interest_notification.
+
+    - count == 1:  soft  — single low-key nudge
+    - count 2-4:   standard — confirmation tone
+    - count >= 5:  urgency — names the cap before the event
+
+    Returns dict with subject/eyebrow/heading/lead_text/cta_label.
+    """
+    if count == 1:
+        return {
+            "subject": "Someone wants to meet you at Proof of Talk",
+            "eyebrow": "Mutual interest",
+            "heading": "Someone wants to meet you",
+            "lead_text": (
+                "{first}, an attendee just said yes to meeting you at Proof of Talk 2026. "
+                "Have a look — if it lands, you can book the meeting in one tap, no login needed."
+            ),
+            "cta_label": "See who it is",
+        }
+    if 2 <= count <= 4:
+        return {
+            "subject": f"{count} people want to meet you at Proof of Talk",
+            "eyebrow": "Mutual interest",
+            "heading": f"{count} people want to meet you",
+            "lead_text": (
+                "Hi {first}, {n} people want to meet you at Proof of Talk 2026. They have "
+                "already said yes — accept back and book the meetings in one tap, no login needed."
+            ),
+            "cta_label": "See who wants to meet you",
+        }
+    # count >= 5 — urgency tier
+    return {
+        "subject": f"{count} people want to meet you — the Louvre is days away",
+        "eyebrow": "Mutual interest",
+        "heading": f"{count} people are waiting on you",
+        "lead_text": (
+            "Hi {first}, {n} attendees have said yes to meeting you at the Louvre. They are "
+            "ready to book — they need a response from you before the doors open on Tuesday "
+            "morning. Accept back in one tap, no login needed."
+        ),
+        "cta_label": f"Respond to all {count}",
+    }
+
+
 def send_interest_notification(
     to_email: str,
     attendee_name: str,
@@ -604,6 +649,11 @@ def send_interest_notification(
 ) -> bool:
     """"N people want to meet you" pull-back email. The CTA lands on the
     magic-link Requests tab so a no-login attendee can accept back in one tap.
+
+    Copy tiers automatically per count (see `_interest_copy_for_count`):
+    1 = soft single-person framing, 2-4 = standard, 5+ = urgency w/ Louvre
+    timing. Same template + CTA shape across tiers - only the wording shifts
+    so the reader recognises the email family.
 
     `force=True` is for the operator backlog batch (notify_pending_interest.py)
     and the future recurring cron — both off the request path. Never call with
@@ -616,30 +666,28 @@ def send_interest_notification(
     requests_url = (
         f"{app_url}/m/{magic_token}?tab=requests" if magic_token else f"{app_url}/matches"
     )
-    noun = "person wants" if count == 1 else "people want"
-    subject = f"{count} {noun} to meet you at Proof of Talk"
+    copy = _interest_copy_for_count(count)
+    lead_text = copy["lead_text"].format(first=first_name, n=count)
     body_html = _render_email(
-        preheader=f"{count} {noun} to meet you. Accept to lock in the meeting.",
-        eyebrow="Mutual interest",
-        heading=f"{count} {noun} to meet you",
+        preheader=f"{count} mutual interest at Proof of Talk. Accept to lock it in.",
+        eyebrow=copy["eyebrow"],
+        heading=copy["heading"],
         body_html=(
-            f"<tr><td style=\"padding:0 0 14px;\">Hi {first_name}, {count} {noun} to meet you at "
-            f"Proof of Talk 2026. They have already said yes. Accept them back and you can book a "
-            f"meeting in one tap, no login needed.</td></tr>"
+            f"<tr><td style=\"padding:0 0 14px;\">{lead_text}</td></tr>"
         ),
-        cta_label="See who wants to meet you",
+        cta_label=copy["cta_label"],
         cta_url=requests_url,
         cta_color="#E76315",
         unsubscribe=True,
         unsubscribe_token=magic_token,
     )
     body_text = (
-        f"{count} {noun} to meet you at Proof of Talk 2026, {first_name}.\n\n"
-        f"They have already said yes. Accept them back and book a meeting in one tap:\n"
-        f"{requests_url}\n\n"
+        f"{copy['heading']} - Proof of Talk 2026, {first_name}.\n\n"
+        f"{lead_text}\n\n"
+        f"Accept and book a meeting: {requests_url}\n\n"
         f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
     )
-    return _send_email(to_email, subject, body_html, body_text, force=force)
+    return _send_email(to_email, copy["subject"], body_html, body_text, force=force)
 
 
 # ── Pre-event emails ─────────────────────────────────────────────────
