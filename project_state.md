@@ -142,3 +142,19 @@
 
 ## 2026-05-25 — User-editable AI write-up (LIVE)
 - Attendees can edit their own AI write-up (`ai_summary`) on the Profile page and/or Regenerate it from AI. A user edit sets `attendees.ai_summary_pinned=true`; `MatchingEngine.process_attendee` skips `generate_ai_summary` when pinned, so the user's text survives every re-embed/cron and feeds their match embedding. Empty submission un-pins ("reset to AI"). 2000-char cap. On for all attendees. Magic-link self-fill card NOT covered (v1 scope).
+
+## 2026-05-29 — Concurrency hardening (PR #19 LIVE)
+- `matches` table now has `uq_matches_pair` unique index on `(LEAST(a,b), GREATEST(a,b))` blocking dup pairs at DB level. Migration `c4f1a2e8b3d7`.
+- All 3 `Match()` insert sites in `services/matching.py` (`_persist_ranked`, `_apply_priority_intros` force-add, sector-fallback) now savepoint-wrapped with `IntegrityError`-catch race-guard.
+- `refresh_profile_matches` errors UPSERT to `sync_status.refresh_profile_matches` (no longer silently swallowed in logs only).
+- Per-attendee `asyncio.Lock` in `refresh_profile_matches` (WeakValueDictionary keyed by attendee_id) — concurrent saves for same person serialize; different attendees still parallel.
+- Pre-cleanup audit: 39 dup pairs in prod. Post-cleanup: 0.
+- Tests: 378 passed (+12 vs yesterday's 366).
+- Ylli duplicate attendee row (`ylli.vllasolli@elliptic.co`) deleted (29 throwaway matches + 1 attendee row, atomically).
+
+## 2026-05-29 — Elliptic priority intros LIVE (PRs #17 + #18)
+- 60 `RequestedIntro` rows persisted (Aylin 33 + Ylli 27); 28 resolved to existing attendees.
+- Aylin: 16 `priority_intro` Match rows. Ylli: 11 (was 0 before today's `_apply_priority_intros` commit() fix — `flush()`-only was being rolled back at session `__aexit__`).
+- New tier surfaces above curated on both `/matches` (authed) and `/m/{token}` (magic link) for both Elliptic accounts.
+- Unresolved intros (32) show as greyed-out cards; auto-resolve as targets register via Rhuna.
+- Migration `9b3e2d1a8c4f` at prod alembic head (now superseded by `c4f1a2e8b3d7`).
