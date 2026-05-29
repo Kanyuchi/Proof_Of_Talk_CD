@@ -1742,3 +1742,14 @@ Three production fixes shipped and verified live, plus a follow-up on the CEO-da
 - **PR #16 Phase 4 (this PR).** Match-pool paywall: when `has_account === false` AND total pool > 8 (`matches.length + locked_count`), the displayed list truncates to the top 8 cards and renders an orange paywall card with up to 5 teaser avatars faded behind, headline "You have {N} more matches in your pool", subhead about unlocking + messaging + booking at the Louvre, CTA "Unlock my full match list →" (opens claim panel via the standard pattern). Backend untouched - truncation is FRONTEND-ONLY on the magic-link surface, so the same `GET /matches/m/{token}` keeps serving the logged-in app intact. Smoke: unclaimed Ylli renders 8 cards + "19 more matches in your pool" paywall ✓; claimed Ylli renders all 24 cards, no paywall ✓.
 - **Full session scope.** 4 PRs + 1 QA copy-fix = the entire 4-phase magic-link conversion funnel from `docs/superpowers/plans/2026-05-28-magic-link-conversion-funnel.md`. Ran under the plan's 10-13h estimate because (1) Phase 1's reorder criterion was already met in the file, (2) the existing claim-panel CTA copy turned out to work for Phase 2 banner taps without needing a `pendingAcceptPersonName`-override hack. Anchored throughout to `feedback_magic_link_preview_only.md` - every change keeps the magic-link as a preview/conversion funnel; no full-feature surfaces (decline, message, schedule) added.
 - **Open follow-up (not blocking).** Add per-side `accepted_a_at` / `accepted_b_at` columns to `matches` so future banner copy can audit WHEN/HOW accepts happened. Surfaced by PR #14 investigation - the wording "accepted your interest" needed correcting partly because the schema can't back the asymmetric reciprocity claim.
+
+## 2026-05-29 - Priority intro requests (Elliptic gold-tier perk)
+
+- Added `requested_intros` table + `matches.accepted_*_at` columns (migration 9b3e2d1a8c4f)
+- New `priority_intro` tier surfaces concierge-curated targets at the top of /matches with honest factual cards (no GPT fabrication)
+- Per-attendee cap at 50; force-include for out-of-pool targets
+- New endpoints: `GET /matches/priority-intros` (authed) and `GET /matches/m/{token}/priority-intros` (magic-link)
+- Frontend: `MyMatches` + `MagicMatches` render a "Your priority intros" section above curated, with greyed-out cards for unresolved targets
+- Tests: 4 matching + 6 endpoint + 4 timestamp = 14 new (all green, no regression in the 55-test matching suite)
+- Pending: ingest script (Task 7) blocked on Elliptic sheet access; backend ready to receive rows once the script lands
+- Commits: `db3b8db`, `99eb7fb`, `bb8cb51`, `ca3d67d`, `5deafc2`, `ccf09fe`, `32b86a0`, `b794b5f`, `889c79a` on branch `priority-intros`

@@ -6,6 +6,8 @@
 
 ## Now
 
+- **[priority-intros]** Backend tier + endpoints + UI live on branch `priority-intros` (not yet merged). Remaining: (a) get access to Sheet `1g40iZM_utxjG_aPzynDmOwny8g_iQKv0FAHyj6RWE5I` (shared with shaunkudzi@gmail.com), confirm per-tab headers, finalise the ingest script (Task 7 in the plan), (b) merge `priority-intros` - main, (c) run the ingest per requester (Aylin / Ylli / Oliver), (d) trigger match-refresh per requester so the new tier surfaces immediately, (e) notify William.
+
 ## Now (reciprocity-loop — ✅ SHIPPED & LIVE 2026-05-25)
 
 - **[hercle-jeremy-dup-cleanup]** — Jeremy Gruffat's email was updated `jeremyg@hercle.financial` → `jeremyg@hercle.com` today (Hercle TLD migration; Olga request, see session_log 2026-05-28 11:25). Tomorrow's 02:00 UTC Extasy sync will not find his row by email and will INSERT a duplicate `.financial` row tied to order `a81e8431-f968-49ad-a6cc-4a135377326f`. One-time cleanup after the sync runs: `DELETE FROM attendees WHERE email='jeremyg@hercle.financial' AND extasy_order_id='a81e8431-f968-49ad-a6cc-4a135377326f';` (verify the `.com` row still holds the order_id first). Same shape as the case-sensitive-email dup pattern already on the books.
@@ -253,3 +255,4 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 
 ### Done — 2026-05-25
 - **User-editable AI write-up** shipped & live: attendees can edit/regenerate their own write-up on the Profile page; edits are pinned so the AI never overwrites them. Backend guard + `PUT /auth/profile` (ai_summary) + `POST /auth/profile/regenerate-summary`; Profile page textarea + Regenerate button. Pouneh's bio pinned. Specs/plans in `docs/superpowers/`.
+- **[elliptic-vip-target-list]** Backend schema, matching engine integration, endpoints, and UI rendering complete on branch `priority-intros` (commits db3b8db-889c79a). Ingest + deploy pending — see the new `[priority-intros]` entry in Now.
