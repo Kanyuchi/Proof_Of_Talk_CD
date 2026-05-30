@@ -160,3 +160,8 @@
 - New tier surfaces above curated on both `/matches` (authed) and `/m/{token}` (magic link) for both Elliptic accounts.
 - Unresolved intros (32) show as greyed-out cards; auto-resolve as targets register via Rhuna.
 - Migration `9b3e2d1a8c4f` at prod alembic head (now superseded by `c4f1a2e8b3d7`).
+
+## 2026-05-30 update
+- Same-org matching filter live (`same_org_filter.py`): no more "matched with CEO of my own company" reports.
+- Full refresh in progress: 1300/1606 done at 09:21, rate sped up ~30x overnight (likely OpenAI throttle cleared), ETA ~2.5 min for the remainder.
+- `scripts/full_refresh_matches.py` now wraps each attendee in `asyncio.wait_for(timeout=180)` + accepts a resume-from-index argv to recover from mid-run kills.

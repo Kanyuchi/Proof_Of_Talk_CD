@@ -36,9 +36,13 @@ from app.services.matching import MatchingEngine  # noqa: E402
 
 
 PROGRESS_EVERY = 10
+PER_ATTENDEE_TIMEOUT = 180  # seconds — added after a single OpenAI/DB call hung indefinitely at #1261 in the first run, freezing the loop for 9h with no failure raised.
 
 
 async def main() -> None:
+    # Optional: resume mid-run after a crash/kill. Skip the first N attendees.
+    start_idx = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+
     async with async_session() as db:
         admin_subq = select(User.attendee_id).where(
             User.is_admin.is_(True),
@@ -52,22 +56,30 @@ async def main() -> None:
         )
         targets = list(result.all())
 
-    print(f"[refresh] {len(targets)} attendees to process", flush=True)
+    print(f"[refresh] {len(targets)} attendees to process (resuming from idx {start_idx})", flush=True)
     start = time.time()
     failed = 0
     total_matches = 0
 
     for i, (attendee_id, name) in enumerate(targets):
+        if i < start_idx:
+            continue
         try:
             async with async_session() as session:
                 engine = MatchingEngine(session)
-                matches = await engine.generate_matches_for_attendee(
-                    attendee_id,
-                    top_k=10,
-                    clear_existing=True,
-                    notify=False,
+                matches = await asyncio.wait_for(
+                    engine.generate_matches_for_attendee(
+                        attendee_id,
+                        top_k=10,
+                        clear_existing=True,
+                        notify=False,
+                    ),
+                    timeout=PER_ATTENDEE_TIMEOUT,
                 )
                 total_matches += len(matches)
+        except asyncio.TimeoutError:
+            failed += 1
+            print(f"[refresh] {i+1}/{len(targets)} TIMEOUT {name!r} (>{PER_ATTENDEE_TIMEOUT}s)", flush=True)
         except (DBAPIError, OperationalError, InterfaceError) as exc:
             failed += 1
             print(f"[refresh] {i+1}/{len(targets)} DB drop on {name!r}: {exc}", flush=True)
