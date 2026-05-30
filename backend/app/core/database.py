@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import uuid
 from typing import Awaitable, Callable, TypeVar
 
 from sqlalchemy.exc import DBAPIError, InterfaceError, OperationalError
@@ -23,18 +24,26 @@ _connect_args: dict = {}
 if _is_pooler:
     # The transaction-mode pooler (pgbouncer) routes a client transaction
     # to one server connection but the next transaction may land on a
-    # different one. Prepared statements cached on connection A fail with
-    # "prepared statement __asyncpg_stmt_X__ does not exist" when re-used
-    # on connection B. We must disable BOTH cache layers to be pgbouncer-
-    # safe: asyncpg's own statement_cache_size AND SQLAlchemy's asyncpg
-    # dialect prepared_statement_cache_size (consumed by the dialect before
+    # different one. Two cache layers must be disabled to be pgbouncer-safe:
+    # asyncpg's own statement_cache_size AND SQLAlchemy's asyncpg dialect
+    # prepared_statement_cache_size (consumed by the dialect before
     # asyncpg.connect, so it's valid in connect_args here even though raw
     # asyncpg.connect would reject it).
     # 2026-05-28: only setting statement_cache_size produced ~100% failure
     # on /matches/m/{token} after the forced pooler migration; adding
-    # prepared_statement_cache_size cleared the Postgres ERROR logs.
+    # prepared_statement_cache_size cleared the "does not exist" errors.
+    # 2026-05-30: residual "prepared statement __asyncpg_stmt_X__ already
+    # exists" errors in Postgres logs traced to asyncpg's sequential
+    # statement-name counter colliding across pgbouncer-pooled server
+    # connections (statement_cache_size=0 stops client caching but asyncpg
+    # still PREPAREs with deterministic names per query). Override the
+    # name function with a UUID so collisions are statistically impossible
+    # and the server can safely garbage-collect them after the transaction.
     _connect_args["statement_cache_size"] = 0
     _connect_args["prepared_statement_cache_size"] = 0
+    _connect_args["prepared_statement_name_func"] = (
+        lambda: f"__asyncpg_{uuid.uuid4().hex}__"
+    )
 
 engine = create_async_engine(
     _url,

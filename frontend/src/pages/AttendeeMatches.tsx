@@ -22,8 +22,8 @@ export default function AttendeeMatches() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: attendee, isLoading: loadingAttendee } = useAttendee(id);
-  const { data: matchData, isLoading: loadingMatches } = useMatches(id);
+  const { data: attendee, isLoading: loadingAttendee, isError: attendeeError } = useAttendee(id);
+  const { data: matchData, isLoading: loadingMatches, isError: matchesError, refetch: refetchMatches } = useMatches(id);
   const updateStatus = useUpdateMatchStatus(id);
   const scheduleMeeting = useScheduleMeeting(id);
   const feedback = useMeetingFeedback(id);
@@ -104,6 +104,24 @@ export default function AttendeeMatches() {
 
   if (isLoading) {
     return <div className="text-center py-20 text-white/30">Loading…</div>;
+  }
+
+  // 2026-05-30: explicit error state. Previously useMatches/useAttendee
+  // silently fell back to seed demo data (Amara Okafor + VaultBridge) on
+  // any backend 500. We propagate the error now so admins can see the
+  // failure instead of staring at someone else's profile.
+  if (attendeeError || matchesError) {
+    return (
+      <div className="text-center py-20 space-y-3">
+        <p className="text-white/60">We couldn't load this profile.</p>
+        <button
+          onClick={() => refetchMatches()}
+          className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 text-sm font-medium transition"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (!attendee) {

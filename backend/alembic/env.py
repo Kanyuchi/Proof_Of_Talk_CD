@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -40,9 +41,23 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online():
+    # Mirror the pgbouncer-safe connect_args from app.core.database so a
+    # migration deploy can't poison server-side prepared-statement state
+    # for request-time connections that share the pooler. NullPool keeps
+    # each migration command on its own short-lived connection.
+    url = config.get_main_option("sqlalchemy.url")
+    is_pooler = "pooler.supabase.com" in url or ":6543" in url
+    connect_args: dict = {}
+    if is_pooler:
+        connect_args["statement_cache_size"] = 0
+        connect_args["prepared_statement_cache_size"] = 0
+        connect_args["prepared_statement_name_func"] = (
+            lambda: f"__asyncpg_{uuid.uuid4().hex}__"
+        )
     connectable = create_async_engine(
-        config.get_main_option("sqlalchemy.url"),
+        url,
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

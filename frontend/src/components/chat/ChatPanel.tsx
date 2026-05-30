@@ -10,7 +10,7 @@ const SUGGESTED_PROMPTS = [
   "Tell me about CBDC-focused attendees",
   "Who is raising Series B capital?",
   "Find me someone interested in compliance infrastructure",
-  "How should I prepare to meet Marcus Chen?",
+  "Help me prep for my next mutual match",
 ];
 
 interface ChatPanelProps {

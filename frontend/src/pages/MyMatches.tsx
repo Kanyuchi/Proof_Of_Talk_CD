@@ -28,7 +28,7 @@ export default function MyMatches() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const attendeeId = user?.attendee_id ?? undefined;
 
-  const { data: matchData, isLoading: loadingMatches } = useMatches(attendeeId);
+  const { data: matchData, isLoading: loadingMatches, isError: matchesError, refetch: refetchMatches } = useMatches(attendeeId);
   const { data: priorityIntros } = useQuery<PriorityIntro[]>({
     queryKey: ["priority-intros"],
     queryFn: getPriorityIntros,
@@ -181,6 +181,32 @@ export default function MyMatches() {
 
   if (loadingMatches) {
     return <div className="text-center py-20 text-white/30">Loading your matches…</div>;
+  }
+
+  // 2026-05-30: explicit error state. Previously useMatches/useAttendee
+  // silently fell back to seed demo data, which painted Amara Okafor's
+  // identity + Marcus Chen/VaultBridge demo matches onto a real attendee
+  // when /matches/{id} 500'd from a transient DB error.
+  if (matchesError || !matchData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-5 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center">
+          <Sparkles className="w-8 h-8 text-white/20" />
+        </div>
+        <div>
+          <h2 className="text-xl font-semibold text-white/60">We couldn't load your matches</h2>
+          <p className="text-sm text-white/30 mt-1 max-w-sm">
+            This is on our side, not yours. Tap retry or refresh the page.
+          </p>
+        </div>
+        <button
+          onClick={() => refetchMatches()}
+          className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white/80 text-sm font-medium transition"
+        >
+          Retry
+        </button>
+      </div>
+    );
   }
 
   return (
