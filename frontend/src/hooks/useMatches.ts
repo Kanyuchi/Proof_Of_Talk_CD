@@ -1,19 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getMatches, updateMatchStatus, scheduleMeeting, updateMeetingFeedback, deferMatch } from "../api/client";
-import { demoMatches } from "../data/demo";
+import type { Match, MatchListResult } from "../types";
 
+// 2026-05-30: Previously fell back to demoMatches (Amara/Marcus seed data) on
+// any error or empty result. That masked transient /matches/{id} failures by
+// painting Amara Okafor's identity onto the viewer's page — a real attendee
+// (Kiril Tsenkov, Nexo) saw himself as Amara with VaultBridge demo matches.
+// The hook now propagates loading/error/empty cleanly; consumer pages render
+// explicit states. Matches the post-2026-04-14 pattern in useDashboard.ts.
 export function useMatches(attendeeId: string | undefined) {
-  return useQuery({
+  return useQuery<MatchListResult>({
     queryKey: ["matches", attendeeId],
-    queryFn: async () => {
-      if (!attendeeId) return { matches: demoMatches, attendee_id: "" };
-      try {
-        const result = await getMatches(attendeeId);
-        return result.matches.length > 0 ? result : { matches: demoMatches, attendee_id: attendeeId };
-      } catch {
-        return { matches: demoMatches, attendee_id: attendeeId };
-      }
-    },
+    queryFn: () => getMatches(attendeeId!),
     enabled: !!attendeeId,
     staleTime: 30_000,
   });
@@ -37,7 +35,7 @@ export function useUpdateMatchStatus(attendeeId: string | undefined) {
     // Optimistic update: immediately reflect status in UI even if API is slow/offline
     onMutate: async ({ matchId, status }) => {
       await queryClient.cancelQueries({ queryKey: ["matches", attendeeId] });
-      queryClient.setQueryData(["matches", attendeeId], (old: { matches: typeof demoMatches } | undefined) => {
+      queryClient.setQueryData(["matches", attendeeId], (old: { matches: Match[] } | undefined) => {
         if (!old) return old;
         return {
           ...old,
