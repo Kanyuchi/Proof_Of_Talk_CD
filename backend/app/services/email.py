@@ -38,6 +38,7 @@ def _send_email(
     text: str | None = None,
     attachments: list[dict] | None = None,
     force: bool = False,
+    tracking_options: dict | None = None,
 ) -> bool:
     """Send an email via Resend. Returns True on success, False on failure.
 
@@ -102,6 +103,8 @@ def _send_email(
         payload["text"] = text
     if attachments:
         payload["attachments"] = attachments
+    if tracking_options:
+        payload["tracking_options"] = tracking_options
 
     try:
         resp = httpx.post(
