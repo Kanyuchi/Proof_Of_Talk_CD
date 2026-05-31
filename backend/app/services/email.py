@@ -856,6 +856,118 @@ def send_mid_event_reengagement_email(
     return _send_email(to_email, subject, body_html, body_text, force=force)
 
 
+def send_reengagement_email(
+    to_email: str,
+    attendee_name: str,
+    first_name: str,
+    total_matches: int,
+    incoming_interest_count: int,
+    top_matches: list[dict],
+    magic_token: str,
+    app_url: str | None = None,
+    force: bool = False,
+) -> bool:
+    """Re-engagement blast for unregistered ticket-holders (2026-05-31).
+
+    Personalised subject from app.services.reengagement_blast.pick_subject:
+      - incoming_interest_count > 0: "N people want to meet you at Proof of Talk"
+      - else, total_matches > 0:     "Your N matches at the Louvre, this Tuesday"
+      - both zero: skipped (returns False)
+
+    Body: reciprocity sentence (if applicable) + match-count anchor +
+    top-2 teaser cards + "Louvre, this Tuesday" urgency. CTA deep-links
+    to the magic-link page which auto-expands the claim panel.
+
+    Resend open + click tracking is ENABLED on this template only.
+
+    Spec: docs/superpowers/specs/2026-05-31-reengagement-blast-design.md
+    """
+    from app.services.reengagement_blast import pick_subject
+
+    settings = get_settings()
+    if app_url is None:
+        app_url = settings.APP_PUBLIC_URL
+    if not top_matches:
+        return False
+    subject = pick_subject(
+        first_name=first_name,
+        total_matches=total_matches,
+        incoming_interest_count=incoming_interest_count,
+    )
+    if subject is None:
+        return False
+
+    dashboard_url = f"{app_url}/m/{magic_token}"
+
+    if incoming_interest_count == 1:
+        reciprocity_line = "1 person has already said they want to meet you."
+    elif incoming_interest_count > 1:
+        reciprocity_line = f"{incoming_interest_count} of them have already said they want to meet you."
+    else:
+        reciprocity_line = ""
+
+    cards = ""
+    for i, m in enumerate(top_matches[:2], 1):
+        name = (m.get("name") or "").strip() or "Top match"
+        title = (m.get("title") or "").strip()
+        company = (m.get("company") or "").strip()
+        meta = ", ".join(x for x in (title, company) if x) or ""
+        cards += (
+            f"<tr><td style=\"padding:0 0 10px;\">"
+            f"  <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background:#FBF8F3; border-left:3px solid #C2632A;\">"
+            f"    <tr><td style=\"padding:14px 18px;\">"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#C2632A; margin-bottom:6px;\">Match #{i}</div>"
+            f"      <div style=\"font-family:Georgia,'Playfair Display',serif; font-size:17px; color:#211500; font-weight:600;\">{name}</div>"
+            f"      <div style=\"font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:13px; color:#7A7268;\">{meta}</div>"
+            f"    </td></tr>"
+            f"  </table>"
+            f"</td></tr>"
+        )
+
+    intro_line = (
+        f"You bought a Proof of Talk ticket but haven't opened your matchmaking yet. "
+        f"We've matched you with {total_matches} attendees."
+    )
+    if reciprocity_line:
+        intro_line += " " + reciprocity_line
+
+    body_html = _render_email(
+        preheader="You haven't claimed your account yet. We've matched you with people you'll want to meet.",
+        eyebrow="The Louvre, this Tuesday",
+        heading=f"{first_name}, your matches are waiting",
+        body_html=(
+            f"<tr><td style=\"padding:0 0 14px;\">{intro_line}</td></tr>"
+            f"{cards}"
+            f"<tr><td style=\"padding:8px 0 4px; font-family:-apple-system,'Poppins',Arial,sans-serif; font-size:14px; color:#3A3A3A;\">The Louvre Palace. Tuesday and Wednesday. That's in 2 days.</td></tr>"
+        ),
+        cta_label="See who wants to meet you",
+        cta_url=dashboard_url,
+        unsubscribe=True,
+        unsubscribe_token=magic_token,
+    )
+    body_text_matches = "\n".join(
+        f"  Match #{i}: {m.get('name','')} - {m.get('title','')}, {m.get('company','')}"
+        for i, m in enumerate(top_matches[:2], 1)
+    )
+    body_text = (
+        f"Hi {first_name},\n\n"
+        f"{intro_line}\n\n"
+        f"Your top matches:\n"
+        f"{body_text_matches}\n\n"
+        f"The Louvre Palace. Tuesday and Wednesday. That's in 2 days.\n\n"
+        f"See who wants to meet you: {dashboard_url}\n\n"
+        f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
+    )
+    return _send_email(
+        to_email,
+        subject,
+        body_html,
+        body_text,
+        force=force,
+        tracking_options={"open_tracking": True, "click_tracking": True},
+    )
+
+
 # ── Post-event emails (Phase 6) ─────────────────────────────────────
 
 
