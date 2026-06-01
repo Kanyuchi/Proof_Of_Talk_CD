@@ -79,9 +79,14 @@ async def mutual_free_slots(
     db: AsyncSession,
     attendee_a_id: UUID,
     attendee_b_id: UUID,
-    limit: int = 4,
+    limit: int | None = 4,
 ) -> list[datetime]:
-    """Slots free for both attendees — used to render one-click book chips on a match card."""
+    """Slots free for both attendees.
+
+    Default `limit=4` powers the one-click "Both free at" chip preview on a match
+    card. Pass `limit=None` to get the COMPLETE set of both-parties-free slots so
+    the full picker can grey out times that are already booked for either side.
+    """
     busy_a = await busy_slots_for(db, attendee_a_id)
     busy_b = await busy_slots_for(db, attendee_b_id)
     return free_slots(busy_a | busy_b, limit=limit)
