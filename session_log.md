@@ -1892,3 +1892,7 @@ Three more email-cadence wins on top of the digest cron above. All on origin/mai
 - **Fallback semantics.** If `mutual_free_slots` is null/missing (older mutuals, edge cases) `freeSet === null` and all slots stay clickable (current behaviour); backend 409 guard remains the durable backstop. No tightening of `busy_slots_for` (still overall-status + hidden_by_user, NOT per-side status_a/status_b) - deliberately not regressed.
 - **Tests.** New `backend/tests/test_slots.py` (3 tests, all pass): `free_slots` uncapped vs limit=4; `mutual_free_slots(limit=None)` drops both busy slots and returns > 4; default limit=4 still gives the 4-slot chip preview. Related route suite (test_match_defer / test_magic_matches_viewer / test_match_visibility / test_pending_count_route) = 16 passed. Frontend `tsc --noEmit` clean; eslint shows only pre-existing errors (no-explicit-any / no-unused-expressions) outside the edited regions - zero new lint errors.
 - **Branch.** `fix/slot-picker-gray-busy` off `main`. PR opened, NOT merged - awaiting user verification on the Netlify deploy preview.
+
+## 2026-06-01 14:48 — [slot-picker-busy-greyout] PR #22 merged to main + prod deploy green
+
+- Squash-merged PR #22 (`fix/slot-picker-gray-busy` -> main) after user signed off on the deploy preview; branch deleted. Merge commit on main: `bcec737`. Netlify production deploy (context=production, branch=main, commit bcec737) state=ready; https://meet.proofoftalk.io returns HTTP 200. Railway backend deploy on the same commit: success.
