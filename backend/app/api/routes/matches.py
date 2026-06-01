@@ -73,7 +73,12 @@ async def _build_match_response(db: AsyncSession, match: Match, viewer_id: UUID)
             **redact_for_privacy(att_dict, is_mutual_match=is_mutual)
         )
         if is_mutual and not match.meeting_time:
-            resp.mutual_free_slots = await mutual_free_slots(db, viewer_id, other_id)
+            # limit=None: the picker needs the COMPLETE both-free set so it can grey
+            # out already-booked times. The UI still slices the first 4 for the chip
+            # preview ("Both free at — tap to book").
+            resp.mutual_free_slots = await mutual_free_slots(
+                db, viewer_id, other_id, limit=None
+            )
     return resp
 
 

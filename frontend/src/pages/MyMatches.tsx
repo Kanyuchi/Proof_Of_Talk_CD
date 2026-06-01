@@ -799,6 +799,13 @@ export default function MyMatches() {
                           : "";
                         const isScheduling = schedulingMatchId === match.id;
                         const daySlots = CONFERENCE_SLOTS.filter((g) => g.day === selectedDay);
+                        // Slots free for BOTH parties (full set when present). If the
+                        // backend didn't supply it (older mutuals / edge cases), leave
+                        // freeSet null and render every slot clickable — the 409 guard
+                        // remains the durable backstop against double-booking.
+                        const freeSet = match.mutual_free_slots
+                          ? new Set(match.mutual_free_slots)
+                          : null;
 
                         return (
                           <div className="space-y-3 pt-2">
@@ -906,19 +913,30 @@ export default function MyMatches() {
                                           {group.label.split("—")[1].trim()}
                                         </div>
                                         <div className="flex flex-wrap gap-1.5">
-                                          {group.slots.map((time) => (
-                                            <button
-                                              key={time}
-                                              onClick={() => setSelectedTime(time)}
-                                              className={`px-3 py-2 rounded-lg text-xs font-mono border transition-all min-h-[44px] flex items-center justify-center ${
-                                                selectedTime === time
-                                                  ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
-                                                  : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
-                                              }`}
-                                            >
-                                              {time}
-                                            </button>
-                                          ))}
+                                          {group.slots.map((time) => {
+                                            const iso = slotToISO(selectedDay, time);
+                                            const isBusy =
+                                              freeSet !== null && !freeSet.has(iso);
+                                            return (
+                                              <button
+                                                key={time}
+                                                onClick={() => !isBusy && setSelectedTime(time)}
+                                                disabled={isBusy}
+                                                title={
+                                                  isBusy ? "Already booked for one of you" : undefined
+                                                }
+                                                className={`px-3 py-2 rounded-lg text-xs font-mono border transition-all min-h-[44px] flex items-center justify-center ${
+                                                  isBusy
+                                                    ? "bg-white/[0.02] border-white/5 text-white/20 line-through cursor-not-allowed"
+                                                    : selectedTime === time
+                                                    ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
+                                                    : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
+                                                }`}
+                                              >
+                                                {time}
+                                              </button>
+                                            );
+                                          })}
                                         </div>
                                       </div>
                                     ))}

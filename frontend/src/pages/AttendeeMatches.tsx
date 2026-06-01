@@ -540,6 +540,12 @@ export default function AttendeeMatches() {
                       : "";
                     const isScheduling = schedulingMatchId === match.id;
                     const daySlots = CONFERENCE_SLOTS.filter((g) => g.day === selectedDay);
+                    // Slots free for BOTH parties. Null when the backend didn't supply
+                    // the set (older mutuals / edge cases) — then every slot stays
+                    // clickable and the 409 guard is the backstop. See MyMatches.tsx.
+                    const freeSet = match.mutual_free_slots
+                      ? new Set(match.mutual_free_slots)
+                      : null;
 
                     return (
                       <div className="space-y-3 pt-2">
@@ -632,19 +638,30 @@ export default function AttendeeMatches() {
                                       {group.label.split("—")[1].trim()}
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
-                                      {group.slots.map((time) => (
-                                        <button
-                                          key={time}
-                                          onClick={() => setSelectedTime(time)}
-                                          className={`px-3 py-1 rounded-lg text-xs font-mono border transition-all ${
-                                            selectedTime === time
-                                              ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
-                                              : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
-                                          }`}
-                                        >
-                                          {time}
-                                        </button>
-                                      ))}
+                                      {group.slots.map((time) => {
+                                        const iso = slotToISO(selectedDay, time);
+                                        const isBusy =
+                                          freeSet !== null && !freeSet.has(iso);
+                                        return (
+                                          <button
+                                            key={time}
+                                            onClick={() => !isBusy && setSelectedTime(time)}
+                                            disabled={isBusy}
+                                            title={
+                                              isBusy ? "Already booked for one of you" : undefined
+                                            }
+                                            className={`px-3 py-1 rounded-lg text-xs font-mono border transition-all ${
+                                              isBusy
+                                                ? "bg-white/[0.02] border-white/5 text-white/20 line-through cursor-not-allowed"
+                                                : selectedTime === time
+                                                ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
+                                                : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
+                                            }`}
+                                          >
+                                            {time}
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 ))}
