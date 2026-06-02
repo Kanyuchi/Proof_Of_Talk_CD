@@ -14,7 +14,7 @@ import { useAuth } from "../hooks/useAuth";
 import { enrichAttendee } from "../api/client";
 import { useState } from "react";
 import {
-  CONFERENCE_SLOTS, slotToISO, formatMeetingTime, downloadICS, isSlotPast,
+  CONFERENCE_SLOTS, MEETING_LOCATIONS, DEFAULT_MEETING_LOCATION, slotToISO, formatMeetingTime, downloadICS, isSlotPast,
   matchTypeConfig, ticketIcons, buildIcebreaker, twitterUrl,
 } from "../utils/matchHelpers";
 
@@ -32,6 +32,7 @@ export default function AttendeeMatches() {
   const [schedulingMatchId, setSchedulingMatchId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>("June 2");
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string>(DEFAULT_MEETING_LOCATION);
   const [decliningMatchId, setDecliningMatchId] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
 
@@ -672,24 +673,46 @@ export default function AttendeeMatches() {
                                   </div>
                                 ))}
 
-                                {/* Confirm button */}
+                                {/* Location picker + confirm button */}
                                 {selectedTime && (
-                                  <button
-                                    onClick={() => {
-                                      const iso = slotToISO(selectedDay, selectedTime);
-                                      scheduleMeeting.mutate(
-                                        { matchId: match.id, meeting_time: iso },
-                                        { onSuccess: () => setSchedulingMatchId(null) },
-                                      );
-                                    }}
-                                    disabled={scheduleMeeting.isPending}
-                                    className="w-full flex items-center justify-center gap-2 py-2 bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/30 rounded-lg text-sm font-medium hover:bg-[#E76315]/20 transition-all disabled:opacity-50"
-                                  >
-                                    <Calendar className="w-4 h-4" />
-                                    {scheduleMeeting.isPending
-                                      ? "Saving…"
-                                      : `Confirm ${selectedDay}, ${selectedTime}`}
-                                  </button>
+                                  <>
+                                    <div>
+                                      <div className="text-[10px] text-white/20 uppercase font-medium mb-1.5">
+                                        Where to meet
+                                      </div>
+                                      <div className="flex flex-col gap-1.5">
+                                        {MEETING_LOCATIONS.map((loc) => (
+                                          <button
+                                            key={loc}
+                                            onClick={() => setSelectedLocation(loc)}
+                                            className={`px-3 py-2 rounded-lg text-xs text-left border transition-all min-h-[44px] flex items-center ${
+                                              selectedLocation === loc
+                                                ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"
+                                                : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:border-white/20"
+                                            }`}
+                                          >
+                                            {loc}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        const iso = slotToISO(selectedDay, selectedTime);
+                                        scheduleMeeting.mutate(
+                                          { matchId: match.id, meeting_time: iso, meeting_location: selectedLocation },
+                                          { onSuccess: () => setSchedulingMatchId(null) },
+                                        );
+                                      }}
+                                      disabled={scheduleMeeting.isPending}
+                                      className="w-full flex items-center justify-center gap-2 py-2 bg-[#E76315]/10 text-[#E76315] border border-[#E76315]/30 rounded-lg text-sm font-medium hover:bg-[#E76315]/20 transition-all disabled:opacity-50"
+                                    >
+                                      <Calendar className="w-4 h-4" />
+                                      {scheduleMeeting.isPending
+                                        ? "Saving…"
+                                        : `Confirm ${selectedDay}, ${selectedTime}`}
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             )}

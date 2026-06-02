@@ -14,6 +14,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.attendee import Match
 
 
+# The physical spots an attendee can pick when booking a meeting (from the
+# venue floor plan). Kept in sync with frontend MEETING_LOCATIONS. The first
+# entry is the default when none/unknown is supplied.
+MEETING_LOCATIONS: list[str] = [
+    "B2B Networking Lounge (Edge & Node)",
+    "Concierge Desk",
+    "Networking Area (Food & Beverages)",
+]
+DEFAULT_MEETING_LOCATION = MEETING_LOCATIONS[0]
+
+
+def normalise_location(value: str | None) -> str:
+    """Return a known meeting location, falling back to the default for any
+    empty/unrecognised value so a stray client can't write a junk spot."""
+    if value and value.strip() in MEETING_LOCATIONS:
+        return value.strip()
+    return DEFAULT_MEETING_LOCATION
+
+
 # Each slot is a 30-min block at the Louvre Palace, Paris (Europe/Paris).
 # Stored as naive UTC for simplicity (matches existing meeting_time semantics).
 # Times below are in local Paris wall-clock; matched against meeting_time stored

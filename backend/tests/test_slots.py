@@ -10,7 +10,29 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.services import slots
-from app.services.slots import all_slots, free_slots, mutual_free_slots
+from app.services.slots import (
+    all_slots,
+    free_slots,
+    mutual_free_slots,
+    normalise_location,
+    MEETING_LOCATIONS,
+    DEFAULT_MEETING_LOCATION,
+)
+
+
+def test_normalise_location_accepts_known_spots():
+    """Each floor-plan spot is preserved verbatim."""
+    for loc in MEETING_LOCATIONS:
+        assert normalise_location(loc) == loc
+    # Surrounding whitespace is tolerated.
+    assert normalise_location(f"  {MEETING_LOCATIONS[1]}  ") == MEETING_LOCATIONS[1]
+
+
+def test_normalise_location_falls_back_to_default():
+    """Empty/None/unknown values collapse to the default spot, never junk."""
+    assert normalise_location(None) == DEFAULT_MEETING_LOCATION
+    assert normalise_location("") == DEFAULT_MEETING_LOCATION
+    assert normalise_location("Some Random Room") == DEFAULT_MEETING_LOCATION
 
 
 # Anchor "now" before the conference so past-slot filtering is a no-op and these

@@ -23,7 +23,7 @@ from app.schemas.attendee import (
 from app.services.avatars import upload_avatar, AvatarError, MAX_BYTES
 from app.services.matching import MatchingEngine
 from app.services.profile_pipeline import refresh_profile_matches
-from app.services.slots import mutual_free_slots, has_conflict
+from app.services.slots import mutual_free_slots, has_conflict, normalise_location
 from app.services.match_visibility import ViewerMatch, order_and_cap, tier_limit, next_tier_unlock
 from app.services.concierge import profile_data_quality, compute_completeness_pct
 from app.core.deps import require_auth, require_admin
@@ -799,7 +799,7 @@ async def schedule_meeting(
             )
 
     match.meeting_time = data.meeting_time
-    match.meeting_location = data.meeting_location or "B2B Lounge, Louvre Palace"
+    match.meeting_location = normalise_location(data.meeting_location)
 
     await db.commit()
     await db.refresh(match)
@@ -824,7 +824,7 @@ async def schedule_meeting(
                 time_str = dt.strftime("%a %b %-d · %H:%M") + " (Louvre time)"
             else:
                 time_str = str(match.meeting_time)
-            location = match.meeting_location or "B2B Lounge, Louvre Palace"
+            location = match.meeting_location or normalise_location(None)
             for recipient, partner in [(attendee_a, attendee_b), (attendee_b, attendee_a)]:
                 if recipient.email:
                     send_meeting_confirmation_email(

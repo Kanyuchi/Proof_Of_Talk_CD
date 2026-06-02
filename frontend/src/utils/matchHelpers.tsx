@@ -17,6 +17,16 @@ export const CONFERENCE_SLOTS = [
   { day: "June 3", label: "Wed 3 Jun — Afternoon", slots: ["13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
 ];
 
+// The physical spots an attendee can pick when booking a meeting (from the
+// venue floor plan). Order matters: the first entry is the default selection.
+export const MEETING_LOCATIONS = [
+  "B2B Networking Lounge (Edge & Node)",
+  "Concierge Desk",
+  "Networking Area (Food & Beverages)",
+] as const;
+
+export const DEFAULT_MEETING_LOCATION = MEETING_LOCATIONS[0];
+
 export function slotToISO(day: string, time: string): string {
   const dateStr = day === "June 2" ? "2026-06-02" : "2026-06-03";
   return `${dateStr}T${time}:00`;
