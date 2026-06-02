@@ -1913,3 +1913,15 @@ Three more email-cadence wins on top of the digest cron above. All on origin/mai
 - **Fix.** Added `toInstant()` normalizer in `matchHelpers.tsx`: naive ISO (free-slot chips from `all_slots()`) is pinned `+02:00` (conference is entirely CEST, no DST); offset-bearing ISO (booked `timestamptz`) passes through. `formatMeetingTime`/`formatSlotChip`/`downloadICS` now render via `timeZone: "Europe/Paris"`. `formatMeetingTime` also appends "(Louvre time)" to match the email.
 - **Verified.** `npm run build` clean (tsc passes). Cross-tz harness: Glen's `16:00+00:00` AND the naive `18:00` slot both render `Tue 2 June at 18:00 (Louvre time)` / `Tue 18:00` identically under TZ=Europe/Paris, America/New_York, Asia/Tokyo. App and email now agree for every attendee on any device.
 - Did NOT touch `backend/app/services/email.py` (uncommitted, in flight in a parallel session).
+
+## 2026-06-02 13:05 - [meeting-times-tz] Reverted the +2h UTC shift: meeting times now show booked Paris wall-clock verbatim
+
+- **User report.** Marko Vukolic ↔ Rena Shah showed 16:00 in the app; "if it's 14:00 it's 14:00 Paris, don't convert anything, reminder emails must show one time not two."
+- **Root cause (confirmed in data).** `meeting_time` stores a Paris wall-clock NUMBER, not a UTC instant. The slot picker sends a naive `2026-06-02T14:00:00` (the 14:00 Paris slot clicked); the `timestamptz` column glues `+00` on at write. **All 245 booked rows are `+00`** - the offset is a storage artifact, the number IS the Paris time. `slots.py:_normalise` already strips it and treats `14:00+00` as the 14:00 Paris slot; `morning_schedule._format_time` already does raw `strftime` = wall-clock.
+- **The bug was the prior "tz fix"** (commits 5068a50/bc9d5bc/7d75773, never pushed): it read `+00` as real UTC and `astimezone(Europe/Paris)`, shifting every booked meeting +2h (Marko/Rena 14:00 -> 16:00) and creating the app-vs-email "two times" split.
+- **Fix (commit 2aef10e).** Strip any tzinfo/offset, render the wall-clock number as-is.
+  - `matches.py` confirmation email: `dt.replace(tzinfo=None)` instead of `astimezone`.
+  - `matchHelpers.tsx` `toInstant`: discard offset, pin Paris wall-clock (`naive + "+02:00"`, rendered in Europe/Paris).
+- **Verified.** Cross-tz (Paris / New York / Tokyo): stored `14:00+00` AND naive `14:00` both render "14:00 (Louvre time)". `npm run build` clean; `pytest tests/test_slots.py` 4 passed. No data migration needed (display-only; prior session never mutated `meeting_time`).
+- **Kept from prior commits:** past-slot greyout, B2B Lounge default, +13:00/13:30 slots (unrelated, correct).
+- **State.** 4 commits ahead of origin/main, NOT pushed (event day - awaiting go-ahead). Pushing deploys the full corrected behavior to prod (Railway + Netlify).
