@@ -20,6 +20,8 @@
 - Supabase Edge Functions for real-time match notifications
 
 ## Done ✓
+- [matching] Match-id stability on regen — DEPLOYED LIVE (commit ef5d926, Railway SUCCESS) (2026-06-02). Regen was delete+recreate, giving every pair a new uuid each rebuild → clients 404'd on accept/decline (accepts intermittently lost, rejects never saved + reappeared). Now non-destructive: stale pending rows refreshed in place (stable id), only dropped candidates pruned, user-touched rows preserved. 457 tests pass; prod smoke (Jesus Lander): 3 regens → 17/17 pair ids stable, 10/10 accepts preserved.
+- [account-recovery] Created missing attendee row for Jesus Lander (jedlanca@gmail.com) — ticket was assigned by a different buyer, so buyer-keyed Extasy sync never created his row (2026-06-02). FOLLOW-UP (Soon): extend find_extasy_order_by_email to also match the TICKETS feed by ticket-holder email so assigned-ticket attendees aren't invisible.
 - [sync] All Sync Health errors + partials fixed (commit 8293c9b) AND smoke-tested green on prod (20e8026): all 4 jobs flipped sync_status to ok — match_refresh (32 matches), speakers (errors 1→0), extasy (errors 58→0), grid_audit (terminal INSERT persisted). connection-drop retry (run_with_db_retry); extasy mis-count fixed + error_reasons persisted; speaker dup-row collision handled. (2026-05-21)
 - [matching] Bulk-rebuild blast guard: `generate_all_matches` passes `notify=False` so a full rebuild can't email ~739 intros — unblocks EMAIL_MODE=all (commit 85b41d3) (2026-05-21)
 - [launch] Welcome wave 3 sent: 100/100, 0 failed (261 total sent / 462 remaining) (2026-05-21)
