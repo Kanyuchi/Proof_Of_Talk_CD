@@ -1925,3 +1925,15 @@ Three more email-cadence wins on top of the digest cron above. All on origin/mai
 - **Verified.** Cross-tz (Paris / New York / Tokyo): stored `14:00+00` AND naive `14:00` both render "14:00 (Louvre time)". `npm run build` clean; `pytest tests/test_slots.py` 4 passed. No data migration needed (display-only; prior session never mutated `meeting_time`).
 - **Kept from prior commits:** past-slot greyout, B2B Lounge default, +13:00/13:30 slots (unrelated, correct).
 - **State.** 4 commits ahead of origin/main, NOT pushed (event day - awaiting go-ahead). Pushing deploys the full corrected behavior to prod (Railway + Netlify).
+
+## 2026-06-02 13:50 - [meeting-spot-picker] Attendees pick a meeting spot when booking (3 floor-plan locations)
+
+- **Trigger.** Shaun added the venue floor plan (`floor _Map/Proof-of-Talk-Floor-Plan.pdf`) to open up real meeting spaces. Checked first: no other session had touched physical rooms/locations/capacity - the only prior location work was the cosmetic default-string change to "B2B Lounge, Louvre Palace" (2026-06-02 12:35). This is net-new.
+- **Shipped (commit a544369, pushed).** Booking flow now offers 3 spots from the floor plan instead of one hardcoded label:
+  - `B2B Networking Lounge (Edge & Node)` (default)
+  - `Concierge Desk`
+  - `Networking Area (Food & Beverages)`
+- **Backend.** `slots.py`: `MEETING_LOCATIONS` + `DEFAULT_MEETING_LOCATION` + `normalise_location()` (empty/unknown -> default, so a stray client can't write junk). `matches.py /schedule` runs `data.meeting_location` through `normalise_location`; email fallback uses the same default. All plumbing (API client `scheduleMeeting`, `useScheduleMeeting` hook, `ScheduleMeetingRequest` schema) already accepted `meeting_location` - only the canonical set + UI were missing.
+- **Frontend.** `matchHelpers.tsx` exports the shared `MEETING_LOCATIONS`/`DEFAULT_MEETING_LOCATION`. `MyMatches.tsx` + `AttendeeMatches.tsx` (admin view-as-attendee, same duplicated booking block) show a "Where to meet" picker once a time is selected; selected spot passed as `meeting_location`.
+- **Existing bookings remapped.** All 247 already-booked rows ("B2B Lounge, Louvre Palace" x246 + 1 verbose) updated via SQL -> "B2B Networking Lounge (Edge & Node)" (Shaun's call: closest equivalent, keep everyone consistent with the new set). One reversible UPDATE; verified 247/247 now read the new label.
+- **Smoke.** `npm run build` clean; `pytest tests/test_slots.py tests/test_morning_schedule.py` 15 passed (2 new `normalise_location` tests). Pushed to origin/main (a544369); Railway + Netlify auto-deploy. Deploy verification in progress (new Netlify bundle poll).
