@@ -134,3 +134,15 @@
 - RESURRECTION FIX (extasy_sync.py): sync upserted by email only -> tonight's 02:00 run would not find the survivor under the gmail buyer email and would re-INSERT the dupe (which the 03:30 net-new cron would then regenerate a parallel match set for). Changed the lookup to match an attendee already carrying this extasy_order_id FIRST, then fall back to email. Survivor carries order e8c8f68b, so the sync now recognizes and skips it. Login unaffected (keyed on users.email, not attendees.email).
 - VERIFIED: module imports clean; live-DB check confirms order e8c8f68b resolves to b718e15c with 0 stray gmail rows.
 - CLASS OF BUG: any account merge where the survivor keeps a different login email than the Rhuna buyer email was previously undone on the next sync. order_id-first matching fixes it generally, not just for Razvan.
+
+## 2026-06-02 19:55 — [match-volume] Bumped Cotabe Moral to 50+ matches (live event)
+- Cotabe Moral (90f17fdf, Giveth / Head of Partnerships, DELEGATE) had only 19 matches (17 pending + 2 accepted). Wanted more people to meet on the floor.
+- Ran generate_matches_for_attendee(top_k=50, clear_existing=True, notify=False): pool = max(50, DEEP_POOL_SIZE=20) -> 50 retrieved, 8 GPT-curated + deep tail. Persisted 43 this run.
+- RESULT: 53 distinct people (51 pending + 2 accepted). Both accepts preserved (non-destructive regen, locked counterparts reused in place). No emails.
+- No code change - operational data action only.
+
+## 2026-06-02 20:05 — [match-mutual-label] Fix false "Mutual match — both accepted!" on one-sided accept
+- BUG (Cotabe, live event): clicking "I'd like to meet" while the OTHER party is still pending flipped the card to "Mutual match — both accepted!", implying the other had accepted.
+- ROOT CAUSE: frontend optimistic update in `frontend/src/hooks/useMatches.ts` (useUpdateMatchStatus.onMutate) stamped the clicked value straight onto the AGGREGATE `status` (`{...m, status}`). The cards derive `isMutual = match.status === "accepted"`, so a one-sided accept set status="accepted" locally -> instant false mutual. Backend was correct (overall recomputed to "pending"); the lie was purely the optimistic local write, visible until refetch.
+- FIX: onMutate now sets only the VIEWER's per-side field (status_a/status_b, side via attendee_a_id===attendeeId, same pattern as myStatusFor) and recomputes the aggregate with `computeOverallStatus`, a faithful mirror of backend `_compute_overall_status`. Added a `prev` snapshot + onError rollback. Covers both AttendeeMatches and MyMatches (shared hook).
+- VERIFIED: prod build clean (typecheck passes); standalone logic test: one-sided accept -> status "pending" (isMutual false), genuine both-accepted -> "accepted" (isMutual true), decline -> "declined". Did NOT browser-test against a real attendee (would mutate live match state mid-event); demo personas have no real pending matches to exercise the path.

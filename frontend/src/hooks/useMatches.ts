@@ -19,6 +19,19 @@ export function useMatches(attendeeId: string | undefined) {
   });
 }
 
+// Mirror of the backend's _compute_overall_status (matches.py). The aggregate
+// `status` is the single source of truth for `isMutual` in the cards, so it must
+// ONLY read "accepted" when BOTH sides accepted. Optimistically stamping the raw
+// clicked value onto `status` was the cause of the "Mutual match — both accepted!"
+// label appearing the instant the viewer accepted, before the other party had.
+function computeOverallStatus(statusA: string, statusB: string): string {
+  if (statusA === "declined" || statusB === "declined") return "declined";
+  if (statusA === "met" && statusB === "met") return "met";
+  const acceptedish = (s: string) => s === "accepted" || s === "met";
+  if (acceptedish(statusA) && acceptedish(statusB)) return "accepted";
+  return "pending";
+}
+
 export function useUpdateMatchStatus(attendeeId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -34,16 +47,35 @@ export function useUpdateMatchStatus(attendeeId: string | undefined) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["matches", attendeeId] });
     },
-    // Optimistic update: immediately reflect status in UI even if API is slow/offline
+    // Optimistic update: immediately reflect status in UI even if API is slow/offline.
+    // Set only the VIEWER's per-side status (status_a/status_b) and recompute the
+    // aggregate the same way the backend does, so a one-sided accept stays "pending"
+    // (no false "Mutual match" flash before the other party responds).
     onMutate: async ({ matchId, status }) => {
       await queryClient.cancelQueries({ queryKey: ["matches", attendeeId] });
+      const prev = queryClient.getQueryData(["matches", attendeeId]);
       queryClient.setQueryData(["matches", attendeeId], (old: { matches: typeof demoMatches } | undefined) => {
         if (!old) return old;
         return {
           ...old,
-          matches: old.matches.map((m) => (m.id === matchId ? { ...m, status } : m)),
+          matches: old.matches.map((m) => {
+            if (m.id !== matchId) return m;
+            const iAmA = m.attendee_a_id === attendeeId;
+            const statusA = iAmA ? status : m.status_a;
+            const statusB = iAmA ? m.status_b : status;
+            return {
+              ...m,
+              status_a: statusA,
+              status_b: statusB,
+              status: computeOverallStatus(statusA, statusB),
+            };
+          }),
         };
       });
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["matches", attendeeId], ctx.prev);
     },
   });
 }
