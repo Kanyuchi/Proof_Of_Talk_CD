@@ -276,3 +276,6 @@ Strategy: 2-day Web3 conf, ~5 weeks pre-event, optimise for **3-5 quality return
 
 ## 2026-05-30 - Done
 - Same-org matching filter + full refresh recovery (timeout guard added to refresh script after the 9h hang)
+
+- **[meeting-time-prefix-email-resend] DEFERRED (Shaun, 2026-06-02 14:24) — do later** — Some attendees received pre-fix confirmation emails today with the +2h-wrong time (old `astimezone` code, e.g. Olga's said 13:00, real 11:00). App is now correct (render-side fix `2aef10e`). Decision pending: identify everyone who got a wrong confirmation email (Resend log + match meeting_time) and re-send corrected ones. Outbound/irreversible - needs explicit go-ahead. Glen+Alex already corrected.
+- **[glen-cameron-company-junk] DEFERRED (Shaun, 2026-06-02 14:24) — do later** — Glen Cameron's `company` stored as "Zombie Delete (TAV)"; shows in partner's email body. One-row data cleanup.
