@@ -162,6 +162,7 @@ async def test_out_of_pool_target_force_added():
     db.execute.side_effect = [
         _Scalar([intro]),     # intros query
         _Scalar([target]),    # missing attendees query
+        _Scalar([]),          # existing-row lookup for the pair -> none, so insert
     ]
     db.add = MagicMock()
     db.flush = AsyncMock()

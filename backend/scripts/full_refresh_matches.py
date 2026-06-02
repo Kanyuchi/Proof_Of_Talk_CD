@@ -3,9 +3,10 @@
 Iterates every embedded, non-admin attendee and runs
 generate_matches_for_attendee(clear_existing=True, notify=False).
 
-clear_existing=True takes the safe path: purges stale pending Match rows
-but PRESERVES rows where either side has acted (accepted, declined, hidden,
-scheduled). See _purge_stale_matches_and_collect_locked in matching.py.
+clear_existing=True takes the safe path: refreshes stale pending Match rows
+IN PLACE (stable match id) and PRESERVES rows where either side has acted
+(accepted, declined, hidden, scheduled). Dropped candidates are pruned. See
+_collect_locked_counterparts / _prune_unreferenced_pending in matching.py.
 
 notify=False prevents emailing every attendee an intro to their (now
 recomputed) top match — a full refresh must never fan out 360+ emails.

@@ -186,6 +186,7 @@ async def test_apply_priority_intros_force_add_handles_race():
     db.execute = AsyncMock(side_effect=[
         _Rows([intro]),     # SELECT RequestedIntro
         _Rows([target]),    # SELECT Attendee for missing target hydration
+        _Rows([]),          # SELECT existing Match for the pair -> none, so insert
     ])
     db.commit = AsyncMock()
 

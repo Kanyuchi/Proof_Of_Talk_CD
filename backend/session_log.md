@@ -116,3 +116,14 @@
 - Ran run_full_enrichment + refresh_profile_matches (same as register flow): embedding set, **17 matches** generated. enriched_at still NULL (sparse gmail profile -> factual stub; harmless, re-runs on first register).
 - He can now register at meet.proofoftalk.io with jedlanca@gmail.com and pass the ticket gate.
 - CLASS OF BUG: anyone whose ticket was bought/assigned by a different buyer is invisible to the buyer-keyed sync + the orders-only register fallback. Recommend: extend find_extasy_order_by_email (or a sweep) to also match the TICKETS feed by ticket-holder email.
+
+## 2026-06-02 19:10 — [match-id-stability] Regen reuses match rows in place (fixes accept/reject not saving)
+- SYMPTOM (Jesus Lander, live event): accepts intermittently not saving; rejects never saving (DB showed 10 accepted, 0 declined despite him rejecting) -> rejected matches kept reappearing.
+- ROOT CAUSE: generate_matches_for_attendee regen was delete+recreate. `_purge_stale_matches_and_collect_locked` DELETED stale pending rows up front, then `_persist_ranked` re-INSERTED them with a NEW uuid every regen. Any client holding the old match id 404'd on PATCH /matches/{id}/status -> action silently lost; the un-declined pair regenerated as fresh pending -> "reject reappears". Churn was constant because ANY pending counterpart editing their profile triggers a regen that deletes the shared pending row.
+- FIX (non-destructive regen, stable ids):
+  - `_purge_stale_matches_and_collect_locked` -> replaced by `_collect_locked_counterparts` (returns user-touched counterparts to exclude from candidate gen; NEVER deletes).
+  - `_persist_ranked`: when a stale pending row exists for the pair, REFRESH it in place (same id, preserve status); only insert when truly new. Added `_is_stale_pending` guard so user-touched rows are never overwritten.
+  - `_prune_unreferenced_pending`: removes only fully-stale pending rows whose counterpart genuinely dropped out of the retrieval pool; `keep_ids` spares re-persisted survivors and `keep_counterparts` spares pool members that dipped below the GPT floor this run.
+  - `_apply_priority_intros` force-add now reuses a pre-existing row for the pair (no IntegrityError, not pruned).
+- VERIFIED: full suite 457 passed (rewrote test_matching_preservation.py to the new contract + id-stability/preservation unit tests). Prod smoke test on Jesus: 3 consecutive regens -> 17/17 existing pair ids STABLE, 10/10 accepts preserved (was 0/17 stable under old code).
+- Preserves the David Chapman (2026-05-26) contract: accepts/declines/scheduled/hidden never wiped.

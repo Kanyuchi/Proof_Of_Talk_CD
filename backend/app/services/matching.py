@@ -874,7 +874,23 @@ Return ONLY the JSON array. No markdown, no commentary."""
                     )
                 )
             ).scalars().first()
-            if existing:
+            if existing is not None:
+                # Reuse the row in place when it's fully stale (pending/pending,
+                # untouched) so its match id stays STABLE across regens — an open
+                # client never 404s on accept/decline. Never overwrite a row the
+                # user has acted on (accepted/declined/scheduled/hidden/met).
+                if self._is_stale_pending(existing):
+                    existing.similarity_score = sim_score
+                    existing.complementary_score = entry.get("complementary_score", sim_score)
+                    existing.overall_score = overall_score
+                    existing.match_type = entry.get("match_type", "complementary")
+                    existing.explanation = entry.get("explanation", "")
+                    existing.shared_context = entry.get("shared_context", {})
+                    existing.explanation_confidence = entry.get("explanation_confidence")
+                    existing.tier = tier
+                    await self.db.flush()
+                    persisted.append(existing)
+                # else: user-touched — leave exactly as the user left it.
                 continue
 
             match = Match(
@@ -902,45 +918,93 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 pass
         return persisted
 
-    async def _purge_stale_matches_and_collect_locked(
+    @staticmethod
+    def _is_stale_pending(match: Match) -> bool:
+        """True when a match row carries zero user input on either side — i.e.
+        pending/pending, no meeting, no decline reason, not hidden, never met.
+        Only such rows may be refreshed in place or pruned by a regen; anything
+        the user has acted on is left exactly as they left it."""
+        return (
+            match.status_a == "pending"
+            and match.status_b == "pending"
+            and match.meeting_time is None
+            and match.decline_reason is None
+            and not match.hidden_by_user
+            and match.met_at is None
+        )
+
+    async def _collect_locked_counterparts(
         self, attendee_id: uuid.UUID,
     ) -> set:
-        """Delete only "stale" matches involving this attendee — pending on
-        both sides, no meeting, no decline reason, not hidden, never met —
-        and return the set of counterpart ids whose match rows survived (i.e.
-        carry user input). These counterparts must be excluded from new
-        candidate generation so a regen never duplicates a locked pair and
-        never resurfaces a previously-declined counterpart.
+        """Return the set of counterpart ids whose match row with this attendee
+        carries user input (accepted/declined/scheduled/hidden/met on either
+        side). These are excluded from new candidate generation so a regen
+        never duplicates a locked pair and never resurfaces a declined
+        counterpart.
 
-        Replaces the pre-2026-05-26 unconditional delete that wiped accepts/
-        declines/scheduled meetings on every profile save.
+        NON-DESTRUCTIVE. Replaces the pre-2026-06-02
+        `_purge_stale_matches_and_collect_locked`, which DELETED stale pending
+        rows up front — forcing `_persist_ranked` to re-INSERT them with a fresh
+        UUID on every regen. Any client holding the old match id then 404'd on
+        accept/decline, so user actions silently failed and rejected matches
+        reappeared. Now stale rows are reused in place (stable id) by
+        `_persist_ranked` and only genuinely-dropped candidates are removed by
+        `_prune_unreferenced_pending`.
         """
-        await self.db.execute(
-            sql_delete(Match).where(
+        rows = (await self.db.execute(
+            select(Match.attendee_a_id, Match.attendee_b_id).where(
                 and_(
                     or_(
                         Match.attendee_a_id == attendee_id,
                         Match.attendee_b_id == attendee_id,
                     ),
-                    Match.status_a == "pending",
-                    Match.status_b == "pending",
-                    Match.meeting_time.is_(None),
-                    Match.decline_reason.is_(None),
-                    Match.hidden_by_user.is_(False),
-                    Match.met_at.is_(None),
-                )
-            )
-        )
-        await self.db.commit()
-        survivors = (await self.db.execute(
-            select(Match.attendee_a_id, Match.attendee_b_id).where(
-                or_(
-                    Match.attendee_a_id == attendee_id,
-                    Match.attendee_b_id == attendee_id,
+                    or_(
+                        Match.status_a != "pending",
+                        Match.status_b != "pending",
+                        Match.meeting_time.is_not(None),
+                        Match.decline_reason.is_not(None),
+                        Match.hidden_by_user.is_(True),
+                        Match.met_at.is_not(None),
+                    ),
                 )
             )
         )).all()
-        return {(b if a == attendee_id else a) for a, b in survivors}
+        return {(b if a == attendee_id else a) for a, b in rows}
+
+    async def _prune_unreferenced_pending(
+        self, attendee_id: uuid.UUID, keep_ids: set,
+        keep_counterparts: set = frozenset(),
+    ) -> None:
+        """Delete this attendee's fully-stale pending match rows for candidates
+        that genuinely dropped out of the retrieval pool. Rows carrying user
+        input are never touched (the stale-only filter guards them); survivors
+        keep their stable id via `keep_ids` (refreshed in place by
+        `_persist_ranked`); and `keep_counterparts` protects any pair whose
+        counterpart is still in the retrieval pool but merely dipped below the
+        explanation floor this run (GPT rerank is non-deterministic at the
+        boundary) — so its id stays stable instead of flipping run to run."""
+        conditions = [
+            or_(
+                Match.attendee_a_id == attendee_id,
+                Match.attendee_b_id == attendee_id,
+            ),
+            Match.status_a == "pending",
+            Match.status_b == "pending",
+            Match.meeting_time.is_(None),
+            Match.decline_reason.is_(None),
+            Match.hidden_by_user.is_(False),
+            Match.met_at.is_(None),
+        ]
+        if keep_ids:
+            conditions.append(Match.id.notin_(keep_ids))
+        if keep_counterparts:
+            # Keep the row when its counterpart is still in the pool. Self id is
+            # never in keep_counterparts, so "neither side in pool" == "the
+            # counterpart is not in pool".
+            conditions.append(Match.attendee_a_id.notin_(keep_counterparts))
+            conditions.append(Match.attendee_b_id.notin_(keep_counterparts))
+        await self.db.execute(sql_delete(Match).where(and_(*conditions)))
+        await self.db.commit()
 
     async def _apply_priority_intros(
         self,
@@ -1001,6 +1065,26 @@ Return ONLY the JSON array. No markdown, no commentary."""
                 target_first_name=first_name,
                 target_focus=focus,
             )
+            # Reuse a pre-existing row for this pair (e.g. a stale pending row
+            # not in this run's pool) so we keep its stable id, avoid the
+            # unique-pair IntegrityError, and keep it out of the prune's reach.
+            existing = (await self.db.execute(
+                select(Match).where(
+                    or_(
+                        (Match.attendee_a_id == attendee.id) & (Match.attendee_b_id == target.id),
+                        (Match.attendee_a_id == target.id) & (Match.attendee_b_id == attendee.id),
+                    )
+                )
+            )).scalars().first()
+            if existing is not None:
+                if self._is_stale_pending(existing):
+                    existing.match_type = "priority_intro"
+                    existing.explanation = explanation
+                    existing.tier = "priority_intro"
+                    await self.db.flush()
+                existing_matches.append(existing)
+                added += 1
+                continue
             new_match = Match(
                 attendee_a_id=attendee.id,
                 attendee_b_id=target.id,
@@ -1066,7 +1150,7 @@ Return ONLY the JSON array. No markdown, no commentary."""
         # pair and b) we never resurface a previously-declined counterpart.
         locked_counterparts: set = set()
         if clear_existing:
-            locked_counterparts = await self._purge_stale_matches_and_collect_locked(attendee_id)
+            locked_counterparts = await self._collect_locked_counterparts(attendee_id)
 
         # Stage 2: Retrieve a deeper neighbour set so we can split into
         # a curated head (GPT-explained) and a similarity-only deep tail.
@@ -1170,6 +1254,16 @@ Return ONLY the JSON array. No markdown, no commentary."""
         # Runs after commit so the priority rows are layered on top of the
         # curated/deep/fallback set already flushed to the session.
         matches = await self._apply_priority_intros(attendee, matches)
+
+        # Prune fully-stale pending rows for candidates that dropped out of this
+        # run's pool. Survivors were refreshed in place (stable id) and are in
+        # keep_ids; user-touched rows are protected by the stale-only filter.
+        if clear_existing:
+            await self._prune_unreferenced_pending(
+                attendee.id,
+                keep_ids={m.id for m in matches},
+                keep_counterparts={c.id for c, _ in candidates},
+            )
 
         # Fire-and-forget: notify attendee of their top match via email.
         # Skipped for bulk regeneration (notify=False) to avoid a 739-email blast.
