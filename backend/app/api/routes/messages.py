@@ -51,7 +51,7 @@ async def list_conversations(
     attendee = await _get_attendee(user, db)
 
     # Include mutual matches + any match where this user has accepted and already sent a message
-    from sqlalchemy import or_, and_
+    from sqlalchemy import or_, and_, func
     user_accepted = (await db.execute(
         select(Match).where(
             or_(
@@ -61,36 +61,71 @@ async def list_conversations(
         )
     )).scalars().all()
 
+    if not user_accepted:
+        return {"conversations": []}
+
+    # Batch-load only the columns we render. db.get(Attendee, ...) pulled the
+    # full row including the 1536-dim embedding + enriched_profile JSONB,
+    # which on Supabase pgbouncer (statement_cache_size=0) made this endpoint
+    # take ~30s for 9 matches and hang the messages page.
+    other_ids = [
+        m.attendee_b_id if m.attendee_a_id == attendee.id else m.attendee_a_id
+        for m in user_accepted
+    ]
+    match_ids = [m.id for m in user_accepted]
+
+    other_rows = (await db.execute(
+        select(
+            Attendee.id, Attendee.name, Attendee.company,
+            Attendee.title, Attendee.ticket_type,
+        ).where(Attendee.id.in_(other_ids))
+    )).all()
+    others_by_id = {r.id: r for r in other_rows}
+
+    conv_rows = (await db.execute(
+        select(Conversation.id, Conversation.match_id)
+        .where(Conversation.match_id.in_(match_ids))
+    )).all()
+    conv_by_match = {r.match_id: r.id for r in conv_rows}
+    conv_ids = list(conv_by_match.values())
+
+    last_msg_by_conv: dict = {}
+    unread_by_conv: dict = {}
+    if conv_ids:
+        last_rows = (await db.execute(
+            select(Message.conversation_id, Message.content, Message.created_at)
+            .where(Message.conversation_id.in_(conv_ids))
+            .order_by(Message.conversation_id, Message.created_at.desc())
+            .distinct(Message.conversation_id)
+        )).all()
+        last_msg_by_conv = {r.conversation_id: (r.content, r.created_at) for r in last_rows}
+
+        unread_rows = (await db.execute(
+            select(Message.conversation_id, func.count(Message.id))
+            .where(
+                Message.conversation_id.in_(conv_ids),
+                Message.sender_attendee_id != attendee.id,
+                Message.read_at.is_(None),
+            )
+            .group_by(Message.conversation_id)
+        )).all()
+        unread_by_conv = {r[0]: r[1] for r in unread_rows}
+
     summaries = []
     for match in user_accepted:
         other_id = match.attendee_b_id if match.attendee_a_id == attendee.id else match.attendee_a_id
-        other = await db.get(Attendee, other_id)
-
-        conv = (await db.execute(
-            select(Conversation).where(Conversation.match_id == match.id)
-        )).scalars().first()
+        other = others_by_id.get(other_id)
+        conv_id = conv_by_match.get(match.id)
 
         last_msg_content = None
         last_msg_at = None
         unread = 0
-
-        if conv:
-            last = (await db.execute(
-                select(Message).where(Message.conversation_id == conv.id)
-                .order_by(Message.created_at.desc()).limit(1)
-            )).scalars().first()
+        if conv_id is not None:
+            last = last_msg_by_conv.get(conv_id)
             if last:
-                last_msg_content = last.content
-                last_msg_at = last.created_at.isoformat()
-
-            unread_msgs = (await db.execute(
-                select(Message).where(
-                    (Message.conversation_id == conv.id)
-                    & (Message.sender_attendee_id != attendee.id)
-                    & (Message.read_at.is_(None))
-                )
-            )).scalars().all()
-            unread = len(unread_msgs)
+                last_msg_content = last[0]
+                last_msg_at = last[1].isoformat()
+            unread = unread_by_conv.get(conv_id, 0)
 
         # Only include pending (non-mutual) matches if there's already a message
         is_mutual = match.status == "accepted"
@@ -102,7 +137,7 @@ async def list_conversations(
             "match_id": str(match.id),
             "match_status": match.status,
             "is_mutual": is_mutual,
-            "conversation_id": str(conv.id) if conv else None,
+            "conversation_id": str(conv_id) if conv_id is not None else None,
             "other_attendee_id": str(other.id) if other else None,
             "other_attendee_name": other.name if other else "Unknown",
             "other_attendee_company": other.company if other else "",
