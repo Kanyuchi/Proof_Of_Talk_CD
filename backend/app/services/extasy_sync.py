@@ -436,8 +436,19 @@ async def _process_order_chunk(
         # rolled back" errors after a single IntegrityError).
         try:
             async with db.begin_nested():
-                result   = await db.execute(select(Attendee).where(Attendee.email == email))
-                existing = result.scalar_one_or_none()
+                # Match an attendee already linked to this Rhuna order FIRST, then
+                # fall back to email. This keeps the sync stable across account
+                # merges: when two records for one person are merged, the survivor
+                # carries the dupe's extasy_order_id but keeps its own (different)
+                # login email — matching on order_id stops the buyer-email lookup
+                # from re-inserting the just-deleted dupe on the next run.
+                existing = (await db.execute(
+                    select(Attendee).where(Attendee.extasy_order_id == order_id)
+                )).scalars().first()
+                if existing is None:
+                    existing = (await db.execute(
+                        select(Attendee).where(Attendee.email == email)
+                    )).scalars().first()
 
                 if existing:
                     changed = False
