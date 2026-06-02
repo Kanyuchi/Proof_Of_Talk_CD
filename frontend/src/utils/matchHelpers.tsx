@@ -39,20 +39,21 @@ export function isSlotPast(iso: string): boolean {
 // disagree (e.g. app 18:00 vs email 16:00) for anyone not on a Paris clock.
 const PARIS_TZ = "Europe/Paris";
 
-/** Normalise a backend ISO string to a single absolute instant.
+/** Normalise a backend ISO string to a Paris wall-clock instant.
  *
- *  Two formats reach the frontend for the same grid:
- *   - free-slot chips come from `all_slots()` as NAIVE ISO ("2026-06-02T18:00:00")
- *     which is Paris wall-clock;
- *   - a booked `meeting_time` comes from a `timestamptz` column WITH an offset
- *     ("2026-06-02T16:00:00+00:00") which is a real instant.
- *  The conference (June 2-3 2026) sits entirely in CEST (UTC+02:00) with no DST
- *  change, so a naive string is pinned to +02:00 rather than the device tz.
- *  Offset-bearing strings pass through unchanged. Callers then render in PARIS_TZ
- *  so every attendee, on any device, sees identical Louvre time. */
+ *  Every meeting/slot time carries a Paris WALL-CLOCK number, not a UTC instant:
+ *   - free-slot chips come from `all_slots()` as NAIVE ISO ("2026-06-02T14:00:00");
+ *   - a booked `meeting_time` comes from the `timestamptz` column with a spurious
+ *     "+00" offset ("2026-06-02T14:00:00+00:00"). The slot picker sent a naive
+ *     14:00 (the 14:00 Paris slot); the column glued "+00" on at write time. The
+ *     offset is a STORAGE ARTIFACT - the number is still the Paris time booked.
+ *  So we discard any offset and pin the wall-clock to Paris (CEST, UTC+02:00 - the
+ *  conference is entirely within CEST, no DST change). Rendering in PARIS_TZ then
+ *  shows the booked number verbatim (14:00 stays 14:00) on every device. We never
+ *  treat the "+00" as real UTC - that would shift 14:00 -> 16:00. */
 function toInstant(iso: string): Date {
-  const hasTz = /([zZ])|([+-]\d{2}:?\d{2})$/.test(iso);
-  return new Date(hasTz ? iso : `${iso}+02:00`);
+  const naive = iso.replace(/([zZ])|([+-]\d{2}:?\d{2})$/, "");
+  return new Date(`${naive}+02:00`);
 }
 
 export function formatMeetingTime(iso: string): string {

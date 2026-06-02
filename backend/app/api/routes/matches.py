@@ -806,18 +806,21 @@ async def schedule_meeting(
 
     # Fire-and-forget: send meeting confirmation to both parties
     try:
-        from zoneinfo import ZoneInfo
         from app.services.email import send_meeting_confirmation_email
         attendee_a = await db.get(Attendee, match.attendee_a_id)
         attendee_b = await db.get(Attendee, match.attendee_b_id)
         if attendee_a and attendee_b and match.meeting_time:
-            # Format the time for the email as Louvre (Europe/Paris) wall-clock.
-            # meeting_time may be tz-aware (UTC) or naive Paris wall-clock; only
-            # convert when tz-aware, otherwise it is already Paris local.
+            # meeting_time stores a Paris wall-clock NUMBER. The slot picker sends
+            # a naive "2026-06-02T14:00:00" (the 14:00 Paris slot); the timestamptz
+            # column glues a "+00" offset onto it on write. That offset is a storage
+            # artifact, NOT real UTC - the number IS the Paris time the attendee
+            # booked. So strip any tzinfo and print the wall-clock as-is. Never
+            # astimezone-convert (that would shift 14:00 -> 16:00). Matches the
+            # naive-Paris semantics used by slots.py and morning_schedule.
             dt = match.meeting_time
             if hasattr(dt, "strftime"):
                 if dt.tzinfo is not None:
-                    dt = dt.astimezone(ZoneInfo("Europe/Paris"))
+                    dt = dt.replace(tzinfo=None)
                 time_str = dt.strftime("%a %b %-d · %H:%M") + " (Louvre time)"
             else:
                 time_str = str(match.meeting_time)
