@@ -1896,3 +1896,12 @@ Three more email-cadence wins on top of the digest cron above. All on origin/mai
 ## 2026-06-01 14:48 — [slot-picker-busy-greyout] PR #22 merged to main + prod deploy green
 
 - Squash-merged PR #22 (`fix/slot-picker-gray-busy` -> main) after user signed off on the deploy preview; branch deleted. Merge commit on main: `bcec737`. Netlify production deploy (context=production, branch=main, commit bcec737) state=ready; https://meet.proofoftalk.io returns HTTP 200. Railway backend deploy on the same commit: success.
+
+## 2026-06-02 12:35 — [meeting-times-tz] Fix live meeting-time confusion: Paris-tz display, past-slot greyout, B2B Lounge, +13:00 slots
+
+- **Root cause of "which time is correct?"** `meeting_time` rows are stored inconsistently: some naive Paris wall-clock, some tz-aware UTC (e.g. Glen↔Olga = `11:00+00:00`). The app display converts to Paris (shows 13:00, correct), but the confirmation-email formatter did `strftime("%H:%M") + " (Louvre time)"` on the raw value — mislabeling 11:00 UTC as "11:00 Louvre time". Fixed `matches.py` to `astimezone(Europe/Paris)` when tz-aware before formatting. Verified: stored 11:00Z now renders "Tue Jun 2 · 13:00 (Louvre time)".
+- **Past-slot greyout.** `free_slots()` now drops any slot already started (Paris `now`, injectable for tests). Booking grid (`AttendeeMatches.tsx`, `MyMatches.tsx`) disables past slots with "Already started" via new `isSlotPast()` helper. At 12:32 Paris the first bookable slot is now 13:00.
+- **Added 13:00 / 13:30 slots** to both days (backend `_RAW_SLOTS` + frontend `CONFERENCE_SLOTS`) so the next bookable today is 1:00 PM as requested.
+- **Default meeting location** changed from "Louvre Palace, Paris (exact spot shared at the venue)" → "B2B Lounge, Louvre Palace" (`matches.py`, both the booking default and email fallback).
+- Smoke tests: `npm run build` clean; `pytest tests/test_slots.py` 4 passed (added `test_free_slots_drops_past_slots`); formatter conversion verified against Glen's real row.
+- TODO (not yet done): send corrected confirmation email to Olga Shpunyakova (olgabonney@gmail.com) — meeting with Glen Cameron is 13:00 Tue Jun 2, B2B Lounge. EMAIL_MODE=off, so needs a forced one-off send; awaiting user go-ahead.

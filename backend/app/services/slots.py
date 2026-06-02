@@ -6,6 +6,7 @@ same list in `frontend/src/utils/matchHelpers.tsx::CONFERENCE_SLOTS`. Keep both 
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from uuid import UUID
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +24,7 @@ _RAW_SLOTS: list[tuple[str, str]] = [
     ("2026-06-02", "09:00"), ("2026-06-02", "09:30"),
     ("2026-06-02", "10:00"), ("2026-06-02", "10:30"),
     ("2026-06-02", "11:00"), ("2026-06-02", "11:30"),
+    ("2026-06-02", "13:00"), ("2026-06-02", "13:30"),
     ("2026-06-02", "14:00"), ("2026-06-02", "14:30"),
     ("2026-06-02", "15:00"), ("2026-06-02", "15:30"),
     ("2026-06-02", "16:00"), ("2026-06-02", "16:30"),
@@ -31,6 +33,7 @@ _RAW_SLOTS: list[tuple[str, str]] = [
     ("2026-06-03", "09:00"), ("2026-06-03", "09:30"),
     ("2026-06-03", "10:00"), ("2026-06-03", "10:30"),
     ("2026-06-03", "11:00"), ("2026-06-03", "11:30"),
+    ("2026-06-03", "13:00"), ("2026-06-03", "13:30"),
     ("2026-06-03", "14:00"), ("2026-06-03", "14:30"),
     ("2026-06-03", "15:00"), ("2026-06-03", "15:30"),
     ("2026-06-03", "16:00"), ("2026-06-03", "16:30"),
@@ -40,6 +43,11 @@ _RAW_SLOTS: list[tuple[str, str]] = [
 def all_slots() -> list[datetime]:
     """All bookable conference slots as naive datetimes (Paris wall-clock)."""
     return [datetime.fromisoformat(f"{d}T{t}:00") for d, t in _RAW_SLOTS]
+
+
+def _paris_now() -> datetime:
+    """Current Paris wall-clock as a naive datetime (matches slot semantics)."""
+    return datetime.now(ZoneInfo("Europe/Paris")).replace(tzinfo=None)
 
 
 def _normalise(dt: datetime | None) -> datetime | None:
@@ -69,9 +77,18 @@ async def busy_slots_for(db: AsyncSession, attendee_id: UUID) -> set[datetime]:
     return busy
 
 
-def free_slots(busy: set[datetime], limit: int | None = None) -> list[datetime]:
-    """Bookable slots minus busy. Returns chronological order."""
-    free = [s for s in all_slots() if s not in busy]
+def free_slots(
+    busy: set[datetime], limit: int | None = None, now: datetime | None = None
+) -> list[datetime]:
+    """Bookable slots minus busy and minus slots already past (Paris time).
+
+    Chronological order. Past-slot filtering keeps the "both free at" chips and
+    the full picker from ever offering a time that has already started at the venue.
+    `now` defaults to current Paris wall-clock; injectable for deterministic tests.
+    """
+    if now is None:
+        now = _paris_now()
+    free = [s for s in all_slots() if s not in busy and s >= now]
     return free[:limit] if limit else free
 
 
@@ -80,16 +97,18 @@ async def mutual_free_slots(
     attendee_a_id: UUID,
     attendee_b_id: UUID,
     limit: int | None = 4,
+    now: datetime | None = None,
 ) -> list[datetime]:
     """Slots free for both attendees.
 
     Default `limit=4` powers the one-click "Both free at" chip preview on a match
     card. Pass `limit=None` to get the COMPLETE set of both-parties-free slots so
     the full picker can grey out times that are already booked for either side.
+    `now` defaults to current Paris wall-clock; injectable for deterministic tests.
     """
     busy_a = await busy_slots_for(db, attendee_a_id)
     busy_b = await busy_slots_for(db, attendee_b_id)
-    return free_slots(busy_a | busy_b, limit=limit)
+    return free_slots(busy_a | busy_b, limit=limit, now=now)
 
 
 async def has_conflict(db: AsyncSession, attendee_id: UUID, when: datetime) -> bool:

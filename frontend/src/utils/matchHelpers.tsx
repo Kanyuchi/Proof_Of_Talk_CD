@@ -11,15 +11,27 @@ export function twitterUrl(handle: string): string {
 // Conference time slots — June 2 & 3, 2026
 export const CONFERENCE_SLOTS = [
   { day: "June 2", label: "Tue 2 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },
-  { day: "June 2", label: "Tue 2 Jun — Afternoon", slots: ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
+  { day: "June 2", label: "Tue 2 Jun — Afternoon", slots: ["13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
   { day: "June 2", label: "Tue 2 Jun — Evening", slots: ["18:00", "18:30", "19:00"] },
   { day: "June 3", label: "Wed 3 Jun — Morning", slots: ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30"] },
-  { day: "June 3", label: "Wed 3 Jun — Afternoon", slots: ["14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
+  { day: "June 3", label: "Wed 3 Jun — Afternoon", slots: ["13:00", "13:30", "14:00", "14:30", "15:00", "15:30", "16:00", "16:30"] },
 ];
 
 export function slotToISO(day: string, time: string): string {
   const dateStr = day === "June 2" ? "2026-06-02" : "2026-06-03";
   return `${dateStr}T${time}:00`;
+}
+
+/** True if a slot (Paris wall-clock) has already started. Compares against
+ *  current Paris time regardless of the viewer's device timezone, so a slot
+ *  that has passed at the venue is disabled for everyone. */
+export function isSlotPast(iso: string): boolean {
+  const slot = new Date(iso); // naive ISO → parsed as device-local wall-clock
+  // Current Paris wall-clock, expressed in the same device-local frame.
+  const parisNow = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }),
+  );
+  return slot.getTime() < parisNow.getTime();
 }
 
 export function formatMeetingTime(iso: string): string {

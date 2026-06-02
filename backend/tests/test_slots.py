@@ -13,15 +13,31 @@ from app.services import slots
 from app.services.slots import all_slots, free_slots, mutual_free_slots
 
 
+# Anchor "now" before the conference so past-slot filtering is a no-op and these
+# tests stay deterministic regardless of the wall-clock they run at.
+BEFORE_EVENT = datetime(2026, 6, 1, 0, 0)
+
+
 def test_free_slots_uncapped_returns_everything():
     """limit=None returns all bookable slots minus busy; limit=4 truncates."""
     busy = {datetime(2026, 6, 2, 9, 0)}
-    full = free_slots(busy, limit=None)
+    full = free_slots(busy, limit=None, now=BEFORE_EVENT)
     assert datetime(2026, 6, 2, 9, 0) not in full
-    # All other slots survive (27 total - 1 busy = 26).
+    # All other slots survive (full grid - 1 busy).
     assert len(full) == len(all_slots()) - 1
     # The default chip-preview cap still works.
-    assert len(free_slots(busy, limit=4)) == 4
+    assert len(free_slots(busy, limit=4, now=BEFORE_EVENT)) == 4
+
+
+def test_free_slots_drops_past_slots():
+    """Slots that have already started (relative to `now`) are never offered."""
+    # Mid-conference: 12:30 on June 2 — morning slots gone, 13:00 onward survive.
+    now = datetime(2026, 6, 2, 12, 30)
+    free = free_slots(set(), limit=None, now=now)
+    assert datetime(2026, 6, 2, 9, 0) not in free
+    assert datetime(2026, 6, 2, 11, 30) not in free
+    assert datetime(2026, 6, 2, 13, 0) in free  # next bookable today
+    assert datetime(2026, 6, 3, 9, 0) in free   # tomorrow untouched
 
 
 @pytest.mark.asyncio
@@ -36,7 +52,7 @@ async def test_mutual_free_slots_uncapped_returns_all_non_busy():
         return busy_a if attendee_id == a_id else busy_b
 
     with patch.object(slots, "busy_slots_for", side_effect=fake_busy):
-        free = await mutual_free_slots(AsyncMock(), a_id, b_id, limit=None)
+        free = await mutual_free_slots(AsyncMock(), a_id, b_id, limit=None, now=BEFORE_EVENT)
 
     # Neither party's booked slot is offered.
     assert datetime(2026, 6, 2, 16, 0) not in free
@@ -54,6 +70,6 @@ async def test_mutual_free_slots_default_limit_is_chip_preview():
         return set()
 
     with patch.object(slots, "busy_slots_for", side_effect=fake_busy):
-        preview = await mutual_free_slots(AsyncMock(), "A", "B")
+        preview = await mutual_free_slots(AsyncMock(), "A", "B", now=BEFORE_EVENT)
 
     assert len(preview) == 4

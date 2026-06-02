@@ -16,7 +16,7 @@ import { profileCompleteness } from "../utils/profileCompleteness";
 import { Lock, Zap } from "lucide-react";
 import { useState } from "react";
 import {
-  CONFERENCE_SLOTS, slotToISO, formatMeetingTime, formatSlotChip, downloadICS,
+  CONFERENCE_SLOTS, slotToISO, formatMeetingTime, formatSlotChip, downloadICS, isSlotPast,
   matchTypeConfig, ticketIcons, buildIcebreaker, twitterUrl,
 } from "../utils/matchHelpers";
 import { verticalDisplayName } from "../utils/verticals";
@@ -915,18 +915,24 @@ export default function MyMatches() {
                                         <div className="flex flex-wrap gap-1.5">
                                           {group.slots.map((time) => {
                                             const iso = slotToISO(selectedDay, time);
+                                            const isPast = isSlotPast(iso);
                                             const isBusy =
-                                              freeSet !== null && !freeSet.has(iso);
+                                              !isPast && freeSet !== null && !freeSet.has(iso);
+                                            const disabled = isPast || isBusy;
                                             return (
                                               <button
                                                 key={time}
-                                                onClick={() => !isBusy && setSelectedTime(time)}
-                                                disabled={isBusy}
+                                                onClick={() => !disabled && setSelectedTime(time)}
+                                                disabled={disabled}
                                                 title={
-                                                  isBusy ? "Already booked for one of you" : undefined
+                                                  isPast
+                                                    ? "Already started"
+                                                    : isBusy
+                                                    ? "Already booked for one of you"
+                                                    : undefined
                                                 }
                                                 className={`px-3 py-2 rounded-lg text-xs font-mono border transition-all min-h-[44px] flex items-center justify-center ${
-                                                  isBusy
+                                                  disabled
                                                     ? "bg-white/[0.02] border-white/5 text-white/20 line-through cursor-not-allowed"
                                                     : selectedTime === time
                                                     ? "bg-[#E76315]/20 border-[#E76315]/40 text-[#E76315]"

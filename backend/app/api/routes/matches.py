@@ -799,25 +799,29 @@ async def schedule_meeting(
             )
 
     match.meeting_time = data.meeting_time
-    match.meeting_location = data.meeting_location or "Louvre Palace, Paris (exact spot shared at the venue)"
+    match.meeting_location = data.meeting_location or "B2B Lounge, Louvre Palace"
 
     await db.commit()
     await db.refresh(match)
 
     # Fire-and-forget: send meeting confirmation to both parties
     try:
-        from datetime import timezone
+        from zoneinfo import ZoneInfo
         from app.services.email import send_meeting_confirmation_email
         attendee_a = await db.get(Attendee, match.attendee_a_id)
         attendee_b = await db.get(Attendee, match.attendee_b_id)
         if attendee_a and attendee_b and match.meeting_time:
-            # Format the time for the email (simple ISO → readable)
+            # Format the time for the email as Louvre (Europe/Paris) wall-clock.
+            # meeting_time may be tz-aware (UTC) or naive Paris wall-clock; only
+            # convert when tz-aware, otherwise it is already Paris local.
             dt = match.meeting_time
             if hasattr(dt, "strftime"):
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone(ZoneInfo("Europe/Paris"))
                 time_str = dt.strftime("%a %b %-d · %H:%M") + " (Louvre time)"
             else:
                 time_str = str(match.meeting_time)
-            location = match.meeting_location or "Louvre Palace, Paris"
+            location = match.meeting_location or "B2B Lounge, Louvre Palace"
             for recipient, partner in [(attendee_a, attendee_b), (attendee_b, attendee_a)]:
                 if recipient.email:
                     send_meeting_confirmation_email(
