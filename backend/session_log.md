@@ -102,3 +102,17 @@
 - State: 421 attendees ever LinkedIn-enriched; 242 in last 7d; 37 in last 24h; most recent stamp 2026-05-21T18:06 — but that coincides with today's extasy-sync enrichment of new rows (the auto-fallback path), NOT a manual operator Playwright scrape.
 - Last evidence of a MANUAL operator scrape session: exports `attendees_missing_linkedin_20260504.xlsx` (May 4) + `diagnose_photo_dom.json` photo diagnostic (May 19). `updated_at` is useless as a proxy (sweep/match-refresh touch every row).
 - Session covered: Tommi/forgot-password fix + surgical force (deployed), pending-count 422 fix (deployed+verified), bulk-rebuild blast guard (notify=False), all 4 sync crons fixed + SMOKE-TESTED green on prod, welcome waves 2+3 (261 sent/462 remaining), deleted duplicate sithum attendee row.
+
+## 2026-06-02 12:45 — [meeting-times-tz] Systemic fix (app = source of truth), not per-person; B2B Lounge backfill
+
+- Clarified intent: do NOT rewrite anyone's meeting time. The app time is the single source of truth; the confusion was app (13:00) vs the old email (11:00). Fix is systemic for everyone, not an Olga-specific email — dropped scripts/send_olga_glen_confirmation.py.
+- Frontend (concurrent-session edit, kept): formatMeetingTime/formatSlotChip now render in Europe/Paris via toInstant(), labeled "(Louvre time)" — app + email now agree for every viewer on any device.
+- Backfilled meeting_location for all 243 booked matches: 'Louvre Palace, Paris (exact spot shared...)' -> 'B2B Lounge, Louvre Palace' so the B2B Lounge point shows for everyone already booked, not just new bookings.
+- No meeting_time values changed.
+
+## 2026-06-02 18:35 — [account-recovery] Created missing attendee row for Jesus Lander (jedlanca@gmail.com)
+- Problem: Jesus Lander couldn't activate/register. He bought nothing himself - his General Pass was assigned to him on order JGUGc2sTHz, **bought by Jean-Andre Villamizar** (jean@HODLmarkets.com). extasy_sync is buyer-keyed, so it only created the buyer's attendee row; Jesus had no row. Registration's live-Extasy fallback (find_extasy_order_by_email) searches the ORDERS feed by email, and jedlanca@gmail.com only appears in the TICKETS feed -> he'd hit "we couldn't find a ticket".
+- Fix: created attendee 98ed2763-ef96-4f98-80a0-e8ada6518a60 from his tickets-feed row via attendee_from_extasy_order (General Pass -> DELEGATE, country GBR, phone +447539501349, source=extasy_ticket_recovery, ticket_qr SvXDXb59, buyer_email recorded). Assigned magic_access_token.
+- Ran run_full_enrichment + refresh_profile_matches (same as register flow): embedding set, **17 matches** generated. enriched_at still NULL (sparse gmail profile -> factual stub; harmless, re-runs on first register).
+- He can now register at meet.proofoftalk.io with jedlanca@gmail.com and pass the ticket gate.
+- CLASS OF BUG: anyone whose ticket was bought/assigned by a different buyer is invisible to the buyer-keyed sync + the orders-only register fallback. Recommend: extend find_extasy_order_by_email (or a sweep) to also match the TICKETS feed by ticket-holder email.
