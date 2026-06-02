@@ -34,23 +34,44 @@ export function isSlotPast(iso: string): boolean {
   return slot.getTime() < parisNow.getTime();
 }
 
+// Meeting/slot times must ALWAYS read as Louvre (Europe/Paris) wall-clock, never
+// the viewer's device timezone — otherwise the app and the confirmation email
+// disagree (e.g. app 18:00 vs email 16:00) for anyone not on a Paris clock.
+const PARIS_TZ = "Europe/Paris";
+
+/** Normalise a backend ISO string to a single absolute instant.
+ *
+ *  Two formats reach the frontend for the same grid:
+ *   - free-slot chips come from `all_slots()` as NAIVE ISO ("2026-06-02T18:00:00")
+ *     which is Paris wall-clock;
+ *   - a booked `meeting_time` comes from a `timestamptz` column WITH an offset
+ *     ("2026-06-02T16:00:00+00:00") which is a real instant.
+ *  The conference (June 2-3 2026) sits entirely in CEST (UTC+02:00) with no DST
+ *  change, so a naive string is pinned to +02:00 rather than the device tz.
+ *  Offset-bearing strings pass through unchanged. Callers then render in PARIS_TZ
+ *  so every attendee, on any device, sees identical Louvre time. */
+function toInstant(iso: string): Date {
+  const hasTz = /([zZ])|([+-]\d{2}:?\d{2})$/.test(iso);
+  return new Date(hasTz ? iso : `${iso}+02:00`);
+}
+
 export function formatMeetingTime(iso: string): string {
-  const d = new Date(iso);
+  const d = toInstant(iso);
   return d.toLocaleString("en-GB", {
     weekday: "short", day: "numeric", month: "long",
     hour: "2-digit", minute: "2-digit",
-  });
+    timeZone: PARIS_TZ,
+  }) + " (Louvre time)";
 }
 
-/** Compact slot label for one-click-book chips, e.g. "Tue 09:30". */
+/** Compact slot label for one-click-book chips, e.g. "Tue 09:30" (Louvre time). */
 export function formatSlotChip(iso: string): string {
-  // Slots come from the backend as naive ISO strings ("2026-06-02T09:00:00").
-  // Treat them as wall-clock — `new Date(iso)` parses naive ISO as local time.
-  const d = new Date(iso);
-  const day = d.getDate() === 2 ? "Tue" : "Wed";
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${day} ${hh}:${mm}`;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short", hour: "2-digit", minute: "2-digit",
+    hour12: false, timeZone: PARIS_TZ,
+  }).formatToParts(toInstant(iso));
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("weekday")} ${get("hour")}:${get("minute")}`;
 }
 
 export function downloadICS(
@@ -61,7 +82,7 @@ export function downloadICS(
   location: string,
   explanation: string,
 ) {
-  const start = new Date(meetingTime);
+  const start = toInstant(meetingTime);
   const end = new Date(start.getTime() + 30 * 60 * 1000); // 30-min block
   const fmt = (d: Date) =>
     d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";

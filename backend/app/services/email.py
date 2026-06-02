@@ -489,6 +489,7 @@ def send_meeting_confirmation_email(
     meeting_time_str: str,
     meeting_location: str,
     app_url: str | None = None,
+    force: bool = False,
 ) -> None:
     """Send a meeting confirmation email with time/location when a slot is booked.
 
@@ -541,7 +542,7 @@ def send_meeting_confirmation_email(
         f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
     )
 
-    _send_email(to_email, subject, body_html, body_text)
+    _send_email(to_email, subject, body_html, body_text, force=force)
 
 
 def send_welcome_email(
