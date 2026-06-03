@@ -91,3 +91,23 @@ def test_declined_dropped():
     visible, locked = order_and_cap(vms, limit=10)
     assert [round(v.overall_score, 2) for v in visible] == [0.70]
     assert locked == 0
+
+
+def test_viewer_limit_override():
+    """Per-attendee enriched_profile.match_visibility_limit widens one viewer's
+    window without affecting the tier mapping; absent/invalid falls back to tier."""
+    from types import SimpleNamespace
+    from app.api.routes.matches import _viewer_limit
+
+    # No override -> tier limit
+    a = SimpleNamespace(enriched_profile={})
+    assert _viewer_limit(a, "GOOD") == 20
+    assert _viewer_limit(a, "SPARSE") == 5
+    # Override widens it
+    a2 = SimpleNamespace(enriched_profile={"match_visibility_limit": 70})
+    assert _viewer_limit(a2, "SPARSE") == 70
+    # Invalid override ignored
+    a3 = SimpleNamespace(enriched_profile={"match_visibility_limit": 0})
+    assert _viewer_limit(a3, "PARTIAL") == 10
+    a4 = SimpleNamespace(enriched_profile=None)
+    assert _viewer_limit(a4, "GOOD") == 20

@@ -176,6 +176,17 @@ async def _load_priority_intros(db: AsyncSession, attendee_id) -> list[PriorityI
     return out
 
 
+def _viewer_limit(attendee: Attendee, tier: str) -> int:
+    """Per-viewer review-pool cap. Defaults to the completeness-tier limit, but
+    an optional per-attendee override in enriched_profile.match_visibility_limit
+    lets us widen one person's window (e.g. a manual "show 50 more") without
+    changing the tier mapping for everyone else."""
+    override = (getattr(attendee, "enriched_profile", None) or {}).get("match_visibility_limit")
+    if isinstance(override, int) and override > 0:
+        return override
+    return tier_limit(tier)
+
+
 @router.get("/{attendee_id}", response_model=MatchListResponse)
 async def get_matches(
     attendee_id: UUID,
@@ -216,7 +227,7 @@ async def get_matches(
         )
 
     vms = [_to_viewer_match(m, attendee_id) for m in rows]
-    visible, locked = order_and_cap(vms, tier_limit(tier))
+    visible, locked = order_and_cap(vms, _viewer_limit(attendee, tier))
     responses = [await _build_match_response(db, vm.match, attendee_id) for vm in visible]
     return MatchListResponse(
         matches=responses, attendee_id=attendee_id, tier=tier,
@@ -264,7 +275,7 @@ async def get_matches_by_magic_link(
     tier = profile_data_quality(attendee)
     pct = compute_completeness_pct(attendee)
     vms = [_to_viewer_match(m, attendee.id) for m in rows]
-    visible, locked = order_and_cap(vms, tier_limit(tier))
+    visible, locked = order_and_cap(vms, _viewer_limit(attendee, tier))
     responses = [await _build_match_response(db, vm.match, attendee.id) for vm in visible]
 
     # Drives the MagicMatches "Set your password" panel: default-expanded for
