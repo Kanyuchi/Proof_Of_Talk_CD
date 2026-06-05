@@ -38,6 +38,7 @@ def _send_email(
     text: str | None = None,
     attachments: list[dict] | None = None,
     force: bool = False,
+    critical: bool = False,
 ) -> bool:
     """Send an email via Resend. Returns True on success, False on failure.
 
@@ -56,10 +57,23 @@ def _send_email(
     stays "allowlist" — so the *automated* triggers (match intros, mutual
     matches, password resets) remain gated until the team is ready to flip
     EMAIL_MODE=all. Never set force=True from a request-triggered path.
+
+    `critical=True` marks account-recovery mail (password reset). It is the
+    ONLY thing that survives EMAIL_GLOBAL_DISABLED — the master kill-switch
+    that blocks every other send regardless of force/EMAIL_MODE.
     """
     settings = get_settings()
     if not settings.RESEND_API_KEY:
         logger.debug("RESEND_API_KEY not set — email skipped")
+        return False
+
+    # Master kill-switch: drop everything except critical account-recovery
+    # mail. Sits above force/EMAIL_MODE so it cannot be bypassed.
+    if settings.EMAIL_GLOBAL_DISABLED and not critical:
+        logger.info(
+            "EMAIL_GLOBAL_DISABLED — skipped non-critical send to %s (subject: %s)",
+            to_email, subject[:50],
+        )
         return False
 
     mode = "all" if force else (settings.EMAIL_MODE or "off").strip().lower()
@@ -292,7 +306,9 @@ def send_password_reset_email(
         f"Proof of Talk, The Louvre, Paris, June 2 and 3, 2026"
     )
 
-    _send_email(to_email, subject, body_html, body_text, force=force)
+    # critical=True: account recovery survives EMAIL_GLOBAL_DISABLED so a
+    # locked-out user can always reset, even with the email system fully off.
+    _send_email(to_email, subject, body_html, body_text, force=force, critical=True)
 
 
 def send_match_intro_email(

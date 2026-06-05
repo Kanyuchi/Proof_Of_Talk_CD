@@ -1954,3 +1954,11 @@ Three more email-cadence wins on top of the digest cron above. All on origin/mai
 - My earlier +2h commits (`5068a50`, `bc9d5bc`) were superseded by the other session's `2aef10e`. My complementary changes remain and are fine: past-slot greyout + `isSlotPast()` + 13:00/13:30 slots. My stale default location string was already replaced by their `normalise_location()`.
 - Locations: all 250 booked matches now read "B2B Networking Lounge (Edge & Node)" (their re-backfill over my earlier "B2B Lounge, Louvre Palace"). No stale rows.
 - Residual: the one-off email I sent Olga Shpunyakova at 10:56 UTC said 13:00; her meeting with Glen was booked 11:00 (already past by resolution time, so moot). That was sent during the mistaken +2h window — flagged, not chased.
+
+## 2026-06-05 09:20 — Master email kill-switch (EMAIL_GLOBAL_DISABLED) [topic: email]
+- Added `EMAIL_GLOBAL_DISABLED` setting (default False) in `config.py`. When true, `_send_email` drops EVERY outbound message regardless of `EMAIL_MODE` or `force=True` — match intros, mutual-match, engagement, reciprocity cron, operator batch scripts, the forgot-password welcome branch — everything.
+- ONE exception: account-recovery mail marked `critical=True`. `send_password_reset_email` now passes `critical=True`, so locked-out users can still reset even with email fully off. Gate sits above force/EMAIL_MODE so it can't be bypassed.
+- Why a new flag: `EMAIL_MODE=off` alone does NOT stop the `force=True` paths (password reset, reciprocity cron, operator scripts). This is the real single off-switch the team can flip.
+- Verified: unit-tested the gate with a stubbed `httpx.post` — non-critical force send returns False with 0 network calls; critical send returns True with 1 network call. PASS.
+- Local `.env` set to `EMAIL_GLOBAL_DISABLED=true`; documented in `.env.example`.
+- ACTION REQUIRED for production: set `EMAIL_GLOBAL_DISABLED=true` on Railway. Code default is False, so prod email keeps working until that env var is flipped.

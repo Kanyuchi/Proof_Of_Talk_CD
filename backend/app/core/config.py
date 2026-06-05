@@ -73,6 +73,15 @@ class Settings(BaseSettings):
     # revokes the old link.
     SPONSOR_INVITE_CODE: str = ""
 
+    # Master kill-switch for the ENTIRE email system. When true, _send_email
+    # drops every outbound message regardless of EMAIL_MODE or force=True —
+    # match intros, mutual-match, engagement, reciprocity cron, operator batch
+    # scripts, everything. The ONE exception is account-recovery mail marked
+    # critical=True (password reset), so locked-out users can still get back in.
+    # This is the real off-switch: EMAIL_MODE=off alone does NOT stop the
+    # force-send paths. Default False; flip true on Railway to go fully dark.
+    EMAIL_GLOBAL_DISABLED: bool = False
+
     EMAIL_MODE: str = "off"
     # Comma-separated; used when EMAIL_MODE=allowlist. Entries starting with
     # "@" match a whole domain (e.g. "@proofoftalk.io"), others are exact
