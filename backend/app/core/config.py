@@ -79,8 +79,13 @@ class Settings(BaseSettings):
     # scripts, everything. The ONE exception is account-recovery mail marked
     # critical=True (password reset), so locked-out users can still get back in.
     # This is the real off-switch: EMAIL_MODE=off alone does NOT stop the
-    # force-send paths. Default False; flip true on Railway to go fully dark.
-    EMAIL_GLOBAL_DISABLED: bool = False
+    # force-send paths (match digest, reciprocity cron, welcome, meeting
+    # confirmation all force-send).
+    # Default True (post-event, 2026-06-10): the whole system ships dark so no
+    # deploy can email without a deliberate opt-in. To re-enable, set
+    # EMAIL_GLOBAL_DISABLED=false on Railway AND ensure EMAIL_MODE / the
+    # per-cron flags (MATCH_DIGEST_ENABLED, RECIPROCITY_NOTIFY_ENABLED) are set.
+    EMAIL_GLOBAL_DISABLED: bool = True
 
     EMAIL_MODE: str = "off"
     # Comma-separated; used when EMAIL_MODE=allowlist. Entries starting with

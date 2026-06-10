@@ -1962,3 +1962,11 @@ Three more email-cadence wins on top of the digest cron above. All on origin/mai
 - Verified: unit-tested the gate with a stubbed `httpx.post` — non-critical force send returns False with 0 network calls; critical send returns True with 1 network call. PASS.
 - Local `.env` set to `EMAIL_GLOBAL_DISABLED=true`; documented in `.env.example`.
 - ACTION REQUIRED for production: set `EMAIL_GLOBAL_DISABLED=true` on Railway. Code default is False, so prod email keeps working until that env var is flipped.
+
+## 2026-06-10 14:20 — Email kill-switch now defaults ON (matchmaking emails still firing) [topic: email]
+- Report: matchmaking emails still going out despite EMAIL_GLOBAL_DISABLED added 2026-06-05. Root cause: the flag was never set true on Railway, and EMAIL_MODE=off was NEVER stopping these — the match-digest cron (09:00 UTC), reciprocity cron (every 2h), welcome, and meeting-confirmation all send with force=True, which bypasses EMAIL_MODE entirely. Only EMAIL_GLOBAL_DISABLED stops force-sends.
+- Audit confirmed: every email path funnels through the single `_send_email` (one httpx.post to Resend, no bypass). So the master switch covers 100% of outbound mail.
+- Fix: flipped the CODE DEFAULT `EMAIL_GLOBAL_DISABLED = True` in config.py. The whole email system now ships dark on deploy — no Railway env var needed. Password reset (critical=True) still works.
+- Verified with env vars cleared (pure default): intro/digest/welcome force-sends all return False with 0 network calls; password reset reaches Resend (1 call). PASS.
+- To re-enable later: set EMAIL_GLOBAL_DISABLED=false on Railway AND set EMAIL_MODE + MATCH_DIGEST_ENABLED / RECIPROCITY_NOTIFY_ENABLED as needed.
+- Which emails were still capable of firing pre-fix: match digest, forward-interest/mutual-match, welcome/magic-link, meeting confirmation (all force=True). Match-intro was already blocked by EMAIL_MODE=off.
