@@ -1970,3 +1970,13 @@ Three more email-cadence wins on top of the digest cron above. All on origin/mai
 - Verified with env vars cleared (pure default): intro/digest/welcome force-sends all return False with 0 network calls; password reset reaches Resend (1 call). PASS.
 - To re-enable later: set EMAIL_GLOBAL_DISABLED=false on Railway AND set EMAIL_MODE + MATCH_DIGEST_ENABLED / RECIPROCITY_NOTIFY_ENABLED as needed.
 - Which emails were still capable of firing pre-fix: match digest, forward-interest/mutual-match, welcome/magic-link, meeting confirmation (all force=True). Match-intro was already blocked by EMAIL_MODE=off.
+
+## 2026-06-10 14:25 — Verified emails OFF in PROD (Resend ground truth) [topic: email]
+- Pulled Resend's actual send log: emails WERE going out today — "Someone wants to meet you at Proof of Talk" / "N people want to meet you", ~20 sends 09:54-09:56 UTC. Source = forward-interest notifications (send_interest_notification, force=True) via the reciprocity path.
+- Root cause of "still sending": the force=True interest emails bypass EMAIL_MODE; the running prod build at 09:56 predated/ignored the EMAIL_GLOBAL_DISABLED gate. EMAIL_MODE=off never stopped them.
+- Locked down via Railway CLI (authed as shaun@proofoftalk.io, project observant-achievement/production):
+  - EMAIL_GLOBAL_DISABLED=true (env) + code default now True (commit 7cfbce7, deployed 14:18)
+  - EMAIL_MODE=off, MATCH_DIGEST_ENABLED=false, RECIPROCITY_NOTIFY_ENABLED=false
+  - Forced a clean `railway redeploy`; health 200 on the new container.
+- VERIFIED OFF: Resend most-recent send is still 09:56:50 UTC — zero sends in the ~2.5h since (incl. the ~11:56 UTC every-2h interest-cron window that previously fired). Nothing sent after the lockdown.
+- Password reset still works (critical=True survives the kill-switch).
